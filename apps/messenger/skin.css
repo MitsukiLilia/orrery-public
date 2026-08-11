@@ -34,8 +34,11 @@
     font-size: 11px; padding: 3px 12px; border-radius: 12px;
 }
 
-.or-msg-row { display: flex; align-items: flex-end; gap: 8px; max-width: 100%; position: relative; }
-.or-msg-row.me { flex-direction: row-reverse; }
+/* 行=竖着三层(名字/气泡行/时间);头像只跟气泡对齐,不受名字和时间行的高度影响。
+   AVATAR_LANE = 头像 28px + gap 8px,名字与时间靠它缩进,好和气泡左缘对齐。 */
+.or-msg-row { display: flex; flex-direction: column; max-width: 100%; --or-avatar-lane: 36px; }
+.or-msg-line { display: flex; align-items: flex-start; gap: 8px; position: relative; }
+.or-msg-row.me .or-msg-line { flex-direction: row-reverse; }
 .or-msg-avatar {
     width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
@@ -44,6 +47,7 @@
 .or-msg-avatar.hidden { visibility: hidden; }
 .or-msg-col { display: flex; flex-direction: column; max-width: 74%; }
 .or-msg-row.me .or-msg-col { align-items: flex-end; }
+.or-sender-name { padding-left: var(--or-avatar-lane); }
 .or-bubble {
     padding: 9px 13px; font-size: 13.5px; line-height: 1.5;
     color: var(--or-cocoa); word-break: break-word; white-space: pre-wrap;
@@ -53,8 +57,10 @@
 .or-msg-meta {
     display: flex; align-items: center; gap: 4px; margin-top: 2px;
     font-size: 10.5px; color: var(--or-cocoa-light);
+    padding-left: var(--or-avatar-lane); /* 与气泡左缘对齐 */
 }
-.or-msg-row.me .or-msg-meta { flex-direction: row-reverse; }
+/* 自己这侧没有头像,时间靠右贴气泡 */
+.or-msg-row.me .or-msg-meta { flex-direction: row-reverse; justify-content: flex-start; padding-left: 0; }
 
 /* 反悔删除小按钮:默认藏,hover / 长按解锁的 .show-revert 才露出 */
 .or-msg-revert {

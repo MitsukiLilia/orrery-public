@@ -113,16 +113,22 @@ export function renderThreadHtml({ thread, world, busy, worldNow }) {
             meta = `<div class="or-msg-meta">${readTag}<span>${formatClock(m.displayTs)}</span></div>`;
         }
 
-        body += `<div class="or-msg-row ${isMe ? 'me' : ''}" data-ts="${m.ts}">`;
-        if (!isMe) {
-            body += showAvatar
+        // 行内三层:发送者名 / 头像+气泡那一行 / 时间。名字和时间**必须在气泡行之外**——
+        // 它们此前都塞在同一个 flex 行里,头像按 align-items 贴的是整行的底,于是被时间行拽到
+        // 气泡下方;同一人连发时,第一行的底又正好落在两个气泡中间(她真机截图指出)。
+        // 摘出去之后,头像只与气泡对齐(顶对齐),气泡多长都不影响。
+        const avatar = !isMe
+            ? (showAvatar
                 ? `<div class="or-msg-avatar" style="background-color:${sender?.color || '#CFCDBE'}">${escapeHtml(sender?.monogram || '?')}</div>`
-                : `<div class="or-msg-avatar hidden"></div>`;
-        }
+                : '<div class="or-msg-avatar hidden"></div>')
+            : '';
         const senderName = (isGroup && showAvatar && sender) ? `<div class="or-sender-name">${escapeHtml(sender.name)}</div>` : '';
         const zhLine = m.zh && m.zh !== m.text ? `<div class="or-zh">${escapeHtml(m.zh)}</div>` : '';
-        body += `<div class="or-msg-col">${senderName}<div class="or-bubble">${escapeHtml(m.text)}${zhLine}</div>${meta}</div>`;
-        body += `<button class="or-msg-revert" data-action="revert" data-ts="${m.ts}" title="从这条起删除本线程之后的所有消息">${ICON_UNDO}</button>`;
+        body += `<div class="or-msg-row ${isMe ? 'me' : ''}" data-ts="${m.ts}">`;
+        body += senderName;
+        body += `<div class="or-msg-line">${avatar}<div class="or-msg-col"><div class="or-bubble">${escapeHtml(m.text)}${zhLine}</div></div>`;
+        body += `<button class="or-msg-revert" data-action="revert" data-ts="${m.ts}" title="从这条起删除本线程之后的所有消息">${ICON_UNDO}</button></div>`;
+        body += meta;
         body += `</div>`;
     }
 
