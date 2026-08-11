@@ -1,15 +1,29 @@
 // 世界模型:worldKey 计算 + 账本 fold。不 import 任何 UI,不碰 IndexedDB(纯函数)。
 
 /**
- * worldKey = 角色卡 avatar 文件名 + '::' + chatId。ST 群聊/角色或聊天缺失时返回 null——
- * 注意:ST 的群聊(group chat)不支持;小世界内部的群聊(type='group' 条目)与此无关。
+ * worldKey:世界的身份钥匙。ST 群聊/角色或聊天缺失时返回 null(ST 群聊不支持;
+ * 小世界内部的群聊 type='group' 与此无关)。
+ *
+ * ⚠️身份冻结(2026-08-11 源码核查后的修):文件名 key(avatar::chatId)在 ST 里会漂——
+ * 改聊天名、改角色名、导出再导入都会换文件名,世界瞬间孤儿化(数据在,钥匙对不上)。
+ * 所以首次使用时把当时的文件名 key **冻进 chat_metadata**(它躺在聊天文件里,随文件走,
+ * 改名/导入导出全都带着),此后永远读 metadata——钥匙从此不再跟文件名走。
+ * 旧世界零迁移:冻结值就取当时的 legacy key,老数据直接无缝。
  */
 export function computeWorldKey(ctx) {
     if (ctx.groupId) return null;
     const avatar = ctx.characters?.[ctx.characterId]?.avatar;
     const chatId = typeof ctx.getCurrentChatId === 'function' ? ctx.getCurrentChatId() : ctx.chatId;
     if (!avatar || !chatId) return null;
-    return `${avatar}::${chatId}`;
+    const legacy = `${avatar}::${chatId}`;
+    const meta = ctx.chatMetadata;
+    if (meta && typeof meta === 'object') {
+        if (meta.orrery_world_id) return meta.orrery_world_id;
+        meta.orrery_world_id = legacy;
+        ctx.saveMetadataDebounced?.();
+        return legacy;
+    }
+    return legacy; // metadata 尚未就绪(启动极早期):先用 legacy 顶着,就绪后冻结的仍是同一值
 }
 
 // 联系人头像色板,与 --or-* 皮肤色系同族但互相可辨。顺序固定,靠 contactId 哈希稳定取色——

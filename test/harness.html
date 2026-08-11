@@ -309,8 +309,11 @@
         },
     };
 
+    let mockChatMetadata = {};
     const ctx = {
         chat, characters, characterId: 0, groupId: null,
+        get chatMetadata() { return mockChatMetadata; },
+        saveMetadataDebounced: () => {},
         get chatId() { return makeChatId(); },
         getCurrentChatId: makeChatId,
         name1: '用户', name2: '小满',
@@ -377,6 +380,7 @@
             log(`MESSAGE_SWIPED(${n})`);
         } else if (act === 'chat-changed') {
             chatCounter++;
+            mockChatMetadata = {}; // 新聊天=新 metadata,别把上一个世界冻结的 ID 带过去
             chat.length = 0;
             chat.push({ name: '小满', is_user: false, mes: '（新聊天的第一层。）' });
             await eventSource.emit(eventTypes.CHAT_CHANGED, makeChatId());
