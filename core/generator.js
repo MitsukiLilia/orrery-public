@@ -587,7 +587,7 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
 
     for (const t of parsed.threads) {
         if (!t || !t.threadId) continue;
-        const threadId = String(t.threadId);
+        let threadId = String(t.threadId);
 
         if (t.newContact?.name && !allowUserContact && isUserSide(t.newContact.name, ctx)) {
             console.warn('[Orrery] 已拦下叙事另一方越界进通讯录:', t.newContact.name);
@@ -614,8 +614,35 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
             }
         }
 
+        // ── 线程身份归一 ──
+        // 私聊线程的身份「就是」联系人 id 本身(world.js:111 dm 的 contactId = threadId),群聊同理。
+        // 但提示词只说 threadId="已有线程id或新id",从没要求它等于 contactId,模型于是很自然地
+        // 给一个装饰性的线程名(chat_xxx)配一个不同的联系人 id(xxx_1)。此前这种线程会被下面
+        // 的存在性检查整批丢掉,而联系人已在上面建好——症状就是「通讯录里有人、点进去聊天是空的」
+        // (真机实锤:后端 JSON 完整、finish_reason=stop,前端整段空白且无报错)。
+        // 认线程一律以本批声明的 contactId/groupId 为准,threadId 只当模型的临时标签。
+        if (!world.contacts.has(threadId) && !world.groups.has(threadId)) {
+            const gid = t.newGroup?.groupId ? String(t.newGroup.groupId) : null;
+            const cid = t.newContact?.contactId ? String(t.newContact.contactId) : null;
+            if (gid && world.groups.has(gid)) threadId = gid;
+            else if (cid && world.contacts.has(cid)) threadId = cid;
+            else {
+                // 再兜一层:没声明新身份(联系人早已存在)但线程名又对不上时,看消息发送者——
+                // 私聊里非 me 的发送者只会是对面那位,唯一且已知就认它。
+                const senders = [...new Set((Array.isArray(t.messages) ? t.messages : [])
+                    .map(m => m?.sender).filter(s => s && s !== 'me').map(String))];
+                if (senders.length === 1 && world.contacts.has(senders[0])) threadId = senders[0];
+            }
+        }
+
         const isGroup = world.groups.has(threadId);
-        if ((!isGroup && !world.contacts.has(threadId)) || !Array.isArray(t.messages)) continue;
+        if ((!isGroup && !world.contacts.has(threadId)) || !Array.isArray(t.messages)) {
+            // 静默丢弃是最难自查的失败:后端明明返回了消息,前端一片空白且无任何报错。
+            if (Array.isArray(t.messages) && t.messages.length) {
+                console.warn('[Orrery] 线程', threadId, '认不出对应的联系人/群组,', t.messages.length, '条消息被丢弃');
+            }
+            continue;
+        }
         const valid = t.messages.filter(m => m && m.text);
         const times = layoutWorldTimes(valid, anchor, world.threads.get(threadId)?.lastMessage?.displayTs);
         for (let i = 0; i < valid.length; i++) {
@@ -777,7 +804,11 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     }
 
     for (const t of Array.isArray(parsed.newThreads) ? parsed.newThreads : []) {
-        if (!t?.boardId || !t?.title || !validAuthor(t.authorId) || !world.boards.has(String(t.boardId))) continue;
+        if (!t?.boardId || !t?.title || !validAuthor(t.authorId) || !world.boards.has(String(t.boardId))) {
+            // 丢弃是既定策略(查无此人/查无此板的帖不入账),但必须留声——否则又是「后端有、前端空」
+            if (t?.title) console.warn('[Orrery] 新帖', t.title, '因板块或作者查无此项被丢弃');
+            continue;
+        }
         const threadId = makeForumThreadId();
         const payload = {
             threadId, boardId: String(t.boardId), title: String(t.title), authorId: String(t.authorId),
