@@ -15,6 +15,11 @@ function waitForExtensionsMenu(cb) {
     }, 400);
 }
 
+// 自报家门:排查「更新了却在跑旧码」(酒馆本地/全局双副本、静默 pull 失败)时,
+// 让实际加载的这份代码自己在控制台亮明版本——比对扩展管理器显示的版本号即知真伪。
+export const ORRERY_VERSION = '0.6.13';
+console.info(`[Orrery] v${ORRERY_VERSION} 已加载 · 输出预算 65500`);
+
 function main() {
     // ⚠️不许持有 getContext() 的一次性快照:characterId/chatId 等是取值瞬间的标量,
     // 扩展加载时用户往往还没选卡,快照会把 undefined 冻结进来(真机首日 bug:worldKey 恒 null,
