@@ -11,10 +11,10 @@ export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎�
 3. 视角纪律。每个人只知道自己视角内能知道的事(在场、被告知、公开可见)。不许任何人未卜先知。
 4. 消息像真人打字:短句、口语、省略,贴合各人身份与关系亲疏。不写小说腔,不用书面语转述剧情。
 5. {{LANG_RULE}}
-6. 克制:本次共 2〜8 条消息,分布在 1〜3 个线程;只在正文有依据或关系上合理时才新建联系人,一次最多新建 1 位(首次生成除外,首次可从正文推断 2〜4 位联系人把手机初始化)。
+6. 克制与规模感:本次共 2〜8 条消息,分布在 1〜3 个线程。通讯录是主人生活的横截面,不是无限清单——总量维持在真人手机的活跃规模(约 6〜12 个线程),接近上限时优先让已有线程发生新动静而不是添人。新联系人必须有名有姓有身份:优先从【人物设定参考】与原著既定事实里挖掘(上级、下属、家人、原著配角——关系疏远、冷淡、常年不联系的家人也是家人,催婚的、只发节日祝福的都很真实);故事开始前主人不是空心人。没有名字的路人不配进通讯录。一次最多新建 1 位(首次生成除外,首次可推断 2〜4 位初始化)。
 7. 联系人纪律(最重要,违反即全盘失败)。手机里只能出现主人**在剧情中已经认识、且合理交换过联系方式**的人。判断只看剧情事实,不看叙事结构:正文哪怕通篇是两个人的双线叙事,只要剧情里他们尚未相识,对方就绝不能出现在通讯录——素未谋面的人不会躺在彼此的手机里。不要被任何先验带偏(比如默认两位主角是恋人或熟人)。宁缺勿滥:联系人晚一点出现,永远比过早出现真实。
 8. 熟稔度纪律。就算是真联系人,消息的语气亲疏也必须匹配剧情当前的关系阶段:刚认识就客气生分,熟人才随意,恋人才亲昵。关系阶段以正文为准,不许自行升温。
-9. 群聊也是余波的舞台。主人的工作群/朋友群/同好群里,事件会以八卦、吐槽、歪楼的形式荡开;主人可以全程潜水。建群要有剧情依据(主人的职业、圈子),首次初始化最多 1 个群;群成员不必都是通讯录好友,但每个成员要有稳定的 id 和身份感。
+9. 群聊也是余波的舞台,而且群聊有谱系:对上的汇报群、对下的指挥群、家族群、朋友群、同好群——主人在不同群里露出不同的人格面(工作群拘谨、朋友群放松、家族群潜水)。建群要有剧情或原著设定依据,别只盯着一种群造;首次初始化最多 1 个,之后按需。主人可以全程潜水;群成员不必都是通讯录好友,但每个成员要有稳定的 id 和身份感。
 10. OOC 纪律。主线人物及其身边人的一切言行,必须符合【人物设定参考】与正文已确立的性格;参考里没有的地方保持克制,不得自行发明重大设定。
 
 # 输出
@@ -231,6 +231,15 @@ async function buildCastReference(ctx, floorTexts) {
     return parts.length ? `【人物设定参考(权威;主线人物言行以此为准,不得OOC)】\n${parts.join('\n')}\n\n` : '';
 }
 
+// user 侧硬防线:提示词纪律 Gemini 屡教不改(她真机三抓),消化层直接拒收名字匹配叙事另一方的
+// 联系人/群成员/住民小号。剧情真到相识时,设置里「允许叙事另一方登场」手动解禁——导演权在她。
+function isUserSide(name, ctx) {
+    const u = (ctx.name1 || '').trim();
+    if (!u || !name) return false;
+    const n = String(name).trim();
+    return n === u || n.includes(u) || u.includes(n);
+}
+
 function recentFloorTexts(ctx, count = 6) {
     // 与 ST 自身调用习惯一致(script.js:4455):带发言人名(可命中世界书人名关键词)、新→旧倒序
     return ctx.chat.slice(-count)
@@ -360,13 +369,13 @@ function pendingOrRegrow(watermark, tip, floorWindow) {
     for (let i = start; i <= tip; i++) regrow.push(i);
     return {
         floors: regrow,
-        hint: '(正文自上次生成后没有新进展。请基于同样的进展,让小世界继续自然生长——本次请优先考虑:有没有此前未出现、但关系上合理的存在应该在这里登场?比如主人的家人、旧友、同事、常去店家的群、圈子里的群聊、新的板块话题。有合理人选就让 TA 登场;实在没有,再自然续写已有内容。纪律照旧:不认识的人仍然不许出现,不要为了新而新,不要重复已有内容。)\n\n',
+        hint: '(正文自上次生成后没有新进展。请基于同样的进展,让小世界继续自然生长——本次优先自问:主人的既定人际网里,还有谁没在这部手机上登场?从【人物设定参考】和原著既定事实里挖:上级、下属、家人(关系差的也算)、旧友、原著配角;群聊谱系里还缺哪种群(汇报群/指挥群/家族群/朋友群)?有合理人选就让 TA 登场;实在没有,再自然续写已有内容。纪律照旧且最优先:叙事另一方仍然绝对不许出现;通讯录规模守住真人手机的量级;不要为了新而新,不要重复已有内容。)\n\n',
     };
 }
 
 // ── 主生成:楼层事件触发,批量产出多线程条目。──
 
-async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language }) {
+async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, allowUserContact }) {
     const watermark = await store.getWatermark(worldKey, 'messenger');
     const tip = ctx.chat.length - 1;
     const { floors: pendingFloors, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
@@ -396,7 +405,9 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
         if (!t || !t.threadId) continue;
         const threadId = String(t.threadId);
 
-        if (t.newContact?.contactId && t.newContact?.name && !world.contacts.has(String(t.newContact.contactId))) {
+        if (t.newContact?.name && !allowUserContact && isUserSide(t.newContact.name, ctx)) {
+            console.warn('[Orrery] 已拦下叙事另一方越界进通讯录:', t.newContact.name);
+        } else if (t.newContact?.contactId && t.newContact?.name && !world.contacts.has(String(t.newContact.contactId))) {
             const contactId = String(t.newContact.contactId);
             const payload = {
                 contactId, name: String(t.newContact.name), relation: t.newContact.relation || '',
@@ -410,6 +421,7 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
             const groupId = String(t.newGroup.groupId);
             const members = (Array.isArray(t.newGroup.members) ? t.newGroup.members : [])
                 .filter(m => m?.id && m?.name)
+                .filter(m => allowUserContact || !isUserSide(m.name, ctx))
                 .map(m => ({ id: String(m.id), name: String(m.name) }));
             if (members.length >= 2) { // 一个人不成群
                 const payload = { groupId, name: String(t.newGroup.name), members };
@@ -524,7 +536,7 @@ async function maybeSummarizeThread(ctx, store, { worldKey, threadId, summaryThr
 
 // ── 论坛主生成:独立水位、独立触发(app 内「刷新」),消化 newBoards/newResidents/newThreads/newReplies。──
 
-async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language }) {
+async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, allowUserContact }) {
     const watermark = await store.getWatermark(worldKey, 'forum');
     const tip = ctx.chat.length - 1;
     const { floors: pendingFloors, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
@@ -557,6 +569,10 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     }
 
     for (const r of Array.isArray(parsed.newResidents) ? parsed.newResidents : []) {
+        if (!allowUserContact && r?.castName && isUserSide(r.castName, ctx)) {
+            console.warn('[Orrery] 已拦下叙事另一方越界注册住民小号:', r.castName);
+            continue;
+        }
         if (!r?.residentId || !r?.handle || world.residents.has(String(r.residentId))) continue;
         const residentId = String(r.residentId);
         const payload = { residentId, handle: String(r.handle), persona: r.persona || '' };
@@ -623,7 +639,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
 
 // ── 论坛盖楼:定向续写单帖,允许返回空;newResident 一批最多新建 2 名(任务书 §4)。──
 
-async function runForumThreadContinue(ctx, store, { worldKey, threadId, profileId, customApi, language }) {
+async function runForumThreadContinue(ctx, store, { worldKey, threadId, profileId, customApi, language, allowUserContact }) {
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
     const thread = world.forumThreads.get(threadId);
     if (!thread?.title) return { ok: false, error: 'no_thread' };
@@ -646,6 +662,7 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, profileI
         if (!world.residents.has(authorId)) {
             const nr = rp.newResident;
             if (!(nr?.residentId && String(nr.residentId) === authorId && newResidentBudget > 0)) continue; // 查无此人且非法新建,丢弃
+            if (!allowUserContact && nr.castName && isUserSide(nr.castName, ctx)) { console.warn('[Orrery] 已拦下叙事另一方越界注册住民小号(盖楼):', nr.castName); continue; }
             const payload = { residentId: authorId, handle: String(nr.handle || '?'), persona: nr.persona || '' };
             if (nr.castName) payload.castName = String(nr.castName);
             const added = await store.addEntry({ worldKey, sourceFloor, app: 'forum', type: 'resident', payload });

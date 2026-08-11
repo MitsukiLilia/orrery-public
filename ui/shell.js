@@ -16,7 +16,7 @@ const SHELL_CSS_URL = new URL('./shell.css', import.meta.url).href;
 
 const DEFAULT_SETTINGS = {
     floorWindow: 4, profileId: null, summaryThreshold: 40,
-    autoRefresh: false, theme: 'seasalt', showFab: true, language: 'zh',
+    autoRefresh: false, theme: 'seasalt', showFab: true, allowUserContact: false, language: 'zh',
     customApi: { enabled: false, baseUrl: '', apiKey: '', model: '' },
 };
 
@@ -106,6 +106,10 @@ function renderSettingsHtml(s, profileLabel, owner) {
             <div class="or-row">
                 <span class="or-row-label">悬浮球入口</span>
                 <button class="or-switch ${s.showFab !== false ? 'on' : ''}" data-action="toggle-field" data-field="showFab" title="酒馆界面右侧的 Orrery 悬浮球,可上下拖动;关掉后走魔杖菜单进入"></button>
+            </div>
+            <div class="or-row">
+                <span class="or-row-label">允许「叙事另一方」登场</span>
+                <button class="or-switch ${s.allowUserContact ? 'on' : ''}" data-action="toggle-field" data-field="allowUserContact" title="默认拦下 user 侧越界混入通讯录/群聊/论坛小号;剧情里两人真正相识、交换联系方式之后再打开"></button>
             </div>
             <div class="or-row">
                 <span class="or-row-label">楼层更新后自动刷新</span>
@@ -287,6 +291,7 @@ export function createShell(ctx, onExternalChange) {
             const result = await generateMore(ctx, store, {
                 worldKey, floorWindow: s.floorWindow, summaryThreshold: s.summaryThreshold,
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                allowUserContact: !!s.allowUserContact,
             });
             if (!result.ok) showToast('生成失败,请重试');
             else if (!result.changed) showToast('还没有新的正文进展');
@@ -344,6 +349,7 @@ export function createShell(ctx, onExternalChange) {
             const result = await generateMoreForum(ctx, store, {
                 worldKey, floorWindow: s.floorWindow,
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                allowUserContact: !!s.allowUserContact,
             });
             if (!result.ok) showToast('生成失败,请重试');
             else if (!result.changed) showToast('还没有新的正文进展');
@@ -368,6 +374,7 @@ export function createShell(ctx, onExternalChange) {
             const result = await continueForumThread(ctx, store, {
                 worldKey, threadId: top.threadId,
                 profileId: s.profileId || null, customApi: s.customApi, language: s.language,
+                allowUserContact: !!s.allowUserContact,
             });
             if (!result.ok) showToast('生成失败,请重试');
             else if (result.added === 0) showToast('暂时没有新动静');
