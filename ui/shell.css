@@ -65,6 +65,13 @@
 }
 .or-statusbar-label { font-size: 12px; font-weight: 600; letter-spacing: .04em; }
 .or-statusbar-icons { display: flex; align-items: center; gap: 6px; }
+.or-close-btn {
+    width: 32px; height: 32px; margin-left: 10px; border: none; border-radius: 50%;
+    background: none; color: var(--or-cocoa); display: flex; align-items: center; justify-content: center;
+    padding: 0; cursor: pointer; flex-shrink: 0;
+}
+.or-close-btn:active { background: rgba(110, 90, 80, .10); }
+.or-close-btn svg { width: 15px; height: 15px; }
 .or-statusbar-icons svg { height: 11px; width: auto; }
 
 .or-homebar { flex-shrink: 0; display: flex; justify-content: center; padding: 8px 0 10px; }

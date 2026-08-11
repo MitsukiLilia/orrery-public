@@ -5,7 +5,7 @@ import * as store from '../core/store.js';
 import { generateMore, continueThread, generateMoreForum, continueForumThread } from '../core/generator.js';
 import { manualRevert } from '../core/rollback.js';
 import {
-    ICON_BACK, ICON_CHEVRON_RIGHT, ICON_CHECK, ICON_MINUS, ICON_PLUS,
+    ICON_BACK, ICON_CHEVRON_RIGHT, ICON_CHECK, ICON_MINUS, ICON_PLUS, ICON_CLOSE,
     ICON_APP_MESSENGER, ICON_APP_SETTINGS, ICON_APP_FORUM, ICON_APP_MEMO, ICON_APP_SNS, ICON_APP_GALLERY,
     ICON_SIGNAL, ICON_BATTERY, dotPatternDataUri, scallopWaveDataUri,
 } from './icons.js';
@@ -476,6 +476,7 @@ export function createShell(ctx, onExternalChange) {
         if (!el) return;
         switch (el.dataset.action) {
             case 'close-backdrop': close(); break;
+            case 'close-phone': close(); break;
             case 'back': navBack(); break;
             case 'open-app': openApp(el.dataset.app); break;
             case 'open-thread': navPush({ type: 'messenger-thread', threadId: el.dataset.threadId }); break;
@@ -589,6 +590,7 @@ export function createShell(ctx, onExternalChange) {
                 <div class="or-statusbar">
                     <span class="or-statusbar-label">Orrery</span>
                     <span class="or-statusbar-icons">${ICON_SIGNAL}${ICON_BATTERY}</span>
+                    <button class="or-close-btn" data-action="close-phone" title="收起手机">${ICON_CLOSE}</button>
                 </div>
                 <div class="or-screen"></div>
                 <div class="or-homebar"></div>
