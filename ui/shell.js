@@ -1,0 +1,628 @@
+// 手机壳:开合、状态栏、app 网格、返回导航。持有 ctx,是 core/* 与 apps/* 之间唯一的装配点——
+// 事件委托只挂一份在 .or-root 上,不随每次重渲染叠加监听器。
+import { computeWorldKey, foldWorld } from '../core/world.js';
+import * as store from '../core/store.js';
+import { generateMore, continueThread, generateMoreForum, continueForumThread } from '../core/generator.js';
+import { manualRevert } from '../core/rollback.js';
+import {
+    ICON_BACK, ICON_CHEVRON_RIGHT, ICON_CHECK, ICON_MINUS, ICON_PLUS,
+    ICON_APP_MESSENGER, ICON_APP_SETTINGS, ICON_APP_FORUM, ICON_APP_MEMO, ICON_APP_SNS, ICON_APP_GALLERY,
+    ICON_SIGNAL, ICON_BATTERY, dotPatternDataUri, scallopWaveDataUri,
+} from './icons.js';
+import { renderThreadListHtml, renderThreadHtml, MESSENGER_SKIN_URL } from '../apps/messenger/app.js';
+import { renderForumListHtml, renderForumThreadHtml, FORUM_SKIN_URL } from '../apps/forum/app.js';
+
+const SHELL_CSS_URL = new URL('./shell.css', import.meta.url).href;
+
+const DEFAULT_SETTINGS = {
+    floorWindow: 4, profileId: null, summaryThreshold: 40,
+    autoRefresh: false, theme: 'seasalt', showFab: true, language: 'zh',
+    customApi: { enabled: false, baseUrl: '', apiKey: '', model: '' },
+};
+
+// M1:论坛开通。messenger/设置/论坛可点,其余画出来但置灰——按参考图风格三色底轮换。
+const APPS = [
+    { id: 'messenger', label: '消息', bg: 'salt', icon: ICON_APP_MESSENGER, enabled: true },
+    { id: 'settings', label: '设置', bg: 'cocoa', icon: ICON_APP_SETTINGS, enabled: true },
+    { id: 'forum', label: '论坛', bg: 'cream', icon: ICON_APP_FORUM, enabled: true },
+    { id: 'memo', label: '备忘录', bg: 'salt', icon: ICON_APP_MEMO, enabled: false },
+    { id: 'sns', label: 'SNS', bg: 'cream', icon: ICON_APP_SNS, enabled: false },
+    { id: 'gallery', label: '相册', bg: 'cocoa', icon: ICON_APP_GALLERY, enabled: false },
+];
+
+function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = String(s ?? '');
+    return d.innerHTML;
+}
+
+// 手机主人=世界的锚点,一经设定不可更改(她 2026-08-11 拍板:唯一不可改的设置)。
+// 多人卡({{char}}=世界观名)时,余波视角必须锚在一个具体人物身上,这里就是锚。
+function renderSetupHtml(defaultName) {
+    return `
+        <div class="or-setup">
+            <div class="or-setup-badge">${ICON_APP_MESSENGER}</div>
+            <div class="or-setup-title">这部手机属于谁?</div>
+            <div class="or-setup-note">单人卡填角色名;世界观卡(多人)填你想围观的那个人。<br>联系人、聊天、一切余波,都将从这个人的视角长出来。</div>
+            <div class="or-field or-setup-field"><label>主人的名字</label><input type="text" data-setup-name value="${escapeHtml(defaultName)}" spellcheck="false"></div>
+            <button class="or-pill-btn" data-action="confirm-setup">就是这个人</button>
+            <div class="or-setup-warn">一经设定不可更改。想换人,只能在设置里抹掉这部手机、一切重来。</div>
+        </div>`;
+}
+
+// 生图图标(assets/icons/<theme>/<id>.png,已裁边);加载失败时 onerror 自摘,露出底下的 SVG 保底
+function iconAssetUrl(theme, id) {
+    return new URL(`../assets/icons/${theme}/${id}.png`, import.meta.url).href;
+}
+
+// dots:{ messenger: bool, forum: bool } —— 每个 app 各看各的水位(M1 水位重构后不再共用一份 pending)。
+function renderGridHtml(dots, theme) {
+    return `<div class="or-grid">${APPS.map(a => `
+        <button class="or-app ${a.enabled ? '' : 'disabled'}" data-action="open-app" data-app="${a.id}" data-bg="${a.bg}">
+            <div class="or-app-icon">${a.icon}<img class="or-app-img" src="${iconAssetUrl(theme, a.id)}" alt="" onerror="this.remove()">${dots[a.id] ? '<span class="or-app-badge"></span>' : ''}</div>
+            <span class="or-app-label">${a.label}</span>
+        </button>`).join('')}</div>`;
+}
+
+function renderSettingsHtml(s, profileLabel, owner) {
+    return `
+        <div class="or-header"><button class="or-back-btn" data-action="back">${ICON_BACK}</button><span class="or-header-title">设置</span></div>
+        <div class="or-list">
+            <div class="or-row">
+                <span class="or-row-label">这部手机属于</span>
+                <span class="or-row-value">${escapeHtml(owner || '未设定')}</span>
+            </div>
+            <div class="or-row">
+                <span class="or-row-label">主题</span>
+                <div class="or-theme-seg">
+                    <button class="${s.theme === 'seasalt' ? 'on' : ''}" data-action="set-theme" data-theme="seasalt">海盐巧克力</button>
+                    <button class="${s.theme === 'mono' ? 'on' : ''}" data-action="set-theme" data-theme="mono">墨白</button>
+                    <button class="${s.theme === 'lunar' ? 'on' : ''}" data-action="set-theme" data-theme="lunar">月夜</button>
+                </div>
+            </div>
+            <div class="or-row">
+                <span class="or-row-label">语言</span>
+                <div class="or-theme-seg">
+                    <button class="${s.language !== 'ja_zh' ? 'on' : ''}" data-action="set-language" data-language="zh">中文</button>
+                    <button class="${s.language === 'ja_zh' ? 'on' : ''}" data-action="set-language" data-language="ja_zh">日中双语</button>
+                </div>
+            </div>
+            <div class="or-row">
+                <span class="or-row-label">生成范围(前 ${s.floorWindow} 层)</span>
+                <div class="or-stepper">
+                    <button data-action="stepper" data-field="floorWindow" data-delta="-1">${ICON_MINUS}</button>
+                    <span class="or-stepper-value">${s.floorWindow}</span>
+                    <button data-action="stepper" data-field="floorWindow" data-delta="1">${ICON_PLUS}</button>
+                </div>
+            </div>
+            <div class="or-row">
+                <span class="or-row-label">总结阈值(${s.summaryThreshold} 条)</span>
+                <div class="or-stepper">
+                    <button data-action="stepper" data-field="summaryThreshold" data-delta="-5">${ICON_MINUS}</button>
+                    <span class="or-stepper-value">${s.summaryThreshold}</span>
+                    <button data-action="stepper" data-field="summaryThreshold" data-delta="5">${ICON_PLUS}</button>
+                </div>
+            </div>
+            <div class="or-row">
+                <span class="or-row-label">悬浮球入口</span>
+                <button class="or-switch ${s.showFab !== false ? 'on' : ''}" data-action="toggle-field" data-field="showFab" title="酒馆界面右侧的 Orrery 悬浮球,可上下拖动;关掉后走魔杖菜单进入"></button>
+            </div>
+            <div class="or-row">
+                <span class="or-row-label">楼层更新后自动刷新</span>
+                <button class="or-switch ${s.autoRefresh ? 'on' : ''}" data-action="toggle-field" data-field="autoRefresh" title="开=酒馆出新楼层就自动生成一批余波;关=只亮红点,手动刷新"></button>
+            </div>
+            <button class="or-row or-row-nav" data-action="open-profile-picker">
+                <span class="or-row-label" style="flex:1">生成模型</span>
+                <span class="or-row-value">${escapeHtml(profileLabel)}</span>
+                ${ICON_CHEVRON_RIGHT}
+            </button>
+            <div class="or-section-title">独立 API(启用后优先于上面的生成模型;配置存在酒馆本地)</div>
+            <div class="or-row">
+                <span class="or-row-label">启用独立 API</span>
+                <button class="or-switch ${s.customApi.enabled ? 'on' : ''}" data-action="toggle-capi"></button>
+            </div>
+            <div class="or-field"><label>Base URL</label><input type="text" data-capi="baseUrl" value="${escapeHtml(s.customApi.baseUrl)}" placeholder="https://…/v1" spellcheck="false"></div>
+            <div class="or-field"><label>API Key</label><input type="password" data-capi="apiKey" value="${escapeHtml(s.customApi.apiKey)}"></div>
+            <div class="or-field"><label>模型名</label><input type="text" data-capi="model" value="${escapeHtml(s.customApi.model)}" placeholder="例:gemini-2.5-flash" spellcheck="false"></div>
+            <button class="or-row or-danger" data-action="wipe-phone"><span class="or-row-label">抹掉这部手机</span></button>
+        </div>`;
+}
+
+function renderProfilePickerHtml(profiles, currentProfileId) {
+    const rows = [{ id: '', label: '跟随酒馆当前连接' }, ...profiles.map(p => ({ id: p.id, label: p.name }))];
+    return `
+        <div class="or-header"><button class="or-back-btn" data-action="back">${ICON_BACK}</button><span class="or-header-title">生成模型</span></div>
+        <div class="or-list">${rows.map(r => `
+            <button class="or-option" data-action="pick-profile" data-profile-id="${escapeHtml(r.id)}">
+                <span>${escapeHtml(r.label)}</span>
+                ${(currentProfileId || '') === r.id ? ICON_CHECK : ''}
+            </button>`).join('')}</div>`;
+}
+
+/**
+ * @param {object} ctx SillyTavern.getContext() 结果
+ * @param {() => void} [onExternalChange] 手机内生成/清空 pending 后回调——用来刷新魔杖菜单红点
+ *   (那个红点在 light DOM,不在这份 shadow 树里,回滚触发的刷新走 index.js 自己的事件监听,
+ *   但"生成更多"/"刷新"是手机内部发起的动作,没有对应的酒馆事件,得靠这个回调补上)
+ */
+export function createShell(ctx, onExternalChange) {
+    let host = null, shadow = null, root = null, screenEl = null, toastEl = null;
+    let navStack = [{ type: 'grid' }];
+    let busy = false;
+    let longPressTimer = null;
+    let toastTimer = null;
+    let suppressNextClick = false; // 线程行长按触发删除后,抑制紧随的 click(否则会顺手打开线程)
+
+    function settings() {
+        const cur = ctx.extensionSettings.orrery || {};
+        ctx.extensionSettings.orrery = {
+            ...DEFAULT_SETTINGS, ...cur,
+            customApi: { ...DEFAULT_SETTINGS.customApi, ...(cur.customApi || {}) },
+        };
+        return ctx.extensionSettings.orrery;
+    }
+    function saveSettings() { ctx.saveSettingsDebounced?.(); }
+
+    function currentWorldKey() { return computeWorldKey(ctx); }
+
+    // tip + 各 app 水位一起取,渲染网格/判断红点都从这一份派生——两个 app 各看各的水位。
+    async function currentWorld() {
+        const worldKey = currentWorldKey();
+        const tip = ctx.chat && ctx.chat.length ? ctx.chat.length - 1 : -1;
+        if (!worldKey) {
+            return {
+                worldKey: null,
+                world: { contacts: new Map(), threads: new Map(), boards: new Map(), residents: new Map(), forumThreads: new Map() },
+                tip: -1, watermarks: { messenger: -1, forum: -1 },
+            };
+        }
+        const [entries, wmMessenger, wmForum] = await Promise.all([
+            store.getEntriesForWorld(worldKey),
+            store.getWatermark(worldKey, 'messenger'),
+            store.getWatermark(worldKey, 'forum'),
+        ]);
+        return { worldKey, world: foldWorld(entries), tip, watermarks: { messenger: wmMessenger, forum: wmForum } };
+    }
+
+    function profileLabel(profileId) {
+        if (!profileId) return '跟随酒馆当前连接';
+        const profiles = ctx.ConnectionManagerRequestService?.getSupportedProfiles?.() || [];
+        return profiles.find(p => p.id === profileId)?.name || '跟随酒馆当前连接';
+    }
+
+    function showToast(msg) {
+        if (!toastEl) return;
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+    }
+
+    function applyTheme() {
+        if (!root) return;
+        const theme = settings().theme || 'seasalt';
+        root.dataset.theme = theme;
+        if (theme === 'mono' || theme === 'lunar') {
+            // 墨白/月夜:极简底,不要波点和浪花(月夜的氛围交给图标)
+            root.style.setProperty('--or-dots', 'none');
+            root.style.setProperty('--or-wave', 'none');
+            root.style.setProperty('--or-chat-dots', 'none');
+        } else {
+            root.style.setProperty('--or-dots', dotPatternDataUri('#FBF9F4', 0.6));
+            root.style.setProperty('--or-wave', scallopWaveDataUri('#FBF9F4'));
+            root.style.setProperty('--or-chat-dots', dotPatternDataUri('#E7DFCF', 0.5));
+        }
+    }
+
+    async function render() {
+        if (!screenEl) return;
+        applyTheme();
+        const top = navStack[navStack.length - 1];
+        const { worldKey, world, tip, watermarks } = await currentWorld();
+
+        // 主人门:世界可用但还没认主 → 先过激活页,别的什么都看不到
+        if (worldKey && top.type !== 'setup') {
+            const owner = await store.getOwner(worldKey);
+            if (!owner) {
+                navStack = [{ type: 'setup' }];
+                screenEl.innerHTML = renderSetupHtml(ctx.name2 || '');
+                return;
+            }
+        }
+
+        if (top.type === 'setup') {
+            screenEl.innerHTML = renderSetupHtml(ctx.name2 || '');
+        } else if (top.type === 'grid') {
+            const dots = { messenger: watermarks.messenger < tip, forum: watermarks.forum < tip };
+            screenEl.innerHTML = renderGridHtml(dots, settings().theme || 'seasalt');
+        } else if (top.type === 'messenger-list') {
+            screenEl.innerHTML = renderThreadListHtml({ world, busy });
+        } else if (top.type === 'messenger-thread') {
+            const thread = world.threads.get(top.threadId);
+            const ok = thread && (thread.kind === 'group' ? !!thread.group : world.contacts.has(top.threadId));
+            if (!ok) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚/删除清空
+            screenEl.innerHTML = renderThreadHtml({ thread, world, busy, worldNow: world.worldNow });
+        } else if (top.type === 'forum-list') {
+            screenEl.innerHTML = renderForumListHtml({ world, busy, boardId: top.boardId || null });
+        } else if (top.type === 'forum-thread') {
+            const thread = world.forumThreads.get(top.threadId);
+            if (!thread || !thread.title) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚/删除清空
+            screenEl.innerHTML = renderForumThreadHtml({ thread, world, busy, forumNow: world.forumNow });
+        } else if (top.type === 'settings') {
+            const s = settings();
+            const owner = await store.getOwner(currentWorldKey());
+            screenEl.innerHTML = renderSettingsHtml(s, profileLabel(s.profileId), owner);
+        } else if (top.type === 'settings-profile-picker') {
+            const s = settings();
+            const profiles = ctx.ConnectionManagerRequestService?.getSupportedProfiles?.() || [];
+            screenEl.innerHTML = renderProfilePickerHtml(profiles, s.profileId);
+        }
+    }
+
+    function navPush(screen) { navStack.push(screen); render(); }
+    function navBack() {
+        if (navStack.length <= 1) { close(); return; }
+        navStack.pop();
+        render();
+    }
+
+    function openApp(appId) {
+        const app = APPS.find(a => a.id === appId);
+        if (!app) return;
+        if (!app.enabled) { showToast('未开通'); return; }
+        if (appId === 'messenger') navPush({ type: 'messenger-list' });
+        else if (appId === 'settings') navPush({ type: 'settings' });
+        else if (appId === 'forum') navPush({ type: 'forum-list', boardId: null });
+    }
+
+    async function doGenerateMore() {
+        if (busy) return;
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        const owner = await store.getOwner(worldKey);
+        if (!owner) { showToast('先设定手机主人'); return; }
+        busy = true; await render();
+        try {
+            const s = settings();
+            const result = await generateMore(ctx, store, {
+                worldKey, floorWindow: s.floorWindow, summaryThreshold: s.summaryThreshold,
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+            });
+            if (!result.ok) showToast('生成失败,请重试');
+            else if (!result.changed) showToast('还没有新的正文进展');
+            else showToast(`小世界起了 ${result.added || 0} 圈涟漪`);
+        } finally {
+            busy = false; await render();
+            onExternalChange?.();
+        }
+    }
+
+    async function doContinueThread() {
+        if (busy) return;
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'messenger-thread') return;
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        const owner = await store.getOwner(worldKey);
+        if (!owner) { showToast('先设定手机主人'); return; }
+        busy = true; await render();
+        try {
+            const s = settings();
+            const result = await continueThread(ctx, store, {
+                worldKey, threadId: top.threadId, summaryThreshold: s.summaryThreshold,
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+            });
+            if (!result.ok) showToast('生成失败,请重试');
+            else if (result.added === 0) showToast('暂时没有新动静');
+        } finally {
+            busy = false; await render();
+        }
+    }
+
+    async function doRevert(ts) {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'messenger-thread' || !Number.isFinite(ts)) return;
+        const confirmed = await ctx.callGenericPopup('从这条起删除本线程之后的所有消息?', ctx.POPUP_TYPE.CONFIRM);
+        if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        await manualRevert(store, worldKey, top.threadId, ts);
+        await render();
+    }
+
+    // ── 论坛:独立水位的「刷新」/「生成更多」+ 反悔(单楼倒带同消息工法 / 整帖级联删)。 ──
+
+    async function doGenerateMoreForum() {
+        if (busy) return;
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        const owner = await store.getOwner(worldKey);
+        if (!owner) { showToast('先设定手机主人'); return; }
+        busy = true; await render();
+        try {
+            const s = settings();
+            const result = await generateMoreForum(ctx, store, {
+                worldKey, floorWindow: s.floorWindow,
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+            });
+            if (!result.ok) showToast('生成失败,请重试');
+            else if (!result.changed) showToast('还没有新的正文进展');
+            else showToast(`小世界起了 ${result.added || 0} 圈涟漪`);
+        } finally {
+            busy = false; await render();
+            onExternalChange?.();
+        }
+    }
+
+    async function doContinueForumThread() {
+        if (busy) return;
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'forum-thread') return;
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        const owner = await store.getOwner(worldKey);
+        if (!owner) { showToast('先设定手机主人'); return; }
+        busy = true; await render();
+        try {
+            const s = settings();
+            const result = await continueForumThread(ctx, store, {
+                worldKey, threadId: top.threadId,
+                profileId: s.profileId || null, customApi: s.customApi, language: s.language,
+            });
+            if (!result.ok) showToast('生成失败,请重试');
+            else if (result.added === 0) showToast('暂时没有新动静');
+        } finally {
+            busy = false; await render();
+        }
+    }
+
+    async function doForumRevertFloor(ts) {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'forum-thread' || !Number.isFinite(ts)) return;
+        const confirmed = await ctx.callGenericPopup('从这楼起删除后面的所有回复?', ctx.POPUP_TYPE.CONFIRM);
+        if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        await store.deleteThreadFrom(worldKey, top.threadId, ts); // 与消息线程同一反悔工法
+        await render();
+    }
+
+    async function doDeleteForumThread(threadId) {
+        const worldKey = currentWorldKey();
+        if (!worldKey || !threadId) return;
+        const confirmed = await ctx.callGenericPopup('删除这个帖子和全部回复?剧情推进后可能会有新的帖子出现。', ctx.POPUP_TYPE.CONFIRM);
+        if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
+        await store.deleteForumThreadCascade(worldKey, threadId);
+        const top = navStack[navStack.length - 1];
+        if (top.type === 'forum-thread' && top.threadId === threadId) navStack.pop();
+        await render();
+        onExternalChange?.();
+    }
+
+    function doSelectForumBoard(boardId) {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'forum-list') return;
+        top.boardId = boardId || null; // 只是过滤态,不入栈,不当导航
+        render();
+    }
+
+    function doStepper(field, delta) {
+        const s = settings();
+        if (field === 'floorWindow') s.floorWindow = Math.max(1, Math.min(20, s.floorWindow + delta));
+        if (field === 'summaryThreshold') s.summaryThreshold = Math.max(10, Math.min(200, s.summaryThreshold + delta));
+        saveSettings();
+        render();
+    }
+
+    async function doConfirmSetup() {
+        const input = root?.querySelector('input[data-setup-name]');
+        const name = (input?.value || '').trim();
+        if (!name) { showToast('名字不能为空'); return; }
+        const confirmed = await ctx.callGenericPopup(`这部手机将永远属于「${name}」,之后无法更改。确定吗?`, ctx.POPUP_TYPE.CONFIRM);
+        if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        await store.setOwner(worldKey, name);
+        navStack = [{ type: 'grid' }];
+        render();
+    }
+
+    async function doDeleteContact(threadId) {
+        const worldKey = currentWorldKey();
+        if (!worldKey || !threadId) return;
+        const { world } = await currentWorld();
+        const thread = world.threads.get(threadId);
+        if (!thread) return;
+        const label = thread.kind === 'group'
+            ? `群聊「${thread.group?.name || '?'}」`
+            : `联系人「${world.contacts.get(threadId)?.name || '?'}」`;
+        const confirmed = await ctx.callGenericPopup(`删除${label}和这段聊天的全部记录?剧情推进后 TA 仍可能重新出现。`, ctx.POPUP_TYPE.CONFIRM);
+        if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
+        await store.deleteContactCascade(worldKey, threadId);
+        const top = navStack[navStack.length - 1];
+        if (top.type === 'messenger-thread' && top.threadId === threadId) navStack.pop();
+        await render();
+        onExternalChange?.();
+    }
+
+    async function doWipePhone() {
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        const confirmed = await ctx.callGenericPopup('抹掉这部手机?本聊天的联系人、全部聊天记录和主人设定都将删除,不可恢复。', ctx.POPUP_TYPE.CONFIRM);
+        if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
+        await store.wipeWorld(worldKey);
+        navStack = [{ type: 'grid' }];
+        await render();
+        onExternalChange?.();
+    }
+
+    function doPickProfile(profileId) {
+        const s = settings();
+        s.profileId = profileId || null;
+        saveSettings();
+        navBack();
+    }
+
+    function onClick(e) {
+        if (suppressNextClick) { suppressNextClick = false; return; }
+        const el = e.target.closest('[data-action]');
+        if (!el) return;
+        switch (el.dataset.action) {
+            case 'close-backdrop': close(); break;
+            case 'back': navBack(); break;
+            case 'open-app': openApp(el.dataset.app); break;
+            case 'open-thread': navPush({ type: 'messenger-thread', threadId: el.dataset.threadId }); break;
+            case 'refresh': doGenerateMore(); break;
+            case 'generate-more': doContinueThread(); break;
+            case 'revert': doRevert(Number(el.dataset.ts)); break;
+            case 'open-forum-thread': navPush({ type: 'forum-thread', threadId: el.dataset.threadId }); break;
+            case 'forum-refresh': doGenerateMoreForum(); break;
+            case 'forum-generate-more': doContinueForumThread(); break;
+            case 'select-forum-board': doSelectForumBoard(el.dataset.boardId); break;
+            case 'stepper': doStepper(el.dataset.field, Number(el.dataset.delta)); break;
+            case 'toggle-field': { const s = settings(); s[el.dataset.field] = !s[el.dataset.field]; saveSettings(); render(); onExternalChange?.(); break; }
+            case 'toggle-capi': { const s = settings(); s.customApi.enabled = !s.customApi.enabled; saveSettings(); render(); break; }
+            case 'set-theme': { const s = settings(); s.theme = el.dataset.theme; saveSettings(); render(); break; }
+            case 'set-language': { const s = settings(); s.language = el.dataset.language; saveSettings(); render(); break; }
+            case 'confirm-setup': doConfirmSetup(); break;
+            case 'wipe-phone': doWipePhone(); break;
+            case 'open-profile-picker': navPush({ type: 'settings-profile-picker' }); break;
+            case 'pick-profile': doPickProfile(el.dataset.profileId); break;
+        }
+    }
+
+    // 设置页的独立 API 输入框(设置=驾驶舱,不属于小世界的只读面——她 2026-08-11 点单)
+    function onFieldChange(e) {
+        const input = e.target;
+        if (!input.matches?.('input[data-capi]')) return;
+        const s = settings();
+        s.customApi[input.dataset.capi] = input.value.trim();
+        saveSettings();
+    }
+
+    // 长按 / 桌面右键:消息行=唤出反悔按钮;线程行=删除联系人/群;论坛帖行=删整帖;论坛楼行=删本楼及之后
+    // (后两者跟线程行一样直接弹确认,不走"唤出按钮再点一次"那一步——反悔工法相同,UI 更省一步)。
+    function onPointerDown(e) {
+        clearTimeout(longPressTimer);
+        const msgRow = e.target.closest('.or-msg-row');
+        if (msgRow) {
+            longPressTimer = setTimeout(() => msgRow.classList.add('show-revert'), 480);
+            return;
+        }
+        const threadRow = e.target.closest('.or-thread-row');
+        if (threadRow) {
+            longPressTimer = setTimeout(() => {
+                suppressNextClick = true;
+                doDeleteContact(threadRow.dataset.threadId);
+            }, 550);
+            return;
+        }
+        const forumRow = e.target.closest('.or-forum-row');
+        if (forumRow) {
+            longPressTimer = setTimeout(() => {
+                suppressNextClick = true;
+                doDeleteForumThread(forumRow.dataset.threadId);
+            }, 550);
+            return;
+        }
+        const floorRow = e.target.closest('.or-forum-floor-row');
+        if (floorRow) {
+            longPressTimer = setTimeout(() => {
+                suppressNextClick = true;
+                doForumRevertFloor(Number(floorRow.dataset.ts));
+            }, 550);
+        }
+    }
+    function onPointerClear() { clearTimeout(longPressTimer); }
+    function onContextMenu(e) {
+        const threadRow = e.target.closest('.or-thread-row');
+        if (threadRow) {
+            e.preventDefault();
+            doDeleteContact(threadRow.dataset.threadId);
+            return;
+        }
+        const forumRow = e.target.closest('.or-forum-row');
+        if (forumRow) {
+            e.preventDefault();
+            doDeleteForumThread(forumRow.dataset.threadId);
+            return;
+        }
+        const floorRow = e.target.closest('.or-forum-floor-row');
+        if (floorRow) {
+            e.preventDefault();
+            doForumRevertFloor(Number(floorRow.dataset.ts));
+            return;
+        }
+        const row = e.target.closest('.or-msg-row');
+        if (!row) return;
+        e.preventDefault();
+        root.querySelectorAll('.or-msg-row.show-revert').forEach(r => { if (r !== row) r.classList.remove('show-revert'); });
+        row.classList.toggle('show-revert');
+    }
+
+    function mount() {
+        host = document.createElement('div');
+        host.id = 'orrery-shadow-host';
+        host.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;z-index:2147483647;display:none;';
+        document.body.appendChild(host);
+        shadow = host.attachShadow({ mode: 'open' });
+
+        for (const href of [SHELL_CSS_URL, MESSENGER_SKIN_URL, FORUM_SKIN_URL]) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = href;
+            shadow.appendChild(link);
+        }
+
+        root = document.createElement('div');
+        root.className = 'or-root';
+        root.innerHTML = `
+            <div class="or-backdrop" data-action="close-backdrop"></div>
+            <div class="or-phone">
+                <div class="or-statusbar">
+                    <span class="or-statusbar-label">Orrery</span>
+                    <span class="or-statusbar-icons">${ICON_SIGNAL}${ICON_BATTERY}</span>
+                </div>
+                <div class="or-screen"></div>
+                <div class="or-homebar"></div>
+                <div class="or-toast"></div>
+            </div>`;
+        shadow.appendChild(root);
+        screenEl = root.querySelector('.or-screen');
+        toastEl = root.querySelector('.or-toast');
+
+        root.addEventListener('click', onClick);
+        root.addEventListener('change', onFieldChange);
+        root.addEventListener('pointerdown', onPointerDown);
+        root.addEventListener('pointerup', onPointerClear);
+        root.addEventListener('pointerleave', onPointerClear, true);
+        root.addEventListener('pointermove', onPointerClear);
+        root.addEventListener('contextmenu', onContextMenu);
+    }
+
+    function open() {
+        if (!host) mount();
+        host.style.display = 'block';
+        navStack = [{ type: 'grid' }]; // 不持久化导航状态,重开永远回网格页
+        requestAnimationFrame(() => root.classList.add('open'));
+        render();
+    }
+    function close() {
+        root?.classList.remove('open');
+        setTimeout(() => { if (host) host.style.display = 'none'; }, 200);
+    }
+    function toggle() { isOpen() ? close() : open(); }
+    function isOpen() { return !!root?.classList.contains('open'); }
+
+    /** 世界变化(生成完成 / 回滚 / 换聊天)后的刷新入口——手机开着才重渲染,关着什么都不做。 */
+    function onWorldChanged() {
+        if (isOpen()) render();
+    }
+
+    /** 自动刷新入口(index.js 防抖后调):手机没开也能跑——render/toast 自带空目标保护。 */
+    async function autoGenerate() {
+        await doGenerateMore();
+    }
+
+    return { open, close, toggle, isOpen, onWorldChanged, autoGenerate };
+}

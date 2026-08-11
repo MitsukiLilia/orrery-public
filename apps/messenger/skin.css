@@ -1,0 +1,102 @@
+/* messenger 皮肤——依赖 ui/shell.css 里定义的 --or-* token,自己不重定义。 */
+
+.or-thread-list { flex: 1; overflow-y: auto; }
+.or-thread-row {
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+    border-bottom: 1px solid var(--or-cream-2); cursor: pointer;
+    background: none; border: none; width: 100%; text-align: left; font-family: inherit;
+    position: relative;
+}
+.or-thread-row:active { background: rgba(110, 90, 80, .05); }
+.or-avatar {
+    width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--or-white); font-size: 17px; font-weight: 600;
+}
+.or-thread-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.or-thread-name { font-size: 14.5px; font-weight: 600; color: var(--or-cocoa); }
+.or-thread-preview {
+    font-size: 12.5px; color: var(--or-cocoa-light);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.or-unread-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--or-salt-deep); flex-shrink: 0; }
+
+/* ── 对话视图 ── */
+.or-chat-scroll {
+    flex: 1; overflow-y: auto; padding: 14px 14px 10px;
+    display: flex; flex-direction: column; gap: 6px;
+    background-color: var(--or-cream);
+    background-image: var(--or-chat-dots); background-size: 34px 34px;
+}
+.or-date-sep { text-align: center; margin: 10px 0 4px; }
+.or-date-sep span {
+    background: var(--or-cream-2); color: var(--or-cocoa-light);
+    font-size: 11px; padding: 3px 12px; border-radius: 12px;
+}
+
+.or-msg-row { display: flex; align-items: flex-end; gap: 8px; max-width: 100%; position: relative; }
+.or-msg-row.me { flex-direction: row-reverse; }
+.or-msg-avatar {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--or-white); font-size: 12px; font-weight: 600;
+}
+.or-msg-avatar.hidden { visibility: hidden; }
+.or-msg-col { display: flex; flex-direction: column; max-width: 74%; }
+.or-msg-row.me .or-msg-col { align-items: flex-end; }
+.or-bubble {
+    padding: 9px 13px; font-size: 13.5px; line-height: 1.5;
+    color: var(--or-cocoa); word-break: break-word; white-space: pre-wrap;
+}
+.or-msg-row:not(.me) .or-bubble { background: var(--or-white); border-radius: 18px 18px 18px 4px; }
+.or-msg-row.me .or-bubble { background: var(--or-salt); border-radius: 18px 18px 4px 18px; }
+.or-msg-meta {
+    display: flex; align-items: center; gap: 4px; margin-top: 2px;
+    font-size: 10.5px; color: var(--or-cocoa-light);
+}
+.or-msg-row.me .or-msg-meta { flex-direction: row-reverse; }
+
+/* 反悔删除小按钮:默认藏,hover / 长按解锁的 .show-revert 才露出 */
+.or-msg-revert {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 26px; height: 26px; border-radius: 50%; border: none;
+    background: var(--or-white); box-shadow: 0 1px 4px var(--or-shadow);
+    color: var(--or-cocoa); display: none; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0;
+}
+.or-msg-row:not(.me) .or-msg-revert { right: -34px; }
+.or-msg-row.me .or-msg-revert { left: -34px; }
+.or-msg-revert svg { width: 13px; height: 13px; }
+@media (hover: hover) {
+    .or-msg-row:hover .or-msg-revert { display: flex; }
+}
+.or-msg-row.show-revert .or-msg-revert { display: flex; }
+
+.or-chat-footer {
+    flex-shrink: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+    display: flex; justify-content: center; background: var(--or-cream-2);
+}
+
+/* 生成中:药丸按钮内三点跳动 */
+.or-generating-dots { display: inline-flex; gap: 3px; }
+.or-generating-dots span {
+    width: 4px; height: 4px; border-radius: 50%; background: var(--or-white);
+    animation: or-bounce 1s infinite;
+}
+.or-generating-dots span:nth-child(2) { animation-delay: .15s; }
+.or-generating-dots span:nth-child(3) { animation-delay: .3s; }
+@keyframes or-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: .5; }
+    30% { transform: translateY(-3px); opacity: 1; }
+}
+
+/* ── 群聊件:2x2 成员拼头像 / 气泡上方发送者名 ── */
+.or-avatar-group {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 5px;
+    background: var(--or-cream-2); border-radius: 50%;
+}
+.or-avatar-group span {
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: var(--or-white); font-size: 9px; font-weight: 600; min-width: 0; min-height: 0;
+}
+.or-sender-name { font-size: 10.5px; color: var(--or-cocoa-light); margin: 0 0 2px 2px; }

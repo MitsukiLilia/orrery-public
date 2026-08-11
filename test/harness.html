@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Orrery 试衣间</title>
+<style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #EFEAE0; color: #333; }
+    .wrap { display: flex; min-height: 100vh; }
+    .panel { width: 420px; flex-shrink: 0; padding: 18px; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; }
+    .stage { flex: 1; position: relative; padding: 18px; }
+    h1 { font-size: 16px; margin: 0 0 4px; }
+    .note { font-size: 11.5px; color: #999; margin: 0 0 16px; line-height: 1.5; }
+    fieldset { border: 1px solid #ddd; border-radius: 8px; margin: 0 0 14px; padding: 10px 12px; }
+    legend { font-size: 12px; font-weight: 600; color: #555; padding: 0 4px; }
+    button.mock-btn {
+        font-size: 12.5px; padding: 6px 10px; margin: 3px 4px 3px 0; border-radius: 6px;
+        border: 1px solid #ccc; background: #f7f7f7; cursor: pointer;
+    }
+    button.mock-btn:active { background: #eee; }
+    label.mock-label { font-size: 12px; display: inline-flex; align-items: center; gap: 5px; margin: 3px 10px 3px 0; }
+    input[type="number"] { width: 52px; font-size: 12px; padding: 3px; }
+    #state { font-size: 11.5px; background: #f4f4f4; border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; word-break: break-all; }
+    #log { font-size: 11px; background: #222; color: #b6f7b6; border-radius: 6px; padding: 8px 10px; height: 160px; overflow-y: auto; white-space: pre-wrap; }
+    #chatlog { font-size: 11.5px; background: #f4f4f4; border-radius: 6px; padding: 8px 10px; max-height: 140px; overflow-y: auto; }
+    #chatlog div { padding: 2px 0; border-bottom: 1px dashed #ddd; }
+    #ledgerDump { font-size: 10.5px; background: #f4f4f4; border-radius: 6px; padding: 8px 10px; max-height: 220px; overflow-y: auto; white-space: pre-wrap; }
+    /* 酒馆里 #extensionsMenu 真实是个下拉容器,这里只需要够用的最小复刻,不追求还原度 */
+    #extensionsMenu { border: 1px dashed #bbb; border-radius: 8px; padding: 10px; background: #fafafa; min-height: 40px; }
+    #extensionsMenu .list-group-item {
+        display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px;
+        text-decoration: none; color: #333; font-size: 13px; cursor: pointer;
+    }
+    #extensionsMenu .list-group-item:hover { background: #eee; }
+    #fileProtoWarn {
+        display: none; position: fixed; inset: 0; z-index: 99999;
+        background: #fff8ec; color: #5a3d1f; padding: 40px; font-size: 14px; line-height: 1.8;
+        overflow-y: auto;
+    }
+    #fileProtoWarn code {
+        background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 13px;
+    }
+    #fileProtoWarn pre {
+        background: #2b2b2b; color: #d8f5d8; padding: 12px 14px; border-radius: 8px;
+        overflow-x: auto; font-size: 12.5px;
+    }
+</style>
+</head>
+<body>
+<div id="fileProtoWarn">
+    <h2 style="margin-top:0;">这个页面需要一个本地静态服务器,不能直接双击打开</h2>
+    <p>
+        Orrery 的真实代码用的是 ES module(<code>import</code>/<code>export</code>),这是酒馆加载第三方扩展的真实方式(见
+        <code>docs/VERIFICATION.md</code> §1)。浏览器规范规定:<code>&lt;script type="module"&gt;</code> 跨文件加载时走的是
+        CORS 校验的 fetch 流程,而 <code>file://</code> 页面的 origin 是不透明的 <code>null</code>——不管目标文件是不是同一个文件夹,
+        都会被当成跨域请求直接拦掉(这不是 Orrery 的 bug,是 Chromium 对 ES module 的既定行为;经浏览器控制台实测复现过这条报错:
+        <code>Access to script at 'file:///.../index.js' from origin 'null' has been blocked by CORS policy</code>)。
+    </p>
+    <p>解法很简单,起一个本地静态服务器(任选一种,零依赖):</p>
+    <pre>cd 扩展目录(orrery)&& python3 -m http.server 8420</pre>
+    <p>然后访问 <code>http://localhost:8420/test/harness.html</code>——其余一切(mock 酒馆环境、事件按钮、IndexedDB、手机 UI)照常工作,这一步只是换个协议头。</p>
+    <p style="opacity:.7;">酒馆本身永远是通过 http(s) 服务器加载扩展的,不会遇到这个限制——这纯粹是本地单文件试衣间开发时才会碰到的浏览器平台限制。</p>
+</div>
+<div class="wrap">
+    <div class="panel">
+        <h1>Orrery 试衣间</h1>
+        <p class="note">
+            mock 最小酒馆环境跑通全链路。仅供开发自查,不代表真机,不要据此声称验收通过。<br>
+            左侧控制酒馆事件与 LLM fixture,右侧「魔杖菜单」里的 Orrery 是真实加载的扩展本体。<br>
+            <b>需要用本地静态服务器打开</b>(不能直接双击文件)——ES module 跨文件加载在 <code>file://</code> 下会被
+            CORS 拦掉,和酒馆的加载方式无关,纯粹是浏览器对 file:// 的限制。一行命令:<br>
+            <code>cd 扩展目录 && python3 -m http.server 8420</code>,再访问
+            <code>http://localhost:8420/test/harness.html</code>。
+        </p>
+
+        <fieldset>
+            <legend>1. 楼层事件</legend>
+            <button class="mock-btn" data-act="add-char">+ AI 说一层</button>
+            <button class="mock-btn" data-act="add-user">+ 用户说一层</button>
+            <br>
+            <label class="mock-label">删除到第 <input type="number" id="delN" value="0" min="0"> 层(含)</label>
+            <button class="mock-btn" data-act="delete-from">MESSAGE_DELETED</button>
+            <br>
+            <label class="mock-label">swipe 第 <input type="number" id="swipeN" value="0" min="0"> 层</label>
+            <button class="mock-btn" data-act="swipe">MESSAGE_SWIPED</button>
+        </fieldset>
+
+        <fieldset>
+            <legend>2. 世界切换</legend>
+            <button class="mock-btn" data-act="chat-changed">切换聊天(新 worldKey)</button>
+            <button class="mock-btn" data-act="reset-db">清空 IndexedDB(orrery 库)</button>
+        </fieldset>
+
+        <fieldset>
+            <legend>3. LLM fixture(mock generateRaw / ConnectionManagerRequestService)</legend>
+            <label class="mock-label"><input type="checkbox" id="fxFence"> 主生成用「```json 围栏+前后杂文」包裹(测试宽容解析)</label><br>
+            <label class="mock-label"><input type="checkbox" id="fxBroken"> 模拟解析失败(两次都返回垃圾文本)</label><br>
+            <label class="mock-label"><input type="checkbox" id="fxEmptyB"> 续聊/盖楼返回空 messages/replies(测试「暂无新动静」)</label><br>
+            <p class="note" style="margin:8px 0 0;">
+                fixture 按 systemPrompt 内容自动路由:含「压缩成 5 行以内」→摘要(C)/含「匿名论坛」→论坛主生成(F)/
+                含「围观这个帖子」→论坛盖楼(G)/含「续写」→消息续聊(B/B_GROUP)/否则→消息主生成(A)。
+                论坛与消息的这套流程都从手机内点「刷新」「生成更多」触发,不用额外按钮。<br>
+                语言开关(zh/日中双语)直接在手机「设置」页切——fixture 会读同一份 extensionSettings,
+                切到日中双语后返回的消息/帖子会带 zh 字段。
+            </p>
+        </fieldset>
+
+        <fieldset>
+            <legend>当前状态</legend>
+            <button class="mock-btn" id="refreshStateBtn">刷新状态 + 账本(手机内点了刷新/生成更多/反悔之后手动点一下)</button>
+            <div id="state">(加载中)</div>
+        </fieldset>
+
+        <fieldset>
+            <legend>chat 层(mock ctx.chat)</legend>
+            <div id="chatlog"></div>
+        </fieldset>
+
+        <fieldset>
+            <legend>账本(store.getEntriesForWorld)</legend>
+            <button class="mock-btn" data-act="dump-ledger">刷新账本 dump</button>
+            <div id="ledgerDump"></div>
+        </fieldset>
+
+        <fieldset>
+            <legend>日志</legend>
+            <div id="log"></div>
+        </fieldset>
+    </div>
+
+    <div class="stage">
+        <p class="note">魔杖菜单(真实扩展入口):</p>
+        <div id="extensionsMenu"></div>
+    </div>
+</div>
+
+<script>
+    if (location.protocol === 'file:') {
+        document.getElementById('fileProtoWarn').style.display = 'block';
+    }
+</script>
+<script type="module">
+    // ── mock 最小酒馆环境:先于 index.js 执行(同为 module script,按文档顺序保证)。 ──
+    import * as store from '../core/store.js';
+
+    function log(msg) {
+        const el = document.getElementById('log');
+        const line = document.createElement('div');
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        el.appendChild(line);
+        el.scrollTop = el.scrollHeight;
+    }
+
+    class MockEventEmitter {
+        constructor() { this.handlers = {}; }
+        on(event, fn) { (this.handlers[event] ||= []).push(fn); }
+        async emit(event, ...args) {
+            for (const fn of (this.handlers[event] || [])) await fn(...args);
+        }
+    }
+
+    const eventTypes = {
+        MESSAGE_SWIPED: 'message_swiped',
+        MESSAGE_SENT: 'message_sent',
+        MESSAGE_RECEIVED: 'message_received',
+        MESSAGE_EDITED: 'message_edited',
+        MESSAGE_DELETED: 'message_deleted',
+        CHAT_CHANGED: 'chat_id_changed',
+        CHARACTER_MESSAGE_RENDERED: 'character_message_rendered',
+    };
+    const eventSource = new MockEventEmitter();
+
+    let chatCounter = 1;
+    function makeChatId() { return `demo-chat-${chatCounter}`; }
+
+    const chat = [
+        { name: '小满', is_user: false, mes: '（房间里安静得只剩下时钟的声音，小满盯着手机屏幕，很久没有点开那条未读消息。）' },
+        { name: '用户', is_user: true, mes: '要不要先睡一觉，明天再想？' },
+    ];
+    const characters = [{ avatar: 'sample-char.png', name: '小满' }];
+
+    // ── LLM fixture:按 systemPrompt 内容分流到 A/B/C/F/G 五套返回,受面板开关控制 ──
+    // 语言开关读同一份 ctx.extensionSettings(手机「设置」页与这里是同一个对象引用),
+    // ja_zh 档时给消息/帖子/回复挂 zh 字段,模拟"模型确实照 {{LANG_RULE}} 输出译文"。
+    function langIsJaZh() { return ctx.extensionSettings?.orrery?.language === 'ja_zh'; }
+    function withZh(text) { return langIsJaZh() ? { text, zh: `（中译）${text}` } : { text }; }
+    // 论坛用:字段名是 body 不是 text,单独给一个,别复用 withZh 撞错字段名。
+    function withZhBody(body) { return langIsJaZh() ? { body, zh: `（中译）${body}` } : { body }; }
+
+    function buildFixtureA() {
+        return { worldTime: '2026-08-10 22:15', threads: [
+            { threadId: 'c_aiko', newContact: { contactId: 'c_aiko', name: '愛子', relation: '高中同班同学' },
+              messages: [
+                  { sender: 'me', ...withZh('到家了'), delayMin: 0, read: true },
+                  { sender: 'c_aiko', ...withZh('辛苦啦，早点休息'), delayMin: 12, read: false },
+              ] },
+            { threadId: 'c_mama', newContact: { contactId: 'c_mama', name: '妈妈', relation: '母亲' },
+              messages: [{ sender: 'c_mama', ...withZh('晚饭要留吗'), delayMin: 3, read: true }] },
+            { threadId: 'g_class', newGroup: { groupId: 'g_class', name: '三年二组', members: [
+                  { id: 'c_aiko', name: '愛子' }, { id: 'c_chinatsu', name: '千夏' }, { id: 'c_rin', name: 'りん' }] },
+              messages: [
+                  { sender: 'c_chinatsu', ...withZh('明天谁去补习班'), delayMin: 5, read: true },
+                  { sender: 'c_rin', ...withZh('我我我'), delayMin: 1, read: true },
+                  { sender: 'c_aiko', ...withZh('你昨天不是刚翘了'), delayMin: 0, read: false },
+              ] },
+        ] };
+    }
+    function buildFixtureB() {
+        return { messages: [
+            { sender: 'me', ...withZh('在干嘛'), delayMin: 0, read: true },
+            { sender: 'contact', ...withZh('没什么，躺着'), delayMin: 4, read: false },
+        ] };
+    }
+    const FIXTURE_C = '愛子与主角保持日常联系，语气轻松，暂无未解决话题，情绪基调平稳。';
+
+    // 首次论坛主生成:2 板块 + 3 住民(1 名带 castName,验证 UI 绝不渲染真名)+ 2 帖(1 帖带 2 楼回复,含 replyToFloor)。
+    function buildFixtureF() {
+        return {
+            worldTime: '2026-08-10 23:40',
+            newBoards: [
+                { boardId: 'b_life', name: '杂谈', desc: '什么都能聊两句的地方' },
+                { boardId: 'b_gossip', name: '八卦', desc: '谁看见谁了' },
+            ],
+            newResidents: [
+                { residentId: 'r_neko', handle: '夜猫子', persona: '深夜出没,句尾爱加「(小声)」' },
+                { residentId: 'r_bread', handle: '面包忍者', persona: '打工人,吐槽欲旺盛' },
+                { residentId: 'r_shadow', handle: '路过的影子', persona: '话少但总在场', castName: '小满' },
+            ],
+            newThreads: [
+                {
+                    boardId: 'b_gossip', authorId: 'r_neko', title: '刚刚在便利店看到不熟的两个人',
+                    ...withZhBody('真的很奇怪的气氛(小声)'),
+                    replies: [
+                        { authorId: 'r_bread', ...withZhBody('爆瓜爆瓜'), delayMin: 2 },
+                        { authorId: 'r_shadow', ...withZhBody('……可能只是路过吧'), delayMin: 5, replyToFloor: 1 },
+                    ],
+                },
+                {
+                    boardId: 'b_life', authorId: 'r_bread', title: '今天又被老板骂了,谁懂',
+                    ...withZhBody('干活累死,嘴还不能停'),
+                    replies: [],
+                },
+            ],
+            newReplies: [],
+        };
+    }
+    function buildFixtureG() {
+        return { replies: [
+            { authorId: 'r_bread', ...withZhBody('笑死,前排吃瓜'), delayMin: 1 },
+            { authorId: 'r_neko', ...withZhBody('别说了我也想问(小声)'), delayMin: 3, replyToFloor: 1 },
+        ] };
+    }
+
+    function wrapFenced(obj) {
+        return `好的，这是本次生成结果：\n\`\`\`json\n${JSON.stringify(obj)}\n\`\`\`\n以上，希望符合要求！`;
+    }
+
+    function mockGenerate(systemPrompt) {
+        if (document.getElementById('fxBroken').checked) return '(不知道你在说什么，我拒绝回答。)';
+        const fence = document.getElementById('fxFence').checked;
+        const emptyMore = document.getElementById('fxEmptyB').checked;
+        if (systemPrompt.includes('压缩成 5 行以内')) return FIXTURE_C;
+        if (systemPrompt.includes('匿名论坛')) {
+            const body = buildFixtureF();
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        if (systemPrompt.includes('围观这个帖子')) {
+            const body = emptyMore ? { replies: [] } : buildFixtureG();
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        if (systemPrompt.includes('续写')) {
+            const body = emptyMore ? { messages: [] } : buildFixtureB();
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        const body = buildFixtureA();
+        return fence ? wrapFenced(body) : JSON.stringify(body);
+    }
+
+    async function generateRaw({ systemPrompt }) {
+        await new Promise(r => setTimeout(r, 250)); // 模拟网络延迟,便于观察"生成中"三点动画
+        return mockGenerate(systemPrompt || '');
+    }
+
+    const POPUP_TYPE = { CONFIRM: 2 };
+    const POPUP_RESULT = { AFFIRMATIVE: 1, NEGATIVE: 0 };
+    function callGenericPopup(content, _type) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999999;display:flex;align-items:center;justify-content:center;';
+            overlay.innerHTML = `<div style="background:#fff;padding:20px 24px;border-radius:10px;max-width:280px;font-family:sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25);">
+                <p style="margin:0 0 16px;font-size:13.5px;color:#333;">${content}</p>
+                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                    <button id="mpCancel" style="padding:6px 14px;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer;">取消</button>
+                    <button id="mpOk" style="padding:6px 14px;border:none;background:#6E5A50;color:#fff;border-radius:6px;cursor:pointer;">确定</button>
+                </div></div>`;
+            document.body.appendChild(overlay);
+            overlay.querySelector('#mpOk').onclick = () => { overlay.remove(); resolve(POPUP_RESULT.AFFIRMATIVE); };
+            overlay.querySelector('#mpCancel').onclick = () => { overlay.remove(); resolve(POPUP_RESULT.NEGATIVE); };
+        });
+    }
+
+    const mockProfiles = [{ id: 'p1', name: 'Fixture Profile A' }, { id: 'p2', name: 'Fixture Profile B' }];
+    const ConnectionManagerRequestService = {
+        getSupportedProfiles: () => mockProfiles,
+        constructPrompt: (messages) => messages,
+        async sendRequest(_profileId, prompt, _maxTokens) {
+            const sys = Array.isArray(prompt) ? (prompt.find(m => m.role === 'system')?.content || '') : '';
+            await new Promise(r => setTimeout(r, 250));
+            return { content: mockGenerate(sys) };
+        },
+    };
+
+    const ctx = {
+        chat, characters, characterId: 0, groupId: null,
+        get chatId() { return makeChatId(); },
+        getCurrentChatId: makeChatId,
+        name1: '用户', name2: '小满',
+        eventSource, eventTypes,
+        extensionSettings: {},
+        saveSettingsDebounced: () => {},
+        generateRaw,
+        ConnectionManagerRequestService,
+        callGenericPopup, POPUP_TYPE, POPUP_RESULT,
+    };
+    window.SillyTavern = { getContext: () => ctx };
+
+    // ── 面板逻辑 ──
+    function renderChatLog() {
+        document.getElementById('chatlog').innerHTML = chat.map((m, i) =>
+            `<div>[${i}] ${m.is_user ? '用户' : m.name}: ${m.mes}</div>`).join('');
+    }
+
+    async function renderState() {
+        const worldKey = `${characters[ctx.characterId].avatar}::${ctx.getCurrentChatId()}`;
+        const [wmMessenger, wmForum] = await Promise.all([
+            store.getWatermark(worldKey, 'messenger'),
+            store.getWatermark(worldKey, 'forum'),
+        ]);
+        const tip = chat.length - 1;
+        document.getElementById('state').textContent =
+            `worldKey = ${worldKey}\nchat.length = ${chat.length} (tip = ${tip})\n` +
+            `watermarks = { messenger: ${wmMessenger}, forum: ${wmForum} }\n` +
+            `messenger 落后 = ${wmMessenger < tip} / forum 落后 = ${wmForum < tip}` +
+            `(两个 app 各自独立——一个刷新不该清另一个的红点)`;
+    }
+
+    async function dumpLedger() {
+        const worldKey = `${characters[ctx.characterId].avatar}::${ctx.getCurrentChatId()}`;
+        const entries = await store.getEntriesForWorld(worldKey);
+        document.getElementById('ledgerDump').textContent = JSON.stringify(entries, null, 1);
+    }
+
+    document.querySelector('.panel').addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-act]');
+        if (!btn) return;
+        const act = btn.dataset.act;
+
+        if (act === 'add-char') {
+            chat.push({ name: '小满', is_user: false, mes: '（新的一层正文，随便写点什么。）' });
+            const idx = chat.length - 1;
+            await eventSource.emit(eventTypes.MESSAGE_RECEIVED, idx, 'normal');
+            await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, idx, 'normal');
+            log(`MESSAGE_RECEIVED(${idx})`);
+        } else if (act === 'add-user') {
+            chat.push({ name: '用户', is_user: true, mes: '（用户新的一层发言。）' });
+            const idx = chat.length - 1;
+            await eventSource.emit(eventTypes.MESSAGE_SENT, idx);
+            log(`MESSAGE_SENT(${idx})`);
+        } else if (act === 'delete-from') {
+            const n = Number(document.getElementById('delN').value);
+            chat.length = n;
+            await eventSource.emit(eventTypes.MESSAGE_DELETED, n);
+            log(`MESSAGE_DELETED(${n}) — chat 截断到 ${n} 层`);
+        } else if (act === 'swipe') {
+            const n = Number(document.getElementById('swipeN').value);
+            if (chat[n]) chat[n].mes = '（被 swipe 出的新内容。）';
+            await eventSource.emit(eventTypes.MESSAGE_SWIPED, n);
+            log(`MESSAGE_SWIPED(${n})`);
+        } else if (act === 'chat-changed') {
+            chatCounter++;
+            chat.length = 0;
+            chat.push({ name: '小满', is_user: false, mes: '（新聊天的第一层。）' });
+            await eventSource.emit(eventTypes.CHAT_CHANGED, makeChatId());
+            log(`CHAT_CHANGED → ${makeChatId()}`);
+        } else if (act === 'reset-db') {
+            indexedDB.deleteDatabase('orrery');
+            log('已请求删除 IndexedDB「orrery」库,刷新页面生效');
+        } else if (act === 'dump-ledger') {
+            await dumpLedger();
+        }
+
+        renderChatLog();
+        await renderState();
+    });
+
+    renderChatLog();
+    renderState();
+    // 手机内部的操作(点刷新/生成更多/反悔)不会通知这个面板,不用 setInterval 轮询——
+    // 那会让无头浏览器的 virtual-time-budget 永远等不到静止态(实测会挂住),按钮手动刷新更可控。
+    document.getElementById('refreshStateBtn').addEventListener('click', async () => {
+        await renderState();
+        await dumpLedger();
+    });
+</script>
+
+<!-- 真实扩展本体:与 manifest.json 里 js 字段加载方式一致(type=module),路径按 test/ 相对 ../ 解析。 -->
+<script type="module" src="../index.js"></script>
+</body>
+</html>

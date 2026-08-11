@@ -1,0 +1,250 @@
+/* 手机壳皮肤——海盐巧克力。--or-* token 只在这里定义一次,messenger/skin.css 直接消费。 */
+
+.or-root {
+    --or-cream: #F4EFE4; --or-cream-2: #ECE4D4; --or-white: #FBF9F4;
+    --or-salt: #C7D7E1; --or-salt-deep: #A9C0CF;
+    --or-cocoa: #6E5A50; --or-cocoa-light: #8B7568;
+    --or-shadow: rgba(110, 90, 80, .12);
+}
+
+/* 墨白主题:韩系 ins 黑白灰,同一套 token 换值即换肤(波点/浪花由 JS 置 none) */
+.or-root[data-theme="mono"] {
+    --or-cream: #F5F5F3; --or-cream-2: #E9E9E6; --or-white: #FFFFFF;
+    --or-salt: #DCDCD8; --or-salt-deep: #999995;
+    --or-cocoa: #2C2C2A; --or-cocoa-light: #83837F;
+    --or-shadow: rgba(0, 0, 0, .10);
+}
+
+/* 月夜主题:Lunar Y2K 网络日记,月白蓝底+粉色点缀(salt-deep=粉,担当未读点/开关/选中态) */
+.or-root[data-theme="lunar"] {
+    --or-cream: #F6F8FB; --or-cream-2: #E0ECF6; --or-white: #FFFFFF;
+    --or-salt: #C8D8E5; --or-salt-deep: #F2C5D7;
+    --or-cocoa: #2F3136; --or-cocoa-light: #8A94A0;
+    --or-shadow: rgba(47, 49, 54, .10);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+.or-root {
+    /* ⚠️不许用 fixed:酒馆给 <html> 挂了 transform(哪怕恒等矩阵),祖先 transform 会让 fixed
+       退化、inset:0 撑不出高度(真机实测 height=0,手机飞出屏顶)。host 自身用 vw/dvh 显式
+       尺寸不受此影响,所以这里相对 host 绝对定位即可满屏。 */
+    position: absolute; inset: 0; z-index: 2147483647;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+}
+/* 开合的显隐由 JS 切 host.style.display(见 ui/shell.js),这里只管 200ms 的 scale+fade 过渡。 */
+
+.or-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(60, 50, 45, .35);
+    opacity: 0; transition: opacity .2s ease;
+}
+.or-root.open .or-backdrop { opacity: 1; }
+
+.or-phone {
+    position: absolute; left: 50%; top: 50%;
+    width: 100%; height: 100%;
+    background: var(--or-cream);
+    display: flex; flex-direction: column; overflow: hidden;
+    transform: translate(-50%, -50%) scale(.96); opacity: 0;
+    transition: transform .2s ease, opacity .2s ease;
+}
+.or-root.open .or-phone { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+
+@media (min-width: 640px) {
+    .or-phone {
+        width: 390px; height: 780px; max-height: 92vh;
+        border-radius: 36px; box-shadow: 0 20px 60px var(--or-shadow);
+    }
+}
+
+/* ── 状态栏 / home 条(纯装饰) ── */
+.or-statusbar {
+    flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px 4px; color: var(--or-cocoa);
+}
+.or-statusbar-label { font-size: 12px; font-weight: 600; letter-spacing: .04em; }
+.or-statusbar-icons { display: flex; align-items: center; gap: 6px; }
+.or-statusbar-icons svg { height: 11px; width: auto; }
+
+.or-homebar { flex-shrink: 0; display: flex; justify-content: center; padding: 8px 0 10px; }
+.or-homebar::after {
+    content: ''; width: 120px; height: 4px; border-radius: 2px;
+    background: var(--or-cocoa-light); opacity: .4;
+}
+
+/* ── 屏幕区(网格 / app 内容公用容器) ── */
+.or-screen { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+.or-header {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    flex-shrink: 0; background: var(--or-cream-2);
+}
+.or-header-title { font-size: 15px; font-weight: 600; color: var(--or-cocoa); flex: 1; }
+.or-back-btn {
+    width: 30px; height: 30px; border: none; background: none; color: var(--or-cocoa);
+    display: flex; align-items: center; justify-content: center; border-radius: 50%;
+    padding: 0; cursor: pointer; flex-shrink: 0;
+}
+.or-back-btn:active { background: rgba(110, 90, 80, .08); }
+.or-back-btn svg { width: 18px; height: 18px; }
+
+.or-empty {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 30px; text-align: center; font-size: 13px; color: var(--or-cocoa-light); line-height: 1.6;
+}
+
+/* ── app 网格 ── */
+.or-grid {
+    flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 24px 14px; padding: 28px 22px; align-content: start;
+}
+.or-app {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
+}
+.or-app-icon {
+    position: relative; width: 58px; height: 58px; border-radius: 28%;
+    overflow: hidden; display: flex; align-items: center; justify-content: center;
+    color: var(--or-white);
+    transition: transform .12s ease;
+}
+.or-app:active .or-app-icon { transform: scale(.92); }
+.or-app-icon svg { width: 28px; height: 28px; position: relative; z-index: 1; }
+.or-app-icon::before {
+    content: ''; position: absolute; inset: 0;
+    background-image: var(--or-dots); background-size: 30px 30px;
+}
+.or-app-icon::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 9px;
+    background-image: var(--or-wave); background-size: 20px 9px; background-repeat: repeat-x;
+}
+.or-app[data-bg="cream"] .or-app-icon { background: var(--or-cream-2); color: var(--or-cocoa); }
+.or-app[data-bg="salt"] .or-app-icon { background: var(--or-salt); color: var(--or-cocoa); }
+.or-app[data-bg="cocoa"] .or-app-icon { background: var(--or-cocoa); color: var(--or-white); }
+.or-app-label { font-size: 11px; color: var(--or-cocoa); }
+.or-app.disabled { opacity: .42; }
+.or-app-img {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; z-index: 2; display: block;
+}
+.or-app-badge {
+    position: absolute; top: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--or-cocoa); border: 2px solid var(--or-cream); z-index: 3;
+}
+
+/* ── 通用药丸按钮(刷新 / 生成更多复用) ── */
+.or-pill-btn {
+    border: none; background: var(--or-cocoa); color: var(--or-white);
+    font-size: 13px; font-weight: 600; padding: 9px 22px; border-radius: 999px;
+    cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 6px;
+}
+.or-pill-btn { transition: transform .12s ease, opacity .12s ease; }
+.or-pill-btn:active { opacity: .85; transform: scale(.95); }
+.or-pill-btn:disabled { opacity: .5; cursor: default; }
+.or-pill-btn.small { padding: 6px 16px; font-size: 12px; }
+
+/* ── 设置屏 ── */
+.or-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+.or-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--or-cream-2);
+}
+.or-row-label { font-size: 14px; color: var(--or-cocoa); }
+.or-row-nav {
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    background: none; border: none; font-family: inherit; width: 100%;
+    padding: 14px 18px; text-align: left;
+}
+.or-row-value { font-size: 13px; color: var(--or-cocoa-light); }
+.or-row-nav svg { width: 15px; height: 15px; color: var(--or-cocoa-light); flex-shrink: 0; }
+
+.or-stepper { display: flex; align-items: center; gap: 10px; }
+.or-stepper button {
+    width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--or-cocoa-light);
+    background: none; color: var(--or-cocoa); display: flex; align-items: center; justify-content: center;
+    padding: 0; cursor: pointer;
+}
+.or-stepper button:active { background: rgba(110, 90, 80, .08); }
+.or-stepper button svg { width: 12px; height: 12px; }
+.or-stepper-value { min-width: 26px; text-align: center; font-size: 14px; color: var(--or-cocoa); }
+
+.or-option {
+    display: flex; align-items: center; justify-content: space-between; width: 100%;
+    padding: 14px 18px; border-bottom: 1px solid var(--or-cream-2); cursor: pointer;
+    font-size: 14px; color: var(--or-cocoa); background: none; border: none; text-align: left;
+    font-family: inherit;
+}
+.or-option:active { background: rgba(110, 90, 80, .06); }
+.or-option svg { width: 16px; height: 16px; color: var(--or-salt-deep); }
+
+/* ── 设置页扩展件:开关 / 分区标题 / 独立 API 输入(设置=驾驶舱,不属于小世界只读面) ── */
+.or-switch {
+    width: 42px; height: 24px; border-radius: 12px; border: none; padding: 0;
+    background: var(--or-cream-2); position: relative; cursor: pointer; flex-shrink: 0;
+    transition: background .15s ease;
+}
+.or-switch::after {
+    content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
+    border-radius: 50%; background: var(--or-white); box-shadow: 0 1px 3px var(--or-shadow);
+    transition: left .15s ease;
+}
+.or-switch.on { background: var(--or-salt-deep); }
+.or-switch.on::after { left: 21px; }
+
+.or-section-title {
+    font-size: 11.5px; color: var(--or-cocoa-light); padding: 16px 18px 6px; line-height: 1.5;
+}
+.or-field {
+    display: flex; flex-direction: column; gap: 5px;
+    padding: 10px 18px; border-bottom: 1px solid var(--or-cream-2);
+}
+.or-field label { font-size: 12px; color: var(--or-cocoa-light); }
+.or-field input {
+    border: 1px solid var(--or-cream-2); background: var(--or-white); border-radius: 8px;
+    padding: 8px 10px; font-size: 13px; color: var(--or-cocoa); font-family: inherit; outline: none;
+}
+.or-field input:focus { border-color: var(--or-salt-deep); }
+
+/* ── 激活页(初次认主) ── */
+.or-setup {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 36px 30px; text-align: center;
+}
+.or-setup-badge {
+    width: 64px; height: 64px; border-radius: 28%; background: var(--or-salt);
+    display: flex; align-items: center; justify-content: center; color: var(--or-cocoa);
+    margin-bottom: 4px;
+}
+.or-setup-badge svg { width: 30px; height: 30px; }
+.or-setup-title { font-size: 18px; font-weight: 700; color: var(--or-cocoa); }
+.or-setup-note { font-size: 12.5px; color: var(--or-cocoa-light); line-height: 1.7; }
+.or-setup-field { width: 100%; border-bottom: none; padding: 4px 0 2px; }
+.or-setup-field input { text-align: center; font-size: 15px; }
+.or-setup-warn { font-size: 11px; color: var(--or-cocoa-light); opacity: .85; line-height: 1.6; max-width: 240px; }
+
+/* ── 主题分段选择 / 危险操作 ── */
+.or-theme-seg { display: flex; gap: 6px; }
+.or-theme-seg button {
+    border: 1px solid var(--or-cream-2); background: none; color: var(--or-cocoa-light);
+    font-size: 12px; padding: 6px 12px; border-radius: 999px; cursor: pointer; font-family: inherit;
+}
+.or-theme-seg button.on { background: var(--or-cocoa); border-color: var(--or-cocoa); color: var(--or-white); }
+.or-danger {
+    cursor: pointer; width: 100%; text-align: left; font-family: inherit;
+    background: none; border: none; border-bottom: 1px solid var(--or-cream-2);
+}
+.or-danger:active { background: rgba(180, 86, 78, .06); }
+.or-danger .or-row-label { color: #B4564E; }
+
+/* ── 双语译文行(消息气泡内 / 论坛帖楼共用,M1 全局语言开关 ja_zh 档才会出现) ── */
+.or-zh { font-size: 12px; color: var(--or-cocoa-light); margin-top: 3px; line-height: 1.5; }
+
+/* ── 轻提示 ── */
+.or-toast {
+    position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%);
+    background: var(--or-cocoa); color: var(--or-white); font-size: 12.5px;
+    padding: 8px 16px; border-radius: 16px; opacity: 0; pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease; z-index: 50; white-space: nowrap;
+}
+.or-toast.show { opacity: .95; transform: translateX(-50%) translateY(-6px); }

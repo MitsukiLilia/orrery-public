@@ -1,0 +1,15 @@
+{
+  "created": 1786435844,
+  "usage": {
+    "input_tokens": 2849,
+    "input_tokens_details": {
+      "cache_write_tokens": 0,
+      "cached_tokens": 0
+    },
+    "output_tokens": 254,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 3103
+  }
+}
