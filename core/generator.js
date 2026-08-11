@@ -75,6 +75,13 @@ function langRule(scope, language) {
     return LANG_RULE[scope][language === 'ja_zh' ? 'ja_zh' : 'zh'];
 }
 
+// ── 输出预算 ──
+// max_tokens 是上限不是消耗,给多少不等于烧多少,只按实际生成计费。此前各路按经验值分档
+// (2400/1500/800/4000/1800),但思考型模型的 reasoning tokens 也吃这个额度,真机上仍被
+// finish_reason=length 掐断。统一顶到 Gemini 的输出上限,把「截断」这个失败模式整类消掉;
+// 长度仍由 prompt 里的条数规模约束(每次 2〜8 条之类),不靠预算卡。
+const RESPONSE_BUDGET = 65500;
+
 // zh 净化:LLM 见字段就填,中文档会把原文抄一遍进 zh(她真机踩中「翻译段重复」)。
 // 只有双语档、且译文确实不同于原文时才入账。
 function cleanZh(zh, body, language) {
@@ -239,7 +246,7 @@ async function callCustomApi(customApi, systemPrompt, userContent, responseLengt
         body: JSON.stringify({
             model: customApi.model,
             messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }],
-            max_tokens: responseLength || 600,
+            max_tokens: responseLength || RESPONSE_BUDGET,
             stream: false,
         }),
     });
@@ -279,7 +286,7 @@ export async function callLLM(ctx, systemPrompt, userContent, { profileId, custo
     if (profileId && ctx.ConnectionManagerRequestService) {
         const messages = [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }];
         const constructed = ctx.ConnectionManagerRequestService.constructPrompt(messages, profileId);
-        const result = await ctx.ConnectionManagerRequestService.sendRequest(profileId, constructed, responseLength || 600);
+        const result = await ctx.ConnectionManagerRequestService.sendRequest(profileId, constructed, responseLength || RESPONSE_BUDGET);
         return result?.content ?? '';
     }
     const ev = ctx.eventTypes?.CHAT_COMPLETION_PROMPT_READY ?? ctx.event_types?.CHAT_COMPLETION_PROMPT_READY;
@@ -288,7 +295,7 @@ export async function callLLM(ctx, systemPrompt, userContent, { profileId, custo
         rawGuard = { sysHead: systemPrompt.trim().slice(0, 80), userHead: userContent.trim().slice(0, 80) };
     }
     try {
-        return await ctx.generateRaw({ prompt: userContent, systemPrompt, responseLength: responseLength || 600 });
+        return await ctx.generateRaw({ prompt: userContent, systemPrompt, responseLength: responseLength || RESPONSE_BUDGET });
     } finally {
         rawGuard = null;
     }
@@ -570,9 +577,7 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
     const userContent = `${regrowHint}${caution}${castRef}【正文最新进展】\n${buildFloorContextText(ctx, pendingFloors, floorWindow, excludeTags)}\n\n【手机当前状态】\n${buildWorldDigestText(world)}`;
     const systemPrompt = PROMPT_A.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('messenger', language));
 
-    // responseLength 含思考预算:思考型模型(Gemini 3.1 等)的 reasoning tokens 计入 max_tokens
-    // (她真机实锤:1500 里烧掉 1437 思考,正文被掐断 finish_reason=length),故各路预算 ~3 倍放宽
-    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: 2400 });
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || !Array.isArray(parsed.threads)) return { ok: false, error: 'parse_failed' };
 
     const batchFloor = Math.max(...pendingFloors);
@@ -660,7 +665,7 @@ async function runThreadContinue(ctx, store, { worldKey, threadId, profileId, cu
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
     const userContent = castRef + (buildThreadDigestText(thread, senderNameFn(world, thread)) || '(还没有聊天记录)');
 
-    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: 1500 });
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || !Array.isArray(parsed.messages)) return { ok: false, error: 'parse_failed' };
     if (!parsed.messages.length) return { ok: true, added: 0 };
 
@@ -699,7 +704,7 @@ async function maybeSummarizeThread(ctx, store, { worldKey, threadId, summaryThr
 
     let summary = '';
     try {
-        summary = await callLLM(ctx, PROMPT_C, text, { profileId, customApi, responseLength: 800 });
+        summary = await callLLM(ctx, PROMPT_C, text, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     } catch (err) {
         console.error('[Orrery] 总结生成失败', err);
         return;
@@ -734,7 +739,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     const userContent = `${regrowHint}${caution}${castRef}【正文最新进展】\n${buildFloorContextText(ctx, pendingFloors, floorWindow, excludeTags)}\n\n【论坛当前状态】\n${buildForumDigestText(world)}`;
     const systemPrompt = PROMPT_F.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('forum', language));
 
-    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: 4000 });
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
 
     const batchFloor = Math.max(...pendingFloors);
@@ -830,7 +835,7 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, profileI
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), owner || ctx.name2);
     const userContent = castRef + buildForumThreadDigestText(world, thread);
 
-    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: 1800 });
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || !Array.isArray(parsed.replies)) return { ok: false, error: 'parse_failed' };
     if (!parsed.replies.length) return { ok: true, added: 0 };
 
