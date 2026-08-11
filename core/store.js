@@ -93,9 +93,17 @@ export async function getEntriesForWorld(worldKey) {
     });
 }
 
+// 回滚纪元:每发生一次倒带就 +1。生成是长事务(思考型模型几十秒起步),期间用户完全可能在酒馆里
+// 删楼/swipe;而生成用的 tip/batchFloor 都是发起请求那一刻的快照。没有这个计数器,回来后那句
+// setWatermark 会把回滚刚夹紧的水位又拍回去,这批楼层从此再也不会被生成(且无声无息)。
+// generator 在下笔前比对纪元,变了就整批作废——回滚永远赢,因为它代表用户更晚的意图。
+let rollbackEpoch = 0;
+export function getRollbackEpoch() { return rollbackEpoch; }
+
 /** 删除某世界内 sourceFloor >= floor 的全部条目——回滚的唯一入口(联系人也是余波,一并消失)。 */
 export async function deleteEntriesFromFloor(worldKey, floor) {
     if (!worldKey) return;
+    rollbackEpoch++;
     const db = await openDB();
     await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_LEDGER, 'readwrite');
@@ -104,7 +112,10 @@ export async function deleteEntriesFromFloor(worldKey, floor) {
         req.onsuccess = () => {
             const cursor = req.result;
             if (!cursor) return;
-            if (cursor.value.sourceFloor >= floor) cursor.delete();
+            // 畸形条目(sourceFloor 缺失/非数字)一并清掉:`undefined >= n` 恒为 false,
+            // 不特判的话连 wipeWorld 都清不动它,会变成谁也删不掉的永久孤儿。
+            const sf = cursor.value?.sourceFloor;
+            if (!Number.isFinite(sf) || sf >= floor) cursor.delete();
             cursor.continue();
         };
         tx.oncomplete = resolve;
@@ -126,7 +137,8 @@ export async function deleteThreadFrom(worldKey, threadId, fromTs) {
             const cursor = req.result;
             if (!cursor) return;
             const v = cursor.value;
-            if (v.type !== 'contact' && v.payload?.threadId === threadId && v.ts >= fromTs) cursor.delete();
+            if (v.type !== 'contact' && v.payload?.threadId === threadId
+                && (!Number.isFinite(v.ts) || v.ts >= fromTs)) cursor.delete();
             cursor.continue();
         };
         tx.oncomplete = resolve;
@@ -254,6 +266,7 @@ export async function setWatermark(worldKey, app, floor) {
 /** 回滚夹紧:某层被删/被 swipe 后,所有 app 的水位都不能再声称自己"已处理到"这层之后。 */
 export async function clampWatermarks(worldKey, floor) {
     if (!worldKey) return;
+    rollbackEpoch++;
     const meta = await readMeta(worldKey);
     const wm = normalizeWatermarks(meta);
     for (const app of Object.keys(wm)) wm[app] = Math.min(wm[app], floor - 1);

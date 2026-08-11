@@ -95,16 +95,32 @@ function cleanZh(zh, body, language) {
 
 export function parseLenientJson(raw) {
     if (!raw) return null;
-    let s = String(raw).trim();
-    const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fence) s = fence[1].trim();
-    try { return JSON.parse(s); } catch { /* 继续剥 */ }
+    const s = String(raw).trim();
+    const tryParse = (t) => {
+        try { const v = JSON.parse(t); return (v && typeof v === 'object') ? v : null; } catch { return null; }
+    };
+    // 围栏从后往前试。此前是「抢第一个围栏、把 s 覆写成它」,于是模型先摆一段示例/思考再给正文时
+    // (思考型模型很常见),真正的 JSON 落在覆写范围之外,连后面的大括号兜底都够不着,必然 parse_failed。
+    // 答案通常在最后,所以倒着试;每个围栏各自试各自的,谁也不覆写原文。
+    const fences = [...s.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)];
+    for (let i = fences.length - 1; i >= 0; i--) {
+        const hit = tryParse(fences[i][1].trim());
+        if (hit) return hit;
+    }
+    const whole = tryParse(s);
+    if (whole) return whole;
+    // 最后兜底:回到**原文**取最外层大括号,绝不在被围栏截窄过的子串上找。
     const start = s.indexOf('{');
     const end = s.lastIndexOf('}');
-    if (start !== -1 && end > start) {
-        try { return JSON.parse(s.slice(start, end + 1)); } catch { /* 放弃 */ }
-    }
+    if (start !== -1 && end > start) return tryParse(s.slice(start, end + 1));
     return null;
+}
+
+// 楼层引用只认「已经存在的、更早的楼」。模型数楼层会数错——真机 19 条回复里 3 条把 replyToFloor
+// 指向自己或后面还没出现的楼(渲染出来就是 8F 挂着「>>8」、13F 挂着「>>14」这种指向虚空的引用)。
+// floorNo = 本条自己的楼层号(1F 起)。对不上就当模型没给,整个字段丢掉,不影响正文。
+function validReplyToFloor(rf, floorNo) {
+    return Number.isFinite(rf) && rf >= 1 && rf < floorNo ? rf : undefined;
 }
 
 function stripHtml(text) {
@@ -199,11 +215,17 @@ function fmtWorldTime(ts) {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+// delayMin 上限:世界时钟只许向前走,且 world.worldNow 取全局最大值——模型某条多打两个零
+// (60 → 6000)就能把整个世界的时间地板推到几个月后,之后每批生成都从那里起跳,不可自愈,
+// 只能手动反悔删掉那批才修得回来。一周足够表达「很久以后」,超出的一律按一周算。
+const MAX_DELAY_MIN = 60 * 24 * 7;
+
 /** 从锚点起按 delayMin 依次排开一批消息的世界时刻。起点不早于线程尾,保证单调。 */
 function layoutWorldTimes(messages, anchor, threadTailTs) {
     let clock = Math.max(anchor, threadTailTs || 0);
     return messages.map(m => {
-        clock += (Number.isFinite(m.delayMin) ? Math.max(0, m.delayMin) : 0) * 60000;
+        const d = Number.isFinite(m.delayMin) ? Math.min(Math.max(0, m.delayMin), MAX_DELAY_MIN) : 0;
+        clock += d * 60000;
         return clock;
     });
 }
@@ -577,13 +599,22 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
     const userContent = `${regrowHint}${caution}${castRef}【正文最新进展】\n${buildFloorContextText(ctx, pendingFloors, floorWindow, excludeTags)}\n\n【手机当前状态】\n${buildWorldDigestText(world)}`;
     const systemPrompt = PROMPT_A.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('messenger', language));
 
+    const epoch = store.getRollbackEpoch();
     const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || !Array.isArray(parsed.threads)) return { ok: false, error: 'parse_failed' };
+    // 生成动辄几十秒,期间用户完全可能在酒馆里删楼/swipe。这批内容是照着回滚前的正文写的,
+    // 而 batchFloor 也是那时的快照——照写不误的话,末尾那句 setWatermark 会把回滚刚夹紧的水位
+    // 又拍回去,这段楼层从此再不会被生成。回滚代表用户更晚的意图,整批作废。
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
 
     const batchFloor = Math.max(...pendingFloors);
     const touchedThreads = new Set();
     let addedCount = 0;
     const anchor = parseWorldTime(parsed.worldTime) ?? world.worldNow ?? Date.now();
+    // 批内线程尾时刻:world.threads 是批次开始前的静态快照,循环里从不更新。同一次响应里
+    // 两个块落到同一条线程时(模型重复同一 threadId,或经身份归一后被合并),第二块若仍读旧快照,
+    // 排出来的世界时刻会早于第一块刚写进去的消息,同线程内出现时间倒挂。
+    const batchTail = new Map();
 
     for (const t of parsed.threads) {
         if (!t || !t.threadId) continue;
@@ -626,9 +657,12 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
             const cid = t.newContact?.contactId ? String(t.newContact.contactId) : null;
             if (gid && world.groups.has(gid)) threadId = gid;
             else if (cid && world.contacts.has(cid)) threadId = cid;
-            else {
+            else if (!t.newGroup) {
                 // 再兜一层:没声明新身份(联系人早已存在)但线程名又对不上时,看消息发送者——
                 // 私聊里非 me 的发送者只会是对面那位,唯一且已知就认它。
+                // ⚠️必须排除「本想建群但没建成」的情况(比如成员被 user 侧防线滤到不足两人):
+                // 提示词明写「同一个人在不同线程里用同一个 id」,群友多半同时也是私聊联系人,
+                // 不设这道闸就会把一批群聊消息错投进那个人的私聊里——比丢弃更难发现。
                 const senders = [...new Set((Array.isArray(t.messages) ? t.messages : [])
                     .map(m => m?.sender).filter(s => s && s !== 'me').map(String))];
                 if (senders.length === 1 && world.contacts.has(senders[0])) threadId = senders[0];
@@ -644,7 +678,10 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
             continue;
         }
         const valid = t.messages.filter(m => m && m.text);
-        const times = layoutWorldTimes(valid, anchor, world.threads.get(threadId)?.lastMessage?.displayTs);
+        // 线程尾优先取批内已写入的最后时刻(见上方 batchTail),没有才回落到批前快照
+        const tail = batchTail.get(threadId) ?? world.threads.get(threadId)?.lastMessage?.displayTs;
+        const times = layoutWorldTimes(valid, anchor, tail);
+        if (times.length) batchTail.set(threadId, times[times.length - 1]);
         for (let i = 0; i < valid.length; i++) {
             const m = valid[i];
             const payload = {
@@ -825,7 +862,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
             const rp = replies[i];
             const rpayload = { threadId, authorId: String(rp.authorId), body: String(rp.body), worldTime: times[i] };
             { const z = cleanZh(rp.zh, rp.body, language); if (z) rpayload.zh = z; }
-            if (Number.isFinite(rp.replyToFloor)) rpayload.replyToFloor = rp.replyToFloor;
+            { const rf = validReplyToFloor(rp.replyToFloor, i + 1); if (rf !== undefined) rpayload.replyToFloor = rf; }
             await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'forum', type: 'forum_reply', payload: rpayload });
             addedCount++;
         }
@@ -843,7 +880,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
             const rp = replies[i];
             const rpayload = { threadId, authorId: String(rp.authorId), body: String(rp.body), worldTime: times[i] };
             { const z = cleanZh(rp.zh, rp.body, language); if (z) rpayload.zh = z; }
-            if (Number.isFinite(rp.replyToFloor)) rpayload.replyToFloor = rp.replyToFloor;
+            { const rf = validReplyToFloor(rp.replyToFloor, thread.replies.length + 1); if (rf !== undefined) rpayload.replyToFloor = rf; }
             await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'forum', type: 'forum_reply', payload: rpayload });
             addedCount++;
             thread.replies.push(rpayload);
@@ -897,7 +934,7 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, profileI
         const rp = valid[i];
         const rpayload = { threadId, authorId: String(rp.authorId), body: String(rp.body), worldTime: times[i] };
         { const z = cleanZh(rp.zh, rp.body, language); if (z) rpayload.zh = z; }
-        if (Number.isFinite(rp.replyToFloor)) rpayload.replyToFloor = rp.replyToFloor;
+        { const rf = validReplyToFloor(rp.replyToFloor, thread.replies.length + i + 1); if (rf !== undefined) rpayload.replyToFloor = rf; }
         await store.addEntry({ worldKey, sourceFloor, app: 'forum', type: 'forum_reply', payload: rpayload });
     }
     return { ok: true, added: valid.length };

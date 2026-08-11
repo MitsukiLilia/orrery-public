@@ -17,8 +17,13 @@ export function registerRollback(ctx, store, onWorldChanged) {
     eventSource.on(eventTypes.MESSAGE_RECEIVED, signalNewFloor);
     eventSource.on(eventTypes.CHARACTER_MESSAGE_RENDERED, signalNewFloor);
 
-    // 删层(单条删除 or "删此层及之后"批量删除,ST 两条路径 emit 的都是删除后的新 chat.length,
-    // 数值上就等于起删楼层 N,见 docs/VERIFICATION.md)→ 世界倒带到 N,两个 app 的水位一并夹紧。
+    // 删层 → 世界倒带到 N,两个 app 的水位一并夹紧。
+    // ⚠️N 的语义只对「删此层及之后」精确:那条路径 `chat.length = this_del_mes` 后再 emit,
+    // 新长度恰好等于起删楼层(核实于 script.js:11463)。单条删除走的是 `chat.splice(id,1)` 后
+    // emit 新长度(script.js:1610/1626)——**给的是删完的总长,不是被删的下标**,ST 没有把下标
+    // 告诉任何人。所以中间单删一层时,这里会按「从末层倒带」处理:最近一批余波被删掉、水位夹到
+    // 末层之前(下次刷新会重新生成,能自愈),但更早那些条目的 sourceFloor 不会跟着前移一位,
+    // 从此与真实楼层错位一格。要根治得自己维护一份楼层指纹快照来 diff 出被删下标,尚未做。
     eventSource.on(eventTypes.MESSAGE_DELETED, async (n) => {
         const worldKey = computeWorldKey(ctx);
         if (!worldKey || !Number.isInteger(n)) return;

@@ -54,9 +54,10 @@ export function renderThreadListHtml({ world, busy }) {
             const name = isGroup ? `${t.group.name}(${(t.group.members || []).length})` : world.contacts.get(t.contactId).name;
             let preview = '(暂无消息)';
             if (t.lastMessage) {
+                // 群成员名来自模型,和正文一样要转义(此前只包了正文、漏了这一段)
                 const who = t.lastMessage.sender === 'me' ? '我'
                     : (isGroup ? (resolveSender(world, t, t.lastMessage.sender)?.name || '?') : '');
-                preview = `${who ? who + ': ' : ''}${escapeHtml(t.lastMessage.text)}`;
+                preview = `${who ? escapeHtml(who) + ': ' : ''}${escapeHtml(t.lastMessage.text)}`;
             }
             const avatar = isGroup
                 ? groupAvatarHtml(t.group)

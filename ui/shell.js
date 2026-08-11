@@ -31,10 +31,12 @@ const APPS = [
     { id: 'gallery', label: '相册', bg: 'cocoa', icon: ICON_APP_GALLERY, enabled: false },
 ];
 
+// 注意必须自己转义引号:textContent→innerHTML 那套只转 & < >(序列化文本节点本就不需要转引号),
+// 而这个函数大量用在属性值里(data-thread-id="${...}" 等),那些 id 是模型自由生成的字符串。
+// 一个引号就能提前闭合属性、往标签里塞任意属性;Shadow DOM 只隔离样式和查询,不隔离脚本执行。
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 function escapeHtml(s) {
-    const d = document.createElement('div');
-    d.textContent = String(s ?? '');
-    return d.innerHTML;
+    return String(s ?? '').replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
 }
 
 // 手机主人=世界的锚点,一经设定不可更改(她 2026-08-11 拍板:唯一不可改的设置)。
@@ -292,51 +294,69 @@ export function createShell(ctx, onExternalChange) {
         else if (appId === 'forum') navPush({ type: 'forum-list', boardId: null });
     }
 
-    async function doGenerateMore() {
+    // 失败措辞分档:此前四个入口一律「生成失败,请重试」,把「模型没吐出能用的结果」「配置/网络出错」
+    // 「回滚作废」压成同一句话——而其中一类重试一万次也不会好,用户只能靠猜。
+    const FAIL_TEXT = {
+        parse_failed: '模型没给出能用的结果,可以再试一次',
+        rolled_back: '正文刚回滚了,这次生成已作废',
+        no_thread: '这条线程已经不在了',
+    };
+
+    // 四个生成入口共用的外壳。三条纪律都是真机踩出来的:
+    // ① busy 必须抢在第一个 await 之前——此前 `await store.getOwner()` 夹在 `if (busy) return`
+    //    和 `busy = true` 中间,冷启动连点两下就能双开生成,白烧两次额度。
+    // ② render() 也要进 try——它要碰 IndexedDB,一旦 reject 就跳过 finally,busy 永久停在 true,
+    //    四个按钮集体变成转圈的死按钮,关手机重开都复位不了,只能刷新整个酒馆。
+    // ③ 必须有 catch——此前只有 try/finally,任何意外抛错的表现就是「点了没反应」,连提示都没有。
+    //    这正是最难自查的那类失败,不能再留。
+    async function runGeneration(run) {
         if (busy) return;
-        const worldKey = currentWorldKey();
-        if (!worldKey) return;
-        const owner = await store.getOwner(worldKey);
-        if (!owner) { showToast('先设定手机主人'); return; }
-        busy = true; await render();
+        busy = true;
         try {
-            const s = settings();
+            const worldKey = currentWorldKey();
+            if (!worldKey) return;
+            const owner = await store.getOwner(worldKey);
+            if (!owner) { showToast('先设定手机主人'); return; }
+            await render();
+            const result = await run({ worldKey, owner, s: settings() });
+            if (!result) return;
+            if (!result.ok) showToast(FAIL_TEXT[result.error] || '生成失败,请重试');
+            else if (result.changed === false) showToast('还没有新的正文进展');
+            else if (!result.added) showToast('这次没有新动静');
+            else showToast(`小世界起了 ${result.added} 圈涟漪`);
+        } catch (err) {
+            console.error('[Orrery] 生成出错', err);
+            showToast(`生成出错:${err?.message || '未知错误'}`);
+        } finally {
+            busy = false;
+            await render();
+            // 降级警告排在结果提示之后播,别把「起了 N 圈涟漪」/「生成失败」直接顶掉
+            // (一个会话只出现一次,晚两秒不影响它的作用)。
+            setTimeout(checkPurificationDegraded, 2000);
+        }
+    }
+
+    async function doGenerateMore() {
+        await runGeneration(async ({ worldKey, owner, s }) => {
             const result = await generateMore(ctx, store, {
                 worldKey, floorWindow: s.floorWindow, summaryThreshold: s.summaryThreshold,
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
                 excludeTags: s.excludeTags || '',
                 allowUserContact: !!s.allowUserContact,
             });
-            if (!result.ok) showToast('生成失败,请重试');
-            else if (!result.changed) showToast('还没有新的正文进展');
-            else showToast(`小世界起了 ${result.added || 0} 圈涟漪`);
-        } finally {
-            busy = false; checkPurificationDegraded(); await render();
             onExternalChange?.();
-        }
+            return result;
+        });
     }
 
     async function doContinueThread() {
-        if (busy) return;
         const top = navStack[navStack.length - 1];
         if (top.type !== 'messenger-thread') return;
-        const worldKey = currentWorldKey();
-        if (!worldKey) return;
-        const owner = await store.getOwner(worldKey);
-        if (!owner) { showToast('先设定手机主人'); return; }
-        busy = true; await render();
-        try {
-            const s = settings();
-            const result = await continueThread(ctx, store, {
-                worldKey, threadId: top.threadId, summaryThreshold: s.summaryThreshold,
-                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
-                excludeTags: s.excludeTags || '',
-            });
-            if (!result.ok) showToast('生成失败,请重试');
-            else if (result.added === 0) showToast('暂时没有新动静');
-        } finally {
-            busy = false; checkPurificationDegraded(); await render();
-        }
+        await runGeneration(({ worldKey, owner, s }) => continueThread(ctx, store, {
+            worldKey, threadId: top.threadId, summaryThreshold: s.summaryThreshold,
+            profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+            excludeTags: s.excludeTags || '',
+        }));
     }
 
     async function doRevert(ts) {
@@ -353,51 +373,27 @@ export function createShell(ctx, onExternalChange) {
     // ── 论坛:独立水位的「刷新」/「生成更多」+ 反悔(单楼倒带同消息工法 / 整帖级联删)。 ──
 
     async function doGenerateMoreForum() {
-        if (busy) return;
-        const worldKey = currentWorldKey();
-        if (!worldKey) return;
-        const owner = await store.getOwner(worldKey);
-        if (!owner) { showToast('先设定手机主人'); return; }
-        busy = true; await render();
-        try {
-            const s = settings();
+        await runGeneration(async ({ worldKey, owner, s }) => {
             const result = await generateMoreForum(ctx, store, {
                 worldKey, floorWindow: s.floorWindow,
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
                 excludeTags: s.excludeTags || '',
                 allowUserContact: !!s.allowUserContact,
             });
-            if (!result.ok) showToast('生成失败,请重试');
-            else if (!result.changed) showToast('还没有新的正文进展');
-            else showToast(`小世界起了 ${result.added || 0} 圈涟漪`);
-        } finally {
-            busy = false; checkPurificationDegraded(); await render();
             onExternalChange?.();
-        }
+            return result;
+        });
     }
 
     async function doContinueForumThread() {
-        if (busy) return;
         const top = navStack[navStack.length - 1];
         if (top.type !== 'forum-thread') return;
-        const worldKey = currentWorldKey();
-        if (!worldKey) return;
-        const owner = await store.getOwner(worldKey);
-        if (!owner) { showToast('先设定手机主人'); return; }
-        busy = true; await render();
-        try {
-            const s = settings();
-            const result = await continueForumThread(ctx, store, {
-                worldKey, threadId: top.threadId,
-                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
-                excludeTags: s.excludeTags || '',
-                allowUserContact: !!s.allowUserContact,
-            });
-            if (!result.ok) showToast('生成失败,请重试');
-            else if (result.added === 0) showToast('暂时没有新动静');
-        } finally {
-            busy = false; checkPurificationDegraded(); await render();
-        }
+        await runGeneration(({ worldKey, owner, s }) => continueForumThread(ctx, store, {
+            worldKey, threadId: top.threadId,
+            profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+            excludeTags: s.excludeTags || '',
+            allowUserContact: !!s.allowUserContact,
+        }));
     }
 
     async function doForumRevertFloor(ts) {
@@ -626,6 +622,10 @@ export function createShell(ctx, onExternalChange) {
         root.addEventListener('pointerup', onPointerClear);
         root.addEventListener('pointerleave', onPointerClear, true);
         root.addEventListener('pointermove', onPointerClear);
+        // pointercancel 必须一起清:手机上系统级手势(返回、下拉通知栏、来电)会以 cancel 收场,
+        // 不发 up/leave/move。漏了它,长按计时器照样跑完 → 冒出一个与当前操作无关的删除确认框;
+        // 而且 suppressNextClick 被置上后永远等不到那次合成 click,会去吞掉用户下一次真实点击。
+        root.addEventListener('pointercancel', onPointerClear);
         root.addEventListener('contextmenu', onContextMenu);
     }
 

@@ -64,8 +64,12 @@
     color: var(--or-cocoa); display: none; align-items: center; justify-content: center;
     cursor: pointer; padding: 0;
 }
-.or-msg-row:not(.me) .or-msg-revert { right: -34px; }
-.or-msg-row.me .or-msg-revert { left: -34px; }
+/* 偏移量必须小于聊天区的 14px 内边距,否则按钮会被 .or-screen 的 overflow:hidden 裁到屏幕外。
+   -34px 时:me 侧 26px 的按钮只剩 6px 露在屏内(实测),手机上根本点不到,反悔机制形同虚设。
+   改 -8px 后整颗按钮完整可见,离屏幕边缘还有 6px 余量;它只在 hover/长按时出现,
+   压住气泡外缘那一点点是可以接受的代价。 */
+.or-msg-row:not(.me) .or-msg-revert { right: -8px; }
+.or-msg-row.me .or-msg-revert { left: -8px; }
 .or-msg-revert svg { width: 13px; height: 13px; }
 @media (hover: hover) {
     .or-msg-row:hover .or-msg-revert { display: flex; }

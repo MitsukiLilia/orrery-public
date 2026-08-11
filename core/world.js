@@ -81,6 +81,10 @@ export function foldWorld(entries) {
     }
 
     for (const e of entries) {
+        // 一条畸形记录不能连累整部手机:下面每个分支都直接解构 e.payload.xxx,payload 缺失就是
+        // 一次未捕获的 TypeError,而 foldWorld 在每次渲染前都要跑——等于这个世界永远打不开,
+        // 只能进 devtools 手动删库才能救。跳过它,其余条目照常折叠。
+        if (!e || !e.payload) continue;
         if (e.type === 'contact') {
             contacts.set(e.payload.contactId, { ...e.payload, sourceFloor: e.sourceFloor, ts: e.ts });
             ensureThread(e.payload.contactId);
