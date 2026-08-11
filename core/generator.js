@@ -104,6 +104,80 @@ function stripHtml(text) {
     return String(text || '').replace(/<[^>]+>/g, '').trim();
 }
 
+// ── 正文提纯:镜像酒馆自己的做法,本扩展不认识任何预设的标签名 ──
+// 她的诘问(真机实测:草稿混进正文):写死 <content>/<draft> 就成了某预设专用,换预设即废。
+// 酒馆的答案是——它也不认识标签。送聊天记录进 LLM 前只做两件事(核实于 script.js:4337 coreChat 映射):
+//   ① getRegexedString(mes, USER_INPUT|AI_OUTPUT, {isPrompt:true, depth}) —— 跑正则脚本的 isPrompt 档,
+//      也就是预设自己声明的「进提示词时该删什么」(她的规矩:净化类双开、美化类单开 markdownOnly)
+//   ② 思维链不走正文,而是按 Reasoning 设置里声明的 prefix/suffix 摘出去(add_to_prompts=false 时不回灌)
+// 两者都是预设/用户声明的配置,不是硬编码。orrery 照抄这套:预设换了,提纯规则自动跟着换。
+// 残留由用户在设置里兜(见 settings.excludeTags),默认空——扩展永远不猜标签。
+
+let regexEngine; // undefined=未加载 / null=不可用 / 对象=可用
+
+// 降级必须可见:引擎是酒馆的非公开模块,路径不保证跨版本稳定。一旦引入失败,提纯静默退回
+// 「只去标签壳」——草稿/思维链会重新混进正文,而生成表面照常成功,是最难自查的一类回归。
+// 故用 live binding 把降级状态透出去,由 shell 弹一次提示(她才知道该去填「额外剔除标签」兜底)。
+export let textPurificationDegraded = false;
+
+export async function ensureRegexEngine() {
+    if (regexEngine !== undefined) return regexEngine;
+    try {
+        // 与 world-info.js 同一条 import 路径,跟着酒馆版本走
+        const eng = await import('../../../regex/engine.js');
+        regexEngine = (typeof eng.getRegexedString === 'function' && eng.regex_placement)
+            ? { get: eng.getRegexedString, place: eng.regex_placement } : null;
+    } catch (err) {
+        console.warn('[Orrery] 正则引擎引入失败', err);
+        regexEngine = null;
+    }
+    if (!regexEngine) {
+        textPurificationDegraded = true;
+        console.warn('[Orrery] 正文提纯已降级:预设正则未生效,草稿/思维链可能混入正文。请在设置里用「额外剔除的标签」兜底。');
+    }
+    return regexEngine;
+}
+
+// 思维链:只认 Reasoning 设置里的 prefix/suffix,不认标签名。
+// 宽容一格:前缀常被预设写进 assistant prefill(她的用法),不出现在消息体里——
+// 这时只要后缀在前半段出现,就把它之前的整段当思维链切掉。
+function stripReasoning(ctx, text) {
+    const r = ctx.powerUserSettings?.reasoning;
+    if (!r?.auto_parse) return text;
+    const pre = String(r.prefix || '').trim();
+    const suf = String(r.suffix || '').trim();
+    if (!suf) return text;
+    const end = text.indexOf(suf);
+    if (end === -1) return text;
+    const start = pre ? text.indexOf(pre) : -1;
+    if (start !== -1 && start < end) return text.slice(0, start) + text.slice(end + suf.length);
+    if (end < text.length / 2) return text.slice(end + suf.length);
+    return text;
+}
+
+// 用户兜底:她可在设置里列出自家预设的元信息标签(逗号分隔),整块连内容一起删。
+// 默认空 = 完全跟随酒馆。填了也只影响她自己这套,不写进代码。
+function dropExcludedTags(text, excludeTags) {
+    const tags = String(excludeTags || '').split(/[,，\s]+/).map(t => t.trim().replace(/^<|>$/g, '')).filter(t => /^[A-Za-z_][\w-]*$/.test(t));
+    let s = text;
+    for (const t of tags) {
+        s = s.replace(new RegExp(`<${t}(?:\\s[^>]*)?>[\\s\\S]*?</${t}>`, 'gi'), '');
+    }
+    return s;
+}
+
+/** 一条消息 → 干净正文。depth 同酒馆语义:距末尾的层数(末层=0)。 */
+export function cleanMessageText(ctx, msg, depth, excludeTags) {
+    let s = String(msg?.mes || '');
+    if (regexEngine) {
+        s = regexEngine.get(s, msg?.is_user ? regexEngine.place.USER_INPUT : regexEngine.place.AI_OUTPUT,
+            { isPrompt: true, depth });
+    }
+    s = stripReasoning(ctx, s);
+    s = dropExcludedTags(s, excludeTags);
+    return stripHtml(s);
+}
+
 // ── 世界时刻:LLM 从正文推断的叙事内时间(她拍板:时间戳按正文推算,不锚现实时钟)。──
 
 function parseWorldTime(s) {
@@ -129,7 +203,7 @@ function layoutWorldTimes(messages, anchor, threadTailTs) {
 
 // ── LLM 调用优先级:独立 API > 指定 Connection Profile > 酒馆当前连接的裸调用。──
 
-// 端点拼装沿用她中转站的通行习惯(同 Perigee buildChatEndpoint 语义)
+// 端点拼装按 OpenAI 兼容端点的通行写法:已带 /chat/completions 就照用,只到 /v1 就补全,都没有则补 /v1/chat/completions
 function buildChatEndpoint(baseUrl) {
     let u = String(baseUrl || '').trim().replace(/\/+$/, '');
     if (!u) return null;
@@ -180,7 +254,25 @@ async function callCustomApi(customApi, systemPrompt, userContent, responseLengt
     }
 }
 
-async function callLLM(ctx, systemPrompt, userContent, { profileId, customApi, responseLength } = {}) {
+// ── 裸调用防污染卫兵 ──
+// generateRaw 并不裸:发送前会广播 CHAT_COMPLETION_PROMPT_READY(dryRun:false,核实于
+// script.js:3891),记忆表格等插件监听该事件向一切 CC 请求注入自家指令(她真机实锤:表格
+// insertRow 教学挤进 orrery 的 prompt,Gemini 3.1 把预算烧在表格上,输出 <tableEdit> 而非
+// JSON)。Profile/独立 API 通道不过这个事件、天然干净;裸通道靠这里自卫——发前 makeLast
+// 挂监听(保证排在注入插件之后),按首 80 字前缀认领本次请求的 system/user 两条消息,
+// 把别家塞进来的剔掉。认不满两条就不动(fail-open:宁可脏,绝不误伤别人的生成)。
+let rawGuard = null;
+function onPromptReady(eventData) {
+    if (!rawGuard || eventData?.dryRun || !Array.isArray(eventData?.chat)) return;
+    const ours = eventData.chat.filter(m => typeof m?.content === 'string'
+        && (m.content.startsWith(rawGuard.sysHead) || m.content.startsWith(rawGuard.userHead)));
+    if (ours.length >= 2 && ours.length < eventData.chat.length) {
+        console.warn('[Orrery] 裸调用被注入了', eventData.chat.length - ours.length, '条外来消息,已剔除');
+        eventData.chat.splice(0, eventData.chat.length, ...ours);
+    }
+}
+
+export async function callLLM(ctx, systemPrompt, userContent, { profileId, customApi, responseLength } = {}) {
     if (customApi?.enabled && customApi.baseUrl && customApi.model) {
         return await callCustomApi(customApi, systemPrompt, userContent, responseLength);
     }
@@ -190,7 +282,16 @@ async function callLLM(ctx, systemPrompt, userContent, { profileId, customApi, r
         const result = await ctx.ConnectionManagerRequestService.sendRequest(profileId, constructed, responseLength || 600);
         return result?.content ?? '';
     }
-    return await ctx.generateRaw({ prompt: userContent, systemPrompt, responseLength: responseLength || 600 });
+    const ev = ctx.eventTypes?.CHAT_COMPLETION_PROMPT_READY ?? ctx.event_types?.CHAT_COMPLETION_PROMPT_READY;
+    if (ctx.eventSource && ev) {
+        ctx.eventSource.makeLast(ev, onPromptReady); // 幂等:每次重挂保持最后
+        rawGuard = { sysHead: systemPrompt.trim().slice(0, 80), userHead: userContent.trim().slice(0, 80) };
+    }
+    try {
+        return await ctx.generateRaw({ prompt: userContent, systemPrompt, responseLength: responseLength || 600 });
+    } finally {
+        rawGuard = null;
+    }
 }
 
 async function generateJsonWithRetry(ctx, systemPrompt, userContent, settings) {
@@ -210,25 +311,94 @@ async function generateJsonWithRetry(ctx, systemPrompt, userContent, settings) {
 
 // ── 上下文材料拼装 ──
 
-// 人物设定参考:角色卡字段 + 世界书激活条目(她点单:主线人物扮演不得 OOC,以绑定世界书为准)。
-// getWorldInfoPrompt(核实于 world-info.js:894)isDryRun=true 走纯读路径不触发副作用;失败静默降级为角色卡字段。
-async function buildCastReference(ctx, floorTexts) {
-    const parts = [];
+function subParams(ctx, s) {
+    try { return typeof ctx.substituteParams === 'function' ? ctx.substituteParams(s) : s; } catch { return s; }
+}
+
+// lite 激活:替代不了 ST 完整激活语义(递归/概率/组),但对「设定型绑定书」足够——constant 条目
+// 全取,关键词条目按最近楼层文本命中,禁用条目绝不取;内容过宏替换。排序同 ST sortFn(order 大者先)。
+async function liteBookEntries(ctx, bookName, scanTexts) {
+    if (!bookName || typeof ctx.loadWorldInfo !== 'function') return [];
+    try {
+        const data = await ctx.loadWorldInfo(bookName);
+        if (!data?.entries) return [];
+        const scan = scanTexts.filter(Boolean).join('\n').toLowerCase();
+        return Object.values(data.entries)
+            .filter(e => e && !e.disable && String(e.content || '').trim())
+            .filter(e => e.constant || (Array.isArray(e.key) && e.key.some(k => {
+                const kk = subParams(ctx, String(k)).trim().toLowerCase();
+                return kk && scan.includes(kk);
+            })))
+            // constant(常驻=通常是身份设定)优先进预算,再按 ST sortFn 的 order 降序
+            .sort((a, b) => (b.constant === true) - (a.constant === true) || (b.order ?? 0) - (a.order ?? 0))
+            .map(e => subParams(ctx, String(e.content).trim()));
+    } catch (err) {
+        console.warn('[Orrery] 世界书直读失败,跳过', bookName, err);
+        return [];
+    }
+}
+
+// 人物设定参考:三节有来源标签的材料,主人节永远在前。
+// v0.6.7 真机翻车根因(她后台抓包实锤):getWorldInfoPrompt 的激活串不分来源,persona 书条目与
+// char 书条目混成一串再被截断——主流卡写法(卡面留空、设定全在绑定世界书)下 char 设定被挤出参考,
+// 「权威人物设定」里只剩 user 的过去条目,手机主人身份直接被 user 顶掉。
+// 现在:char 绑定书与 persona 绑定书分别经 ctx.loadWorldInfo 直读并各归各节;getWorldInfoPrompt
+// (核实于 world-info.js:894,isDryRun=true 纯读无副作用)降级为背景节,兜底覆盖全局书/聊天书,
+// 与前两节可能重复、无害。任一环节失败静默降级,不阻塞生成。
+export async function buildCastReference(ctx, floorTexts, ownerName) {
     const ch = ctx.characters?.[ctx.characterId];
+    const charBook = ch?.data?.extensions?.world;
+
+    // 她的点子:orrery 的整个提示词都是「XX 的手机」,主人的名字必然在自己身份条目的关键词里——
+    // 把名字并进扫描文本,身份条目就不再依赖最近几层正文碰巧提到它(纯关键词卡也能稳定激活)。
+    // 各归各扫:char 书配主人名,persona 书配 user 名,免得两边互相激活对方的条目。
+    const charNames = [ch?.name, ctx.name2, ownerName].filter(Boolean);
+    const userNames = [ctx.name1].filter(Boolean);
+
+    const ownerParts = [];
     if (ch) {
         const desc = [ch.description, ch.personality, ch.scenario].filter(Boolean).join('\n').trim();
-        if (desc) parts.push(desc.slice(0, 1200));
+        if (desc) ownerParts.push(desc.slice(0, 1200));
     }
+    ownerParts.push(...await liteBookEntries(ctx, charBook, [...floorTexts, ...charNames]));
+
+    const userParts = [];
+    const personaDesc = String(ctx.powerUserSettings?.persona_description || '').trim();
+    if (personaDesc) userParts.push(subParams(ctx, personaDesc));
+    const personaBook = ctx.powerUserSettings?.persona_description_lorebook;
+    if (personaBook && personaBook !== charBook) {
+        userParts.push(...await liteBookEntries(ctx, personaBook, [...floorTexts, ...userNames]));
+    }
+
+    let wiBlob = '';
     try {
         if (typeof ctx.getWorldInfoPrompt === 'function') {
             const wi = await ctx.getWorldInfoPrompt(floorTexts, 4096, true);
-            const str = (wi?.worldInfoString || '').trim();
-            if (str) parts.push(str.slice(0, 1800));
+            wiBlob = (wi?.worldInfoString || '').trim();
         }
     } catch (err) {
-        console.warn('[Orrery] 世界书读取失败,降级为仅角色卡字段', err);
+        console.warn('[Orrery] 世界书激活串读取失败,跳过背景节', err);
     }
-    return parts.length ? `【人物设定参考(权威;主线人物言行以此为准,不得OOC)】\n${parts.join('\n')}\n\n` : '';
+
+    const cardName = (ch?.name || '').trim();
+    const ownerLabel = (ownerName || '').trim() || cardName || ctx.name2 || '主角';
+    const userName = (ctx.name1 || '').trim();
+
+    const sections = [];
+    if (ownerParts.length) {
+        // 认主名与卡面名一致(常态)直接标「手机主人」;认主给了别名时材料仍按卡面人物标注
+        const header = (!cardName || cardName === ownerLabel)
+            ? `◆ 手机主人「${ownerLabel}」的设定:`
+            : `◆ 主线人物「${cardName}」的设定(这部手机的主人是「${ownerLabel}」):`;
+        sections.push(`${header}\n${ownerParts.join('\n').slice(0, 2400)}`);
+    }
+    if (userParts.length && userName && userName !== ownerLabel) {
+        sections.push(`◆ 「${userName}」是叙事另一方(user)——TA **不是**手机主人。以下材料仅供辨认 TA 的身份,绝不能把 TA 的设定、经历、人际安到主人或任何住民头上:\n${userParts.join('\n').slice(0, 700)}`);
+    }
+    if (wiBlob) {
+        sections.push(`◆ 世界观背景(激活的世界书条目,可能与上文重复;人物身份归属以上文两节为准):\n${wiBlob.slice(0, 1400)}`);
+    }
+    return sections.length ? `【人物设定参考(权威;主线人物言行以此为准,不得OOC)】\n${sections.join('\n\n')}\n\n` : '';
 }
 
 // user 侧硬防线:提示词纪律 Gemini 屡教不改(她真机三抓),消化层直接拒收名字匹配叙事另一方的
@@ -240,24 +410,30 @@ function isUserSide(name, ctx) {
     return n === u || n.includes(u) || u.includes(n);
 }
 
-function recentFloorTexts(ctx, count = 6) {
+function recentFloorTexts(ctx, excludeTags, count = 6) {
     // 与 ST 自身调用习惯一致(script.js:4455):带发言人名(可命中世界书人名关键词)、新→旧倒序
+    const tip = ctx.chat.length - 1;
     return ctx.chat.slice(-count)
-        .map(m => `${m?.name ? m.name + ': ' : ''}${stripHtml(m?.mes)}`)
+        .map((m, k) => {
+            const i = Math.max(0, ctx.chat.length - count) + k;
+            return `${m?.name ? m.name + ': ' : ''}${cleanMessageText(ctx, m, tip - i, excludeTags)}`;
+        })
         .filter(t => t.trim())
         .reverse();
 }
 
-function buildFloorContextText(ctx, pendingFloors, floorWindow) {
+function buildFloorContextText(ctx, pendingFloors, floorWindow, excludeTags) {
     if (!pendingFloors.length) return '';
     const maxFloor = Math.max(...pendingFloors);
     const start = Math.max(0, Math.min(...pendingFloors) - floorWindow);
+    const tip = ctx.chat.length - 1;
     const lines = [];
     for (let i = start; i <= maxFloor && i < ctx.chat.length; i++) {
         const msg = ctx.chat[i];
         if (!msg) continue;
         const speaker = msg.name || (msg.is_user ? ctx.name1 : ctx.name2);
-        lines.push(`[第${i}层] ${speaker}: ${stripHtml(msg.mes)}`);
+        const text = cleanMessageText(ctx, msg, tip - i, excludeTags);
+        if (text) lines.push(`[第${i}层] ${speaker}: ${text}`);
     }
     return lines.join('\n');
 }
@@ -375,7 +551,8 @@ function pendingOrRegrow(watermark, tip, floorWindow) {
 
 // ── 主生成:楼层事件触发,批量产出多线程条目。──
 
-async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, allowUserContact }) {
+async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags }) {
+    await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'messenger');
     const tip = ctx.chat.length - 1;
     const { floors: pendingFloors, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
@@ -389,11 +566,13 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
     const caution = (userSideName && userSideName !== charName)
         ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。除非剧情明确显示 TA 已与「${charName}」相识并交换了联系方式,否则「${userSideName}」不得出现在这部手机里;若现有联系人名册中没有 TA,大概率就是还不该有。\n\n`
         : '';
-    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx));
-    const userContent = `${regrowHint}${caution}${castRef}【正文最新进展】\n${buildFloorContextText(ctx, pendingFloors, floorWindow)}\n\n【手机当前状态】\n${buildWorldDigestText(world)}`;
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
+    const userContent = `${regrowHint}${caution}${castRef}【正文最新进展】\n${buildFloorContextText(ctx, pendingFloors, floorWindow, excludeTags)}\n\n【手机当前状态】\n${buildWorldDigestText(world)}`;
     const systemPrompt = PROMPT_A.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('messenger', language));
 
-    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: 800 });
+    // responseLength 含思考预算:思考型模型(Gemini 3.1 等)的 reasoning tokens 计入 max_tokens
+    // (她真机实锤:1500 里烧掉 1437 思考,正文被掐断 finish_reason=length),故各路预算 ~3 倍放宽
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: 2400 });
     if (!parsed || !Array.isArray(parsed.threads)) return { ok: false, error: 'parse_failed' };
 
     const batchFloor = Math.max(...pendingFloors);
@@ -456,7 +635,8 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
 
 // ── 线程内续聊:定向生成,允许返回空。──
 
-async function runThreadContinue(ctx, store, { worldKey, threadId, profileId, customApi, owner, language }) {
+async function runThreadContinue(ctx, store, { worldKey, threadId, profileId, customApi, owner, language, excludeTags }) {
+    await ensureRegexEngine();
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
     const thread = world.threads.get(threadId);
     if (!thread) return { ok: false, error: 'no_thread' };
@@ -477,10 +657,10 @@ async function runThreadContinue(ctx, store, { worldKey, threadId, profileId, cu
             .replaceAll('{{contact}}', contact.name)
             .replaceAll('{{contactId}}', threadId)
             .replaceAll('{{LANG_RULE}}', langRule('messenger', language));
-    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx));
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
     const userContent = castRef + (buildThreadDigestText(thread, senderNameFn(world, thread)) || '(还没有聊天记录)');
 
-    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: 500 });
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: 1500 });
     if (!parsed || !Array.isArray(parsed.messages)) return { ok: false, error: 'parse_failed' };
     if (!parsed.messages.length) return { ok: true, added: 0 };
 
@@ -519,7 +699,7 @@ async function maybeSummarizeThread(ctx, store, { worldKey, threadId, summaryThr
 
     let summary = '';
     try {
-        summary = await callLLM(ctx, PROMPT_C, text, { profileId, customApi, responseLength: 300 });
+        summary = await callLLM(ctx, PROMPT_C, text, { profileId, customApi, responseLength: 800 });
     } catch (err) {
         console.error('[Orrery] 总结生成失败', err);
         return;
@@ -536,7 +716,8 @@ async function maybeSummarizeThread(ctx, store, { worldKey, threadId, summaryThr
 
 // ── 论坛主生成:独立水位、独立触发(app 内「刷新」),消化 newBoards/newResidents/newThreads/newReplies。──
 
-async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, allowUserContact }) {
+async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags }) {
+    await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'forum');
     const tip = ctx.chat.length - 1;
     const { floors: pendingFloors, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
@@ -549,11 +730,11 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     const caution = (userSideName && userSideName !== charName)
         ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。不得作为住民注册发言(除非剧情确实如此);更不得在任何帖子或回复中暗示 TA 与「${charName}」的关系——两人尚未相识/尚未交往时,连目击式的并排出现都不许写。\n\n`
         : '';
-    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx));
-    const userContent = `${regrowHint}${caution}${castRef}【正文最新进展】\n${buildFloorContextText(ctx, pendingFloors, floorWindow)}\n\n【论坛当前状态】\n${buildForumDigestText(world)}`;
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
+    const userContent = `${regrowHint}${caution}${castRef}【正文最新进展】\n${buildFloorContextText(ctx, pendingFloors, floorWindow, excludeTags)}\n\n【论坛当前状态】\n${buildForumDigestText(world)}`;
     const systemPrompt = PROMPT_F.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('forum', language));
 
-    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: 1500 });
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: 4000 });
     if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
 
     const batchFloor = Math.max(...pendingFloors);
@@ -639,16 +820,17 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
 
 // ── 论坛盖楼:定向续写单帖,允许返回空;newResident 一批最多新建 2 名(任务书 §4)。──
 
-async function runForumThreadContinue(ctx, store, { worldKey, threadId, profileId, customApi, language, allowUserContact }) {
+async function runForumThreadContinue(ctx, store, { worldKey, threadId, profileId, customApi, owner, language, allowUserContact, excludeTags }) {
+    await ensureRegexEngine();
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
     const thread = world.forumThreads.get(threadId);
     if (!thread?.title) return { ok: false, error: 'no_thread' };
 
     const systemPrompt = PROMPT_G.replaceAll('{{LANG_RULE}}', langRule('forum', language));
-    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx));
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), owner || ctx.name2);
     const userContent = castRef + buildForumThreadDigestText(world, thread);
 
-    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: 600 });
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: 1800 });
     if (!parsed || !Array.isArray(parsed.replies)) return { ok: false, error: 'parse_failed' };
     if (!parsed.replies.length) return { ok: true, added: 0 };
 

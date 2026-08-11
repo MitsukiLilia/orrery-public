@@ -2,6 +2,7 @@
 // 事件委托只挂一份在 .or-root 上,不随每次重渲染叠加监听器。
 import { computeWorldKey, foldWorld } from '../core/world.js';
 import * as store from '../core/store.js';
+import * as generator from '../core/generator.js';
 import { generateMore, continueThread, generateMoreForum, continueForumThread } from '../core/generator.js';
 import { manualRevert } from '../core/rollback.js';
 import {
@@ -16,7 +17,7 @@ const SHELL_CSS_URL = new URL('./shell.css', import.meta.url).href;
 
 const DEFAULT_SETTINGS = {
     floorWindow: 4, profileId: null, summaryThreshold: 40,
-    autoRefresh: false, theme: 'seasalt', showFab: true, allowUserContact: false, language: 'zh',
+    autoRefresh: false, theme: 'seasalt', showFab: true, allowUserContact: false, language: 'zh', excludeTags: '',
     customApi: { enabled: false, baseUrl: '', apiKey: '', model: '' },
 };
 
@@ -120,6 +121,9 @@ function renderSettingsHtml(s, profileLabel, owner) {
                 <span class="or-row-value">${escapeHtml(profileLabel)}</span>
                 ${ICON_CHEVRON_RIGHT}
             </button>
+            <div class="or-section-title">正文提纯</div>
+            <div class="or-row-note">默认完全跟随酒馆:预设的正则(进提示词那档)与思维链设置删什么,这里就删什么。若你的预设还会输出草稿/摘要/后记等区块且没写对应正则,把标签名填在下面,整块连内容一起剔除。</div>
+            <div class="or-field"><label>额外剔除的标签(逗号分隔,留空=跟随酒馆)</label><input type="text" data-field-text="excludeTags" value="${escapeHtml(s.excludeTags || '')}" placeholder="draft, abstract, afterword" spellcheck="false"></div>
             <div class="or-section-title">独立 API(启用后优先于上面的生成模型;配置存在酒馆本地)</div>
             <div class="or-row">
                 <span class="or-row-label">启用独立 API</span>
@@ -166,6 +170,15 @@ export function createShell(ctx, onExternalChange) {
         return ctx.extensionSettings.orrery;
     }
     function saveSettings() { ctx.saveSettingsDebounced?.(); }
+
+    // 提纯降级只提醒一次:静默降级=草稿重新混进正文而生成表面照常,必须让她看见
+    let warnedDegraded = false;
+    function checkPurificationDegraded() {
+        if (generator.textPurificationDegraded && !warnedDegraded) {
+            warnedDegraded = true;
+            showToast('正文提纯已降级,请在设置里填「额外剔除的标签」');
+        }
+    }
 
     function currentWorldKey() { return computeWorldKey(ctx); }
 
@@ -291,13 +304,14 @@ export function createShell(ctx, onExternalChange) {
             const result = await generateMore(ctx, store, {
                 worldKey, floorWindow: s.floorWindow, summaryThreshold: s.summaryThreshold,
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                excludeTags: s.excludeTags || '',
                 allowUserContact: !!s.allowUserContact,
             });
             if (!result.ok) showToast('生成失败,请重试');
             else if (!result.changed) showToast('还没有新的正文进展');
             else showToast(`小世界起了 ${result.added || 0} 圈涟漪`);
         } finally {
-            busy = false; await render();
+            busy = false; checkPurificationDegraded(); await render();
             onExternalChange?.();
         }
     }
@@ -316,11 +330,12 @@ export function createShell(ctx, onExternalChange) {
             const result = await continueThread(ctx, store, {
                 worldKey, threadId: top.threadId, summaryThreshold: s.summaryThreshold,
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                excludeTags: s.excludeTags || '',
             });
             if (!result.ok) showToast('生成失败,请重试');
             else if (result.added === 0) showToast('暂时没有新动静');
         } finally {
-            busy = false; await render();
+            busy = false; checkPurificationDegraded(); await render();
         }
     }
 
@@ -349,13 +364,14 @@ export function createShell(ctx, onExternalChange) {
             const result = await generateMoreForum(ctx, store, {
                 worldKey, floorWindow: s.floorWindow,
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                excludeTags: s.excludeTags || '',
                 allowUserContact: !!s.allowUserContact,
             });
             if (!result.ok) showToast('生成失败,请重试');
             else if (!result.changed) showToast('还没有新的正文进展');
             else showToast(`小世界起了 ${result.added || 0} 圈涟漪`);
         } finally {
-            busy = false; await render();
+            busy = false; checkPurificationDegraded(); await render();
             onExternalChange?.();
         }
     }
@@ -373,13 +389,14 @@ export function createShell(ctx, onExternalChange) {
             const s = settings();
             const result = await continueForumThread(ctx, store, {
                 worldKey, threadId: top.threadId,
-                profileId: s.profileId || null, customApi: s.customApi, language: s.language,
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                excludeTags: s.excludeTags || '',
                 allowUserContact: !!s.allowUserContact,
             });
             if (!result.ok) showToast('生成失败,请重试');
             else if (result.added === 0) showToast('暂时没有新动静');
         } finally {
-            busy = false; await render();
+            busy = false; checkPurificationDegraded(); await render();
         }
     }
 
@@ -502,9 +519,12 @@ export function createShell(ctx, onExternalChange) {
     // 设置页的独立 API 输入框(设置=驾驶舱,不属于小世界的只读面——她 2026-08-11 点单)
     function onFieldChange(e) {
         const input = e.target;
-        if (!input.matches?.('input[data-capi]')) return;
         const s = settings();
-        s.customApi[input.dataset.capi] = input.value.trim();
+        if (input.matches?.('input[data-capi]')) {
+            s.customApi[input.dataset.capi] = input.value.trim();
+        } else if (input.matches?.('input[data-field-text]')) {
+            s[input.dataset.fieldText] = input.value.trim();
+        } else return;
         saveSettings();
     }
 
