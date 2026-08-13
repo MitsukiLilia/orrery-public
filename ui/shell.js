@@ -16,7 +16,10 @@ import { renderForumListHtml, renderForumThreadHtml, FORUM_SKIN_URL } from '../a
 const SHELL_CSS_URL = new URL('./shell.css', import.meta.url).href;
 
 const DEFAULT_SETTINGS = {
-    floorWindow: 4, profileId: null, summaryThreshold: 40,
+    // floorWindow: 0 = 整本聊天(2026-08-13 她拍板的默认)。见 generator.js buildFloorContextText 的长注:
+    // 酒馆每轮本来就发整本,旧楼层由预设自己的正则按 depth 压成摘要;orrery 只喂尾部一窗时,
+    // 那一窗全落在「近消息」档、摘要恰好全被删光,于是永远只能凭最新几层反推关系 → OOC。
+    floorWindow: 0, profileId: null, summaryThreshold: 40,
     autoRefresh: false, theme: 'seasalt', showFab: true, allowUserContact: false, language: 'zh', excludeTags: '',
     customApi: { enabled: false, baseUrl: '', apiKey: '', model: '' },
 };
@@ -91,10 +94,10 @@ function renderSettingsHtml(s, profileLabel, owner) {
                 </div>
             </div>
             <div class="or-row">
-                <span class="or-row-label">生成范围(前 ${s.floorWindow} 层)</span>
+                <span class="or-row-label">正文范围(${s.floorWindow ? `近 ${s.floorWindow * 2} 层` : '整本聊天'})</span>
                 <div class="or-stepper">
                     <button data-action="stepper" data-field="floorWindow" data-delta="-1">${ICON_MINUS}</button>
-                    <span class="or-stepper-value">${s.floorWindow}</span>
+                    <span class="or-stepper-value">${s.floorWindow || '全'}</span>
                     <button data-action="stepper" data-field="floorWindow" data-delta="1">${ICON_PLUS}</button>
                 </div>
             </div>
@@ -165,6 +168,13 @@ export function createShell(ctx, onExternalChange) {
 
     function settings() {
         const cur = ctx.extensionSettings.orrery || {};
+        // 一次性迁移:正文范围改成「整本聊天」是 OOC 的正解,但新默认值对老用户无效——
+        // 他们的设置里存着旧默认 4,展开顺序 {...DEFAULT, ...cur} 下 cur 永远赢,装了新版也照样 OOC。
+        // 只搬旧默认值那一档(明确调过别的数字的人不动),搬完打标记,之后她想调回窗口就一直有效。
+        if (cur.floorWindow === 4 && !cur.floorWindowMigrated) {
+            cur.floorWindow = 0;
+            cur.floorWindowMigrated = true;
+        }
         ctx.extensionSettings.orrery = {
             ...DEFAULT_SETTINGS, ...cur,
             customApi: { ...DEFAULT_SETTINGS.customApi, ...(cur.customApi || {}) },
@@ -172,6 +182,12 @@ export function createShell(ctx, onExternalChange) {
         return ctx.extensionSettings.orrery;
     }
     function saveSettings() { ctx.saveSettingsDebounced?.(); }
+
+    // 归一化(含上面那次迁移)必须在扩展加载时就跑一次,不能等她打开 app——
+    // 自动刷新、水位徽标这些路径都在 UI 之外读设置,懒到首次渲染才迁移的话,
+    // 「装了新版但一次都没打开过手机」的用户会继续用旧的正文范围生成,而且毫无征兆。
+    settings();
+    saveSettings();
 
     // 提纯降级只提醒一次:静默降级=草稿重新混进正文而生成表面照常,必须让她看见
     let warnedDegraded = false;
@@ -353,7 +369,7 @@ export function createShell(ctx, onExternalChange) {
         const top = navStack[navStack.length - 1];
         if (top.type !== 'messenger-thread') return;
         await runGeneration(({ worldKey, owner, s }) => continueThread(ctx, store, {
-            worldKey, threadId: top.threadId, summaryThreshold: s.summaryThreshold,
+            worldKey, threadId: top.threadId, floorWindow: s.floorWindow, summaryThreshold: s.summaryThreshold,
             profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
             excludeTags: s.excludeTags || '',
         }));
@@ -389,7 +405,7 @@ export function createShell(ctx, onExternalChange) {
         const top = navStack[navStack.length - 1];
         if (top.type !== 'forum-thread') return;
         await runGeneration(({ worldKey, owner, s }) => continueForumThread(ctx, store, {
-            worldKey, threadId: top.threadId,
+            worldKey, threadId: top.threadId, floorWindow: s.floorWindow,
             profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
             excludeTags: s.excludeTags || '',
             allowUserContact: !!s.allowUserContact,
@@ -428,7 +444,8 @@ export function createShell(ctx, onExternalChange) {
 
     function doStepper(field, delta) {
         const s = settings();
-        if (field === 'floorWindow') s.floorWindow = Math.max(1, Math.min(20, s.floorWindow + delta));
+        // 0 = 整本聊天(默认,与酒馆每轮实际发送的一致;旧楼层由预设正则自行收敛成摘要)
+        if (field === 'floorWindow') s.floorWindow = Math.max(0, Math.min(20, s.floorWindow + delta));
         if (field === 'summaryThreshold') s.summaryThreshold = Math.max(10, Math.min(200, s.summaryThreshold + delta));
         saveSettings();
         render();

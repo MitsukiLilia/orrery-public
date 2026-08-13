@@ -367,6 +367,21 @@ async function liteBookEntries(ctx, bookName, scanTexts) {
     }
 }
 
+// getWorldInfoPrompt 的第二参是「本次可用上下文」,世界书按它的百分比算预算(world_info_budget)。
+// 此前写死 4096,激活串在进门时就被砍成一小截——主流卡把设定全放在绑定世界书里,砍掉的正是人物设定本身。
+// ⚠️不能图省事拿 ctx.maxContext:那是 kobold/textgen/novel 那一侧的 max_context,聊天补全用户根本没在用它
+// (真机上它是 8192,而这台机器实际的 openai_max_context 是 2000000——照 8192 算等于没修)。
+// 照抄酒馆自己的 getMaxContextSize(script.js:5763):openai 档走 openai_max_context - openai_max_tokens,
+// 其余档走 max_context。任一环节取不到就给个足够大的数,让预算不再是瓶颈(她拍板:提示词长没关系)。
+function maxContextSize(ctx) {
+    if (ctx.mainApi === 'openai') {
+        const cc = ctx.chatCompletionSettings || {};
+        const size = Number(cc.openai_max_context) - Number(cc.openai_max_tokens || 0);
+        if (Number.isFinite(size) && size > 0) return size;
+    }
+    return Number(ctx.maxContext) > 0 ? Number(ctx.maxContext) : 200000;
+}
+
 // 人物设定参考:三节有来源标签的材料,主人节永远在前。
 // v0.6.7 真机翻车根因(她后台抓包实锤):getWorldInfoPrompt 的激活串不分来源,persona 书条目与
 // char 书条目混成一串再被截断——主流卡写法(卡面留空、设定全在绑定世界书)下 char 设定被挤出参考,
@@ -387,7 +402,7 @@ export async function buildCastReference(ctx, floorTexts, ownerName) {
     const ownerParts = [];
     if (ch) {
         const desc = [ch.description, ch.personality, ch.scenario].filter(Boolean).join('\n').trim();
-        if (desc) ownerParts.push(desc.slice(0, 1200));
+        if (desc) ownerParts.push(desc);
     }
     ownerParts.push(...await liteBookEntries(ctx, charBook, [...floorTexts, ...charNames]));
 
@@ -402,7 +417,7 @@ export async function buildCastReference(ctx, floorTexts, ownerName) {
     let wiBlob = '';
     try {
         if (typeof ctx.getWorldInfoPrompt === 'function') {
-            const wi = await ctx.getWorldInfoPrompt(floorTexts, 4096, true);
+            const wi = await ctx.getWorldInfoPrompt(floorTexts, maxContextSize(ctx), true);
             wiBlob = (wi?.worldInfoString || '').trim();
         }
     } catch (err) {
@@ -413,21 +428,67 @@ export async function buildCastReference(ctx, floorTexts, ownerName) {
     const ownerLabel = (ownerName || '').trim() || cardName || ctx.name2 || '主角';
     const userName = (ctx.name1 || '').trim();
 
+    // ⚠️2026-08-13 拆掉了这三节原有的字符截断(2400/700/1400)。她真机实测拍板:酒馆每轮本来就发这么多,
+    // 输入长对成本与延迟影响都不大(还吃缓存),而截断砍掉的恰恰是「关系走到哪一步」这类最防 OOC 的材料。
     const sections = [];
     if (ownerParts.length) {
         // 认主名与卡面名一致(常态)直接标「手机主人」;认主给了别名时材料仍按卡面人物标注
         const header = (!cardName || cardName === ownerLabel)
             ? `◆ 手机主人「${ownerLabel}」的设定:`
             : `◆ 主线人物「${cardName}」的设定(这部手机的主人是「${ownerLabel}」):`;
-        sections.push(`${header}\n${ownerParts.join('\n').slice(0, 2400)}`);
+        sections.push(`${header}\n${ownerParts.join('\n')}`);
     }
     if (userParts.length && userName && userName !== ownerLabel) {
-        sections.push(`◆ 「${userName}」是叙事另一方(user)——TA **不是**手机主人。以下材料仅供辨认 TA 的身份,绝不能把 TA 的设定、经历、人际安到主人或任何住民头上:\n${userParts.join('\n').slice(0, 700)}`);
+        sections.push(`◆ 「${userName}」是叙事另一方(user)——TA **不是**手机主人。以下材料仅供辨认 TA 的身份,绝不能把 TA 的设定、经历、人际安到主人或任何住民头上:\n${userParts.join('\n')}`);
     }
     if (wiBlob) {
-        sections.push(`◆ 世界观背景(激活的世界书条目,可能与上文重复;人物身份归属以上文两节为准):\n${wiBlob.slice(0, 1400)}`);
+        sections.push(`◆ 世界观背景(激活的世界书条目,可能与上文重复;人物身份归属以上文两节为准):\n${wiBlob}`);
     }
     return sections.length ? `【人物设定参考(权威;主线人物言行以此为准,不得OOC)】\n${sections.join('\n\n')}\n\n` : '';
+}
+
+// ── 既往摘要与注记:酒馆每轮都会带、而 orrery 此前一条都没读的那一大块材料。──
+// 除了正文,酒馆组 prompt 时还会把各扩展的注入材料一起发出去(摘要扩展 1_memory、作者注释
+// 2_floating_prompt、向量记忆 3_vectors…统一走 extension_prompts,核实于 script.js:3190
+// getExtensionPrompt)。关系史往往就活在这里,而 orrery 一条都没取。
+// 做法照旧 = 镜像酒馆、不认具体扩展名:整表取回,谁往里塞过东西就带上谁,新装的扩展自动生效。
+const EXT_PROMPT_LABELS = {
+    '1_memory': '聊天摘要',
+    '2_floating_prompt': '作者注释',
+    '3_vectors': '向量记忆',
+    'chromadb': '智能上下文',
+};
+
+export async function buildInjectedNotes(ctx) {
+    const table = ctx.extensionPrompts;
+    if (!table || typeof table !== 'object') return { text: '', keys: [] };
+    const keys = [];
+    const parts = [];
+    for (const key of Object.keys(table).sort()) { // 同 ST(script.js:3199)按 key 排序:顺序稳定才吃得到缓存
+        const entry = table[key];
+        // orrery 自己若将来往里塞东西,不许喂回给自己
+        if (!entry || String(key).startsWith('orrery')) continue;
+        const raw = String(entry.value || '').trim();
+        if (!raw) continue;
+        // 扩展可以挂 filter 决定本轮到底注不注入(向量记忆之类按需生效),照它自己的意思办;
+        // filter 抛错就当放行——宁可多带一段材料,不可因为别家的异常把摘要整块弄丢。
+        if (typeof entry.filter === 'function') {
+            try { if (!(await entry.filter())) continue; } catch { /* 放行 */ }
+        }
+        keys.push(key);
+        parts.push(`◆ ${EXT_PROMPT_LABELS[key] || key}:\n${subParams(ctx, raw)}`);
+    }
+    if (!parts.length) return { text: '', keys: [] };
+    const text = `【既往摘要与注记(酒馆本轮同样会带上的材料)】\n这是主人走到「现在」之前的经过。人物关系走到了哪一步、有过什么约定与转折,一律以本节与正文既往楼层为准,不许只凭最新几层反推关系。\n${parts.join('\n\n')}\n\n`;
+    return { text, keys };
+}
+
+// 上下文自报:她真机验收时得能一眼看出「摘要到底进来了没有」。
+// 这个项目在静默失败上栽过太多次(线程整批丢弃、提纯降级、预算被吃),凡是「看起来成功了但材料不对」
+// 的失败模式,都要在控制台留下可对账的一行。
+function logContextShape(tag, userContent, noteKeys) {
+    const floors = (userContent.match(/^\[第\d+层\]/gm) || []).length;
+    console.info(`[Orrery] ${tag} 上下文 — 正文 ${floors} 层 / 注记 [${noteKeys.join(', ') || '无'}] / 合计 ${userContent.length} 字符`);
 }
 
 // user 侧硬防线:提示词纪律 Gemini 屡教不改(她真机三抓),消化层直接拒收名字匹配叙事另一方的
@@ -439,32 +500,87 @@ function isUserSide(name, ctx) {
     return n === u || n.includes(u) || u.includes(n);
 }
 
-function recentFloorTexts(ctx, excludeTags, count = 6) {
-    // 与 ST 自身调用习惯一致(script.js:4455):带发言人名(可命中世界书人名关键词)、新→旧倒序
-    const tip = ctx.chat.length - 1;
-    return ctx.chat.slice(-count)
-        .map((m, k) => {
-            const i = Math.max(0, ctx.chat.length - count) + k;
-            return `${m?.name ? m.name + ': ' : ''}${cleanMessageText(ctx, m, tip - i, excludeTags)}`;
-        })
-        .filter(t => t.trim())
-        .reverse();
+// ── 楼层序列:与酒馆同源的 depth。──
+// 酒馆算 depth 用的是 coreChat(script.js:4332:先滤掉 is_system 楼层),而 orrery 此前直接拿
+// `tip - i` 在原始 chat 上算。聊天里只要有一条系统消息(欢迎语、/sys 提示),后面每一层的 depth
+// 就整体错位——过去只喂尾部 8 层时无所谓(全在浅档),现在 depth 决定了每层旧楼层被预设正则
+// 压成摘要还是留全文,错一格就能让整段历史退回全文,或反过来被压空。照抄酒馆的算法。
+function* coreFloors(ctx) {
+    const chat = ctx.chat || [];
+    const core = [];
+    for (let i = 0; i < chat.length; i++) {
+        if (chat[i] && !chat[i].is_system) core.push(i);
+    }
+    for (let k = 0; k < core.length; k++) {
+        yield { index: core[k], depth: core.length - k - 1, msg: chat[core[k]] };
+    }
 }
 
-function buildFloorContextText(ctx, pendingFloors, floorWindow, excludeTags) {
-    if (!pendingFloors.length) return '';
-    const maxFloor = Math.max(...pendingFloors);
-    const start = Math.max(0, Math.min(...pendingFloors) - floorWindow);
-    const tip = ctx.chat.length - 1;
-    const lines = [];
-    for (let i = start; i <= maxFloor && i < ctx.chat.length; i++) {
-        const msg = ctx.chat[i];
-        if (!msg) continue;
-        const speaker = msg.name || (msg.is_user ? ctx.name1 : ctx.name2);
-        const text = cleanMessageText(ctx, msg, tip - i, excludeTags);
-        if (text) lines.push(`[第${i}层] ${speaker}: ${text}`);
+function recentFloorTexts(ctx, excludeTags, count = 6) {
+    // 与 ST 自身调用习惯一致(script.js:4455):带发言人名(可命中世界书人名关键词)、新→旧倒序
+    const out = [];
+    for (const { depth, msg } of coreFloors(ctx)) {
+        if (depth >= count) continue;
+        const t = `${msg?.name ? msg.name + ': ' : ''}${cleanMessageText(ctx, msg, depth, excludeTags)}`;
+        if (t.trim()) out.push(t);
     }
-    return lines.join('\n');
+    return out.reverse();
+}
+
+// ── 正文上下文:默认整本聊天(floorWindow=0)。2026-08-13 拍板的改法。──
+// 病象:长聊天里关系早已走过很多阶段,生成出来的余波却总把关系写回原点(OOC)。
+// 病根:此前只取尾部一小窗(pending + 前 floorWindow 层,实测约 8 层),模型看不到关系史,
+// 只能凭当前几层正文反推「他们是什么关系」,反推错是必然而不是偶然。
+// ⭐关键机制:酒馆每轮**本来就发整本聊天**,长度靠预设自己的正则按 depth 收敛——这是社区
+// 长篇预设的通行工法(实际抽查过两套互不相干的预设,都是同一形状:一条 minDepth≈5 的脚本把旧楼层
+// 压成只剩摘要块,一条 maxDepth≈4 的脚本让最近几层保留全文,另一条 minDepth≈1 把旧的 user 楼层整条清空)。
+// 所以「最近几层正文 + 更早只剩摘要」不是酒馆截出来的,是预设正则做出来的。
+// orrery 的 cleanMessageText 一直在传真实 depth,只要把范围放开到整本,同一套正则就会自动完成收敛
+// ——不需要 orrery 自己发明任何截断,也不需要认识任何预设的标签名,换预设自动跟着换。
+// 反过来说,过去只喂尾部 8 层,等于这 8 层全部落在「最近几层」这一档,摘要恰好全被删掉:
+// orrery 从来没有见过一条摘要。
+// floorWindow > 0 时保留旧的窗口行为(等价于旧版的 pending fw 层 + 前 fw 层 = 2fw 层),
+// 留给没有这类摘要正则、又不想每轮发整本的用户。
+// 正文小节的抬头。SYSTEM 提示词写的是「①故事正文的最新进展」,而现在喂进去的是整本聊天——
+// 不点破结构的话,模型会把几百层历史整个当成刚发生的事,给早就过去的情节现造一轮余波。
+// SYSTEM 那几段有「逐字不改」的铁律,所以把结构说明放在 user 内容侧的抬头里,效果一样、不动原文。
+const FLOOR_HEADERS = {
+    // 有分界线:线之前是历史背景,线之后才是这次要生成余波的新进展
+    divided: '【故事正文(从开头到现在的完整经过。越早的楼层越简略——那是既往摘要,只作为背景;分界线之后才是这次要生成余波的新进展。分界线之前的事早已过去,不要为它们新造动静)】',
+    // 首次生成:还没有水位,整段都算新的
+    allNew: '【故事正文(从开头到现在的完整经过。越早的楼层越简略——那是既往摘要。这是第一次生成,请从整段经过里长出这部手机此刻该有的样子)】',
+    // 二刷:没有新进展,在同一段进展上再看一圈
+    regrow: '【故事正文(从开头到现在的完整经过。越早的楼层越简略——那是既往摘要。自上次生成以来正文没有新进展,这次是在同一段进展上再看一圈涟漪)】',
+    // 续聊/盖楼:正文全程只作背景,余波由这条线程/这个帖子自己往下长
+    background: '【故事正文(从开头到现在的完整经过,仅作背景:交代主人是谁、关系走到了哪一步。不要复述,也不要为正文里的事新造动静)】',
+};
+
+/** 正文小节(含抬头)。空聊天返回空串。 */
+function buildFloorSection(ctx, { newFrom, floorWindow, excludeTags, background = false }) {
+    const { text, divided } = buildFloorContextText(ctx, { newFrom, floorWindow, excludeTags });
+    if (!text) return '';
+    const key = background ? 'background'
+        : !Number.isFinite(newFrom) ? 'regrow'
+            : divided ? 'divided' : 'allNew';
+    return `${FLOOR_HEADERS[key]}\n${text}\n\n`;
+}
+
+function buildFloorContextText(ctx, { newFrom, floorWindow, excludeTags }) {
+    const lines = [];
+    let marked = false, divided = false;
+    for (const { index, depth, msg } of coreFloors(ctx)) {
+        if (floorWindow > 0 && depth > 2 * floorWindow - 1) continue;
+        const speaker = msg.name || (msg.is_user ? ctx.name1 : ctx.name2);
+        const text = cleanMessageText(ctx, msg, depth, excludeTags);
+        if (!text) continue; // 被预设正则整层压空的旧楼层(没有摘要可留)——照酒馆的意思,它本来就不该发
+        if (!marked && Number.isFinite(newFrom) && index >= newFrom) {
+            marked = true;
+            if (lines.length) { lines.push('—— 以上是既往经过,以下是上次生成之后的新进展 ——'); divided = true; }
+        }
+        lines.push(`[第${index}层] ${speaker}: ${text}`);
+    }
+    // divided:分界线真的画出来了(首次生成时新进展就是第一层,画不出线,抬头要换一种说法)
+    return { text: lines.join('\n'), divided };
 }
 
 function senderNameFn(world, thread) {
@@ -549,31 +665,31 @@ function buildForumThreadDigestText(world, thread) {
     return parts.join('\n');
 }
 
-// ── 水位 → pending 楼层区间(messenger/forum 共用):[max(水位+1, tip-窗口+1) .. tip]。
-// M1 水位重构后 pending 不再靠事件累积,完全推导——冷启动的存量楼层、流式丢事件的楼层都自动补上;
-// 推导只取尾部 floorWindow 层,捡到手机时更早的过去只存在于后续对话里。──
-function derivePendingFloors(watermark, tip, floorWindow) {
-    if (tip < 0) return [];
-    const start = Math.max(0, watermark + 1, tip - (floorWindow - 1));
-    const floors = [];
-    for (let i = start; i <= tip; i++) floors.push(i);
-    return floors;
+// ── 水位 → 本批「新进展」的起点(messenger/forum 共用)。──
+// M1 水位重构后不靠事件累积,完全推导——冷启动的存量楼层、流式丢事件的楼层都自动补上。
+// 2026-08-13 起「新进展」与「上下文范围」彻底分家:上下文默认是整本聊天(见 buildFloorContextText),
+// 这里只回答「哪一层之后算新的」,用来在正文里画那条分界线、并决定本批水位推到哪。
+// 返回本批「新进展」的起始层;没有新进展返回 null(交给二刷)。
+// floorWindow>0 时保留旧的上限:即便水位很旧,一次也只把最后 fw 层算作新进展。
+function deriveNewFrom(watermark, tip, floorWindow) {
+    if (tip < 0) return null;
+    let start = watermark + 1;
+    if (floorWindow > 0) start = Math.max(start, tip - (floorWindow - 1));
+    start = Math.max(0, start);
+    return start <= tip ? start : null;
 }
 
 /**
  * 二刷:楼层没有新进展时,刷新退化为「再涨一批」——同一扇正文窗口再看一圈涟漪
  * (她的用法:反复测试/想在同层多长内容——家人线程、新群、新帖)。靠世界状态差异+明示 hint 防重复。
- * 返回 { floors, hint };真空聊天 floors 为空。
+ * 返回 { newFrom, batchFloor, hint };真空聊天 batchFloor 为 null。
  */
 function pendingOrRegrow(watermark, tip, floorWindow) {
-    const floors = derivePendingFloors(watermark, tip, floorWindow);
-    if (floors.length) return { floors, hint: '' };
-    if (tip < 0) return { floors: [], hint: '' };
-    const start = Math.max(0, tip - (floorWindow - 1));
-    const regrow = [];
-    for (let i = start; i <= tip; i++) regrow.push(i);
+    if (tip < 0) return { newFrom: null, batchFloor: null, hint: '' };
+    const newFrom = deriveNewFrom(watermark, tip, floorWindow);
+    if (newFrom !== null) return { newFrom, batchFloor: tip, hint: '' };
     return {
-        floors: regrow,
+        newFrom: null, batchFloor: tip,
         hint: '(正文自上次生成后没有新进展。请基于同样的进展,让小世界继续自然生长——本次优先自问:主人的既定人际网里,还有谁没在这部手机上登场?从【人物设定参考】和原著既定事实里挖:上级、下属、家人(关系差的也算)、旧友、原著配角;群聊谱系里还缺哪种群(汇报群/指挥群/家族群/朋友群)?有合理人选就让 TA 登场;实在没有,再自然续写已有内容。纪律照旧且最优先:叙事另一方仍然绝对不许出现;通讯录规模守住真人手机的量级;不要为了新而新,不要重复已有内容。)\n\n',
     };
 }
@@ -584,8 +700,8 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
     await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'messenger');
     const tip = ctx.chat.length - 1;
-    const { floors: pendingFloors, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
-    if (!pendingFloors.length) return { ok: true, changed: false };
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    if (batchFloor === null) return { ok: true, changed: false };
 
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
     const charName = owner || ctx.name2 || '主角';
@@ -596,7 +712,11 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
         ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。除非剧情明确显示 TA 已与「${charName}」相识并交换了联系方式,否则「${userSideName}」不得出现在这部手机里;若现有联系人名册中没有 TA,大概率就是还不该有。\n\n`
         : '';
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
-    const userContent = `${regrowHint}${caution}${castRef}【正文最新进展】\n${buildFloorContextText(ctx, pendingFloors, floorWindow, excludeTags)}\n\n【手机当前状态】\n${buildWorldDigestText(world)}`;
+    const notes = await buildInjectedNotes(ctx);
+    // regrowHint 从队首挪到队尾:它是「本次这一趟怎么做」的临时指令,贴着输出更有效;
+    // 更要紧的是队首要留给不变的材料——前缀稳定,连续几次生成才吃得到 provider 的缓存。
+    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}【手机当前状态】\n${buildWorldDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
+    logContextShape('消息生成', userContent, notes.keys);
     const systemPrompt = PROMPT_A.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('messenger', language));
 
     const epoch = store.getRollbackEpoch();
@@ -607,7 +727,6 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
     // 又拍回去,这段楼层从此再不会被生成。回滚代表用户更晚的意图,整批作废。
     if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
 
-    const batchFloor = Math.max(...pendingFloors);
     const touchedThreads = new Set();
     let addedCount = 0;
     const anchor = parseWorldTime(parsed.worldTime) ?? world.worldNow ?? Date.now();
@@ -704,7 +823,7 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
 
 // ── 线程内续聊:定向生成,允许返回空。──
 
-async function runThreadContinue(ctx, store, { worldKey, threadId, profileId, customApi, owner, language, excludeTags }) {
+async function runThreadContinue(ctx, store, { worldKey, threadId, floorWindow, profileId, customApi, owner, language, excludeTags }) {
     await ensureRegexEngine();
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
     const thread = world.threads.get(threadId);
@@ -726,8 +845,14 @@ async function runThreadContinue(ctx, store, { worldKey, threadId, profileId, cu
             .replaceAll('{{contact}}', contact.name)
             .replaceAll('{{contactId}}', threadId)
             .replaceAll('{{LANG_RULE}}', langRule('messenger', language));
+    // 续聊此前只有【人物设定参考】+ 线程记录,连正文和摘要都看不到——比主生成还盲,
+    // 于是「点进去续几句」永远停在关系的原点(她 2026-08-13 报的 OOC,这条路是重灾区)。
+    // 现在与主生成同一套底料:设定 → 摘要注记 → 正文近况,最后才是这条线程自己的上下文。
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
-    const userContent = castRef + (buildThreadDigestText(thread, senderNameFn(world, thread)) || '(还没有聊天记录)');
+    const notes = await buildInjectedNotes(ctx);
+    const recent = buildFloorSection(ctx, { newFrom: null, floorWindow: floorWindow ?? 0, excludeTags, background: true });
+    const userContent = `${castRef}${notes.text}${recent}【这段聊天的记录】\n${buildThreadDigestText(thread, senderNameFn(world, thread)) || '(还没有聊天记录)'}`;
+    logContextShape('消息续聊', userContent, notes.keys);
 
     const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || !Array.isArray(parsed.messages)) return { ok: false, error: 'parse_failed' };
@@ -789,8 +914,8 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'forum');
     const tip = ctx.chat.length - 1;
-    const { floors: pendingFloors, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
-    if (!pendingFloors.length) return { ok: true, changed: false };
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    if (batchFloor === null) return { ok: true, changed: false };
 
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
     const charName = owner || ctx.name2 || '主角';
@@ -800,13 +925,14 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
         ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。不得作为住民注册发言(除非剧情确实如此);更不得在任何帖子或回复中暗示 TA 与「${charName}」的关系——两人尚未相识/尚未交往时,连目击式的并排出现都不许写。\n\n`
         : '';
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
-    const userContent = `${regrowHint}${caution}${castRef}【正文最新进展】\n${buildFloorContextText(ctx, pendingFloors, floorWindow, excludeTags)}\n\n【论坛当前状态】\n${buildForumDigestText(world)}`;
+    const notes = await buildInjectedNotes(ctx);
+    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}【论坛当前状态】\n${buildForumDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
+    logContextShape('论坛生成', userContent, notes.keys);
     const systemPrompt = PROMPT_F.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('forum', language));
 
     const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
 
-    const batchFloor = Math.max(...pendingFloors);
     const anchor = parseWorldTime(parsed.worldTime) ?? world.forumNow ?? Date.now();
     let addedCount = 0;
 
@@ -893,15 +1019,20 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
 
 // ── 论坛盖楼:定向续写单帖,允许返回空;newResident 一批最多新建 2 名(任务书 §4)。──
 
-async function runForumThreadContinue(ctx, store, { worldKey, threadId, profileId, customApi, owner, language, allowUserContact, excludeTags }) {
+async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags }) {
     await ensureRegexEngine();
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
     const thread = world.forumThreads.get(threadId);
     if (!thread?.title) return { ok: false, error: 'no_thread' };
 
     const systemPrompt = PROMPT_G.replaceAll('{{LANG_RULE}}', langRule('forum', language));
+    // 同 runThreadContinue:盖楼也补上摘要与正文近况,否则住民只能凭一个帖子的字面意思接话,
+    // 主线人物的小号一开口就回到关系原点。
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), owner || ctx.name2);
-    const userContent = castRef + buildForumThreadDigestText(world, thread);
+    const notes = await buildInjectedNotes(ctx);
+    const recent = buildFloorSection(ctx, { newFrom: null, floorWindow: floorWindow ?? 0, excludeTags, background: true });
+    const userContent = `${castRef}${notes.text}${recent}${buildForumThreadDigestText(world, thread)}`;
+    logContextShape('论坛盖楼', userContent, notes.keys);
 
     const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || !Array.isArray(parsed.replies)) return { ok: false, error: 'parse_failed' };
