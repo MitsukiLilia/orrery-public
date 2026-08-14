@@ -143,6 +143,73 @@ export function foldWorld(entries) {
     };
 }
 
+// ── 「我看过了」水位:用户视角的未读,与 payload.read 是两回事,不许混。 ──
+// payload.read 是**叙事内**的已读(模型用它演已读不回,主角在故事里看没看到);
+// 下面这套是**用户**有没有亲眼看过——刷新完新长出来的东西,她没点进去就是新的。
+// 两者互不干涉:既読照常由模型演,红点/NEW 只认 seen 水位(每线程/每帖一个入账 ts)。
+// 记 ts(入账序号)而不是 displayTs(世界时间):世界时间是模型编的,同一批生成里可能落在过去。
+
+export function seenKeyForThread(threadId) { return `messenger:${threadId}`; }
+export function seenKeyForForumThread(threadId) { return `forum:${threadId}`; }
+
+/** 线程里最新一条消息的入账 ts(空线程 0)——看过之后 seen 就记到这个值。 */
+export function latestTsOfThread(thread) {
+    let max = 0;
+    for (const m of thread.messages) if (m.ts > max) max = m.ts;
+    return max;
+}
+
+/** 帖子的最新入账 ts:帖体与全部回复取最大(帖子本体也可能比某些回复晚入账)。 */
+export function latestTsOfForumThread(thread) {
+    let max = thread.ts || 0;
+    for (const r of thread.replies) if (r.ts > max) max = r.ts;
+    return max;
+}
+
+/** 上次看过之后新到的「别人发来的」消息数——自己发的不算未读(真手机也不会为自己的话亮红点)。 */
+export function unreadCountOfThread(thread, seenTs) {
+    let n = 0;
+    for (const m of thread.messages) if (m.ts > (seenTs || 0) && m.sender !== 'me') n++;
+    return n;
+}
+
+/** 上次看过之后这个帖子新增的回复数(帖体本身是不是新的由调用方看 seen 有没有记录判断)。 */
+export function newReplyCountOfForumThread(thread, seenTs) {
+    let n = 0;
+    for (const r of thread.replies) if (r.ts > (seenTs || 0)) n++;
+    return n;
+}
+
+/** 某个 app 里还有没有她没看过的东西——真手机的图标角标就是这个语义(有未读就亮)。 */
+export function hasUnseenInApp(app, world, seen) {
+    if (app === 'messenger') {
+        for (const t of world.threads.values()) {
+            if (unreadCountOfThread(t, seen[seenKeyForThread(t.threadId)]) > 0) return true;
+        }
+        return false;
+    }
+    for (const t of world.forumThreads.values()) {
+        if (!t.title) continue; // 帖子壳(悬空回复)不是能点开的东西,不该为它亮角标
+        const s = seen[seenKeyForForumThread(t.threadId)];
+        if (s === undefined || newReplyCountOfForumThread(t, s) > 0) return true;
+    }
+    return false;
+}
+
+/** 打基线用:当下每条线程/每个帖子的最新 ts,一次性记成「看过了」(见 store.initSeenBaseline)。 */
+export function seenBaselinePairs(world) {
+    const pairs = [];
+    for (const t of world.threads.values()) {
+        const ts = latestTsOfThread(t);
+        if (ts) pairs.push([seenKeyForThread(t.threadId), ts]);
+    }
+    for (const t of world.forumThreads.values()) {
+        const ts = latestTsOfForumThread(t);
+        if (ts) pairs.push([seenKeyForForumThread(t.threadId), ts]);
+    }
+    return pairs;
+}
+
 /** 解析线程内某个发送者的显示信息(dm=对面那位联系人;群=成员表;查无此人给兜底)。 */
 export function resolveSender(world, thread, senderId) {
     if (thread.kind !== 'group') {

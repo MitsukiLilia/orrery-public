@@ -25,12 +25,12 @@ export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - delayMin = 距上一条消息的分钟数,用它表达时间流动与迟疑:热聊就密(0〜2),冷场、犹豫、已读不回就拉开
 - read:sender 为 me 时表示对方是否已读;sender 为他人时表示主角是否已读。用它演出已读不回。`;
 
-export const PROMPT_B_GROUP = `你是 Orrery,叙事世界观测引擎。用户想继续围观主角「{{char}}」手机里的群聊「{{group}}」(成员:{{members}})。基于最近的聊天走向和各人身份,自然地续写 0〜6 条新消息;允许有人潜水、允许冷场(返回空 messages),不必人人发言。
+export const PROMPT_B_GROUP = `你是 Orrery,叙事世界观测引擎。用户想继续围观主角「{{char}}」手机里的群聊「{{group}}」(成员:{{members}})。基于最近的聊天走向和各人身份,自然地续写{{COUNT_RULE}}
 遵守:消息像真人打字;每个人只知道自己视角内的事;不复述正文;{{LANG_RULE}}
 只输出 JSON:{"messages":[{"sender":"me 或成员id","text":"","delayMin":0,"read":true}]}`;
 
-export const PROMPT_B = `你是 Orrery,叙事世界观测引擎。用户想继续围观主角「{{char}}」手机里与「{{contact}}」的这段聊天。基于双方关系、最近的故事进展与聊天走向,自然地续写 0〜5 条新消息。
-遵守:消息像真人打字;沉默合理时就沉默(返回空 messages);不复述正文;{{LANG_RULE}}
+export const PROMPT_B = `你是 Orrery,叙事世界观测引擎。用户想继续围观主角「{{char}}」手机里与「{{contact}}」的这段聊天。基于双方关系、最近的故事进展与聊天走向,自然地续写{{COUNT_RULE}}
+遵守:消息像真人打字;不复述正文;{{LANG_RULE}}
 只输出 JSON:{"messages":[{"sender":"me 或 {{contactId}}","text":"","delayMin":0,"read":true}]}`;
 
 export const PROMPT_C = `把下面这段聊天记录压缩成 5 行以内的中立摘要,保留:关系变化、约定与承诺、未解决的话题、双方情绪基调。只输出摘要正文。`;
@@ -55,7 +55,7 @@ export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - replyToFloor 仅在明确回应某楼时给出;delayMin=距上一楼的分钟数
 - worldTime 从正文推断,只许向后走`;
 
-export const PROMPT_G = `你是 Orrery,叙事世界观测引擎。用户想继续围观这个帖子的后续。基于帖子走向和各住民的身份口癖,自然地续写 0〜6 楼新回复;热帖才热闹,冷场合理就冷场(返回空 replies)。
+export const PROMPT_G = `你是 Orrery,叙事世界观测引擎。用户想继续围观这个帖子的后续。基于帖子走向和各住民的身份口癖,自然地续写{{COUNT_RULE}}
 遵守:像论坛不像小说;住民口癖跨帖一致;每人只知道自己知道的;故事人物的小号绝不自曝、言行不得OOC(以【人物设定参考】为准);不复述正文。
 {{LANG_RULE}}
 只输出 JSON:{"replies":[{"authorId":"已有住民id或新id","newResident":{"residentId":"","handle":"","persona":"","castName":"可省略"},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}`;
@@ -73,6 +73,25 @@ const LANG_RULE = {
 };
 function langRule(scope, language) {
     return LANG_RULE[scope][language === 'ja_zh' ? 'ja_zh' : 'zh'];
+}
+
+// ── 点单条数:{{COUNT_RULE}} 同 LANG_RULE 的工法(占位替换,原文一字不动)。──
+// 「刷新」是世界自己起涟漪,该冷场就冷场;但帖内/线程内的「生成」是用户按下的,她点 5 条就是想要 5 条——
+// 这时再让模型自由决定「今天没人想说话」,按钮就成了掷骰子。默认档保持任务书原文,点单档才收紧。
+const COUNT_RULE_DEFAULT = {
+    dm: ' 0〜5 条新消息。沉默合理时就沉默(返回空 messages)。',
+    group: ' 0〜6 条新消息;允许有人潜水、允许冷场(返回空 messages),不必人人发言。',
+    forum: ' 0〜6 楼新回复;热帖才热闹,冷场合理就冷场(返回空 replies)。',
+};
+function countRule(scope, n) {
+    if (!Number.isFinite(n) || n <= 0) return COUNT_RULE_DEFAULT[scope];
+    if (scope === 'forum') {
+        return ` ${n} 楼新回复——这是用户点的数量,请给足;可以让不同住民从不同角度接话、互相抬杠或歪楼,但不要为了凑数注水。`;
+    }
+    if (scope === 'group') {
+        return ` ${n} 条新消息——这是用户点的数量,请给足;可以由不同成员分担,允许有人潜水,不必人人发言。`;
+    }
+    return ` ${n} 条新消息——这是用户点的数量,请给足;可以是一方连发,也可以是一来一往。`;
 }
 
 // ── 输出预算 ──
@@ -290,11 +309,14 @@ async function callCustomApi(customApi, systemPrompt, userContent, responseLengt
 // JSON)。Profile/独立 API 通道不过这个事件、天然干净;裸通道靠这里自卫——发前 makeLast
 // 挂监听(保证排在注入插件之后),按首 80 字前缀认领本次请求的 system/user 两条消息,
 // 把别家塞进来的剔掉。认不满两条就不动(fail-open:宁可脏,绝不误伤别人的生成)。
-let rawGuard = null;
+// ⚠️必须是集合不是单例:消息与论坛现在各持一把生成锁(她 2026-08-14 点单「刷消息时还能去看论坛」),
+// 两路裸调用可以真的同时在飞。单例的话,后发的那次会覆盖先发的认领前缀,而先回来的那次
+// finally 又把它清成 null——两边一起失去防注入保护,且完全无声。
+const rawGuards = new Set();
 function onPromptReady(eventData) {
-    if (!rawGuard || eventData?.dryRun || !Array.isArray(eventData?.chat)) return;
+    if (!rawGuards.size || eventData?.dryRun || !Array.isArray(eventData?.chat)) return;
     const ours = eventData.chat.filter(m => typeof m?.content === 'string'
-        && (m.content.startsWith(rawGuard.sysHead) || m.content.startsWith(rawGuard.userHead)));
+        && [...rawGuards].some(g => m.content.startsWith(g.sysHead) || m.content.startsWith(g.userHead)));
     if (ours.length >= 2 && ours.length < eventData.chat.length) {
         console.warn('[Orrery] 裸调用被注入了', eventData.chat.length - ours.length, '条外来消息,已剔除');
         eventData.chat.splice(0, eventData.chat.length, ...ours);
@@ -312,14 +334,16 @@ export async function callLLM(ctx, systemPrompt, userContent, { profileId, custo
         return result?.content ?? '';
     }
     const ev = ctx.eventTypes?.CHAT_COMPLETION_PROMPT_READY ?? ctx.event_types?.CHAT_COMPLETION_PROMPT_READY;
+    let guard = null;
     if (ctx.eventSource && ev) {
         ctx.eventSource.makeLast(ev, onPromptReady); // 幂等:每次重挂保持最后
-        rawGuard = { sysHead: systemPrompt.trim().slice(0, 80), userHead: userContent.trim().slice(0, 80) };
+        guard = { sysHead: systemPrompt.trim().slice(0, 80), userHead: userContent.trim().slice(0, 80) };
+        rawGuards.add(guard);
     }
     try {
         return await ctx.generateRaw({ prompt: userContent, systemPrompt, responseLength: responseLength || RESPONSE_BUDGET });
     } finally {
-        rawGuard = null;
+        if (guard) rawGuards.delete(guard); // 只撤自己那把,不碰别路正在飞的
     }
 }
 
@@ -823,7 +847,7 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
 
 // ── 线程内续聊:定向生成,允许返回空。──
 
-async function runThreadContinue(ctx, store, { worldKey, threadId, floorWindow, profileId, customApi, owner, language, excludeTags }) {
+async function runThreadContinue(ctx, store, { worldKey, threadId, floorWindow, profileId, customApi, owner, language, excludeTags, count }) {
     await ensureRegexEngine();
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
     const thread = world.threads.get(threadId);
@@ -840,11 +864,13 @@ async function runThreadContinue(ctx, store, { worldKey, threadId, floorWindow, 
             .replaceAll('{{group}}', thread.group.name)
             .replaceAll('{{members}}', (thread.group.members || []).map(m => `${m.name}(id=${m.id})`).join('、'))
             .replaceAll('{{LANG_RULE}}', langRule('messenger', language))
+            .replaceAll('{{COUNT_RULE}}', countRule('group', count))
         : PROMPT_B
             .replaceAll('{{char}}', charName)
             .replaceAll('{{contact}}', contact.name)
             .replaceAll('{{contactId}}', threadId)
-            .replaceAll('{{LANG_RULE}}', langRule('messenger', language));
+            .replaceAll('{{LANG_RULE}}', langRule('messenger', language))
+            .replaceAll('{{COUNT_RULE}}', countRule('dm', count));
     // 续聊此前只有【人物设定参考】+ 线程记录,连正文和摘要都看不到——比主生成还盲,
     // 于是「点进去续几句」永远停在关系的原点(她 2026-08-13 报的 OOC,这条路是重灾区)。
     // 现在与主生成同一套底料:设定 → 摘要注记 → 正文近况,最后才是这条线程自己的上下文。
@@ -1019,13 +1045,15 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
 
 // ── 论坛盖楼:定向续写单帖,允许返回空;newResident 一批最多新建 2 名(任务书 §4)。──
 
-async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags }) {
+async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags, count }) {
     await ensureRegexEngine();
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
     const thread = world.forumThreads.get(threadId);
     if (!thread?.title) return { ok: false, error: 'no_thread' };
 
-    const systemPrompt = PROMPT_G.replaceAll('{{LANG_RULE}}', langRule('forum', language));
+    const systemPrompt = PROMPT_G
+        .replaceAll('{{LANG_RULE}}', langRule('forum', language))
+        .replaceAll('{{COUNT_RULE}}', countRule('forum', count));
     // 同 runThreadContinue:盖楼也补上摘要与正文近况,否则住民只能凭一个帖子的字面意思接话,
     // 主线人物的小号一开口就回到关系原点。
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), owner || ctx.name2);

@@ -20,12 +20,31 @@
     padding: 12px 16px; border-bottom: 1px solid var(--or-cream-2);
 }
 .or-forum-row:active { background: rgba(110, 90, 80, .05); }
+.or-forum-row-tags { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
 .or-forum-tag {
     display: inline-block; font-size: 10.5px; color: var(--or-cocoa-light);
-    background: var(--or-cream-2); padding: 2px 8px; border-radius: 999px; margin-bottom: 5px;
+    background: var(--or-cream-2); padding: 2px 8px; border-radius: 999px;
+}
+/* NEW = 她一次都没点进去过的帖子(刷新刚长出来的那些);点进去看过就再也不挂了 */
+.or-forum-new {
+    display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: .06em;
+    color: var(--or-cocoa); background: var(--or-salt-deep); /* 同未读徽标:深色字才在三套皮上都读得清 */
+    padding: 2px 7px; border-radius: 999px;
+    animation: or-new-pulse 2.6s ease-in-out infinite;
+}
+@keyframes or-new-pulse {
+    0%, 72%, 100% { transform: scale(1); }
+    82% { transform: scale(1.12); }
 }
 .or-forum-title { font-size: 14.5px; font-weight: 600; color: var(--or-cocoa); line-height: 1.4; }
 .or-forum-meta { font-size: 12px; color: var(--or-cocoa-light); margin-top: 3px; }
+/* 看过的帖子又被盖了新楼:不挂 NEW,只在 meta 行末尾报个数 */
+.or-forum-newreply { color: var(--or-salt-deep); font-weight: 700; margin-left: 6px; }
+
+.or-forum-row.just-arrived { animation: or-row-arrive .9s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+    .or-forum-new, .or-forum-row.just-arrived { animation: none; }
+}
 
 /* ── 帖内视图 ── */
 .or-forum-scroll { flex: 1; overflow-y: auto; background: var(--or-cream); }

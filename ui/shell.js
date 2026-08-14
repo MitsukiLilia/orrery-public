@@ -1,6 +1,10 @@
 // 手机壳:开合、状态栏、app 网格、返回导航。持有 ctx,是 core/* 与 apps/* 之间唯一的装配点——
 // 事件委托只挂一份在 .or-root 上,不随每次重渲染叠加监听器。
-import { computeWorldKey, foldWorld } from '../core/world.js';
+import {
+    computeWorldKey, foldWorld,
+    seenKeyForThread, seenKeyForForumThread, latestTsOfThread, latestTsOfForumThread,
+    hasUnseenInApp, seenBaselinePairs,
+} from '../core/world.js';
 import * as store from '../core/store.js';
 import * as generator from '../core/generator.js';
 import { generateMore, continueThread, generateMoreForum, continueForumThread } from '../core/generator.js';
@@ -21,6 +25,8 @@ const DEFAULT_SETTINGS = {
     // 那一窗全落在「近消息」档、摘要恰好全被删光,于是永远只能凭最新几层反推关系 → OOC。
     floorWindow: 0, profileId: null, summaryThreshold: 40,
     autoRefresh: false, theme: 'seasalt', showFab: true, allowUserContact: false, language: 'zh', excludeTags: '',
+    // 帖内/线程内「生成」的点单条数(列表页的「刷新」不受此约束,那是世界自己起涟漪,该冷场就冷场)
+    threadReplyBatch: 3, forumReplyBatch: 3,
     customApi: { enabled: false, baseUrl: '', apiKey: '', model: '' },
 };
 
@@ -109,17 +115,26 @@ function renderSettingsHtml(s, profileLabel, owner) {
                     <button data-action="stepper" data-field="summaryThreshold" data-delta="5">${ICON_PLUS}</button>
                 </div>
             </div>
-            <div class="or-row">
-                <span class="or-row-label">悬浮球入口</span>
-                <button class="or-switch ${s.showFab !== false ? 'on' : ''}" data-action="toggle-field" data-field="showFab" title="酒馆界面右侧的 Orrery 悬浮球,可上下拖动;关掉后走魔杖菜单进入"></button>
+            <div class="or-row with-note">
+                <div class="or-row-main">
+                    <span class="or-row-label">悬浮球入口</span>
+                    <button class="or-switch ${s.showFab !== false ? 'on' : ''}" data-action="toggle-field" data-field="showFab"></button>
+                </div>
+                <div class="or-row-note">酒馆界面右侧的 Orrery 悬浮球,可上下拖动;关掉后走魔杖菜单进入。</div>
             </div>
-            <div class="or-row">
-                <span class="or-row-label">允许「叙事另一方」登场</span>
-                <button class="or-switch ${s.allowUserContact ? 'on' : ''}" data-action="toggle-field" data-field="allowUserContact" title="默认拦下 user 侧越界混入通讯录/群聊/论坛小号;剧情里两人真正相识、交换联系方式之后再打开"></button>
+            <div class="or-row with-note">
+                <div class="or-row-main">
+                    <span class="or-row-label">允许「叙事另一方」登场</span>
+                    <button class="or-switch ${s.allowUserContact ? 'on' : ''}" data-action="toggle-field" data-field="allowUserContact"></button>
+                </div>
+                <div class="or-row-note">默认拦下 user 侧越界混入通讯录/群聊/论坛小号。剧情里两人真正相识、交换过联系方式之后再打开。</div>
             </div>
-            <div class="or-row">
-                <span class="or-row-label">楼层更新后自动刷新</span>
-                <button class="or-switch ${s.autoRefresh ? 'on' : ''}" data-action="toggle-field" data-field="autoRefresh" title="开=酒馆出新楼层就自动生成一批余波;关=只亮红点,手动刷新"></button>
+            <div class="or-row with-note">
+                <div class="or-row-main">
+                    <span class="or-row-label">楼层更新后自动刷新</span>
+                    <button class="or-switch ${s.autoRefresh ? 'on' : ''}" data-action="toggle-field" data-field="autoRefresh"></button>
+                </div>
+                <div class="or-row-note">开 = 酒馆出新楼层就自动生成一批余波;关 = 只亮红点,由你手动刷新。</div>
             </div>
             <button class="or-row or-row-nav" data-action="open-profile-picker">
                 <span class="or-row-label" style="flex:1">生成模型</span>
@@ -161,10 +176,17 @@ function renderProfilePickerHtml(profiles, currentProfileId) {
 export function createShell(ctx, onExternalChange) {
     let host = null, shadow = null, root = null, screenEl = null, toastEl = null;
     let navStack = [{ type: 'grid' }];
-    let busy = false;
+    let lastWorldKey;               // 上次渲染时的世界;变了就把导航栈清回网格(见 render)
+    // 生成锁按 app 分:她的用法是一边等消息生成一边去翻论坛,共用一把锁会把整部手机锁死。
+    // 两个 app 的账、水位、prompt 本来就各走各的,锁也该各管各的。
+    const busy = { messenger: false, forum: false };
+    let autoQueued = false;         // 生成锁占用期间被挡下的自动刷新,解锁后补跑一次(见 autoGenerate)
     let longPressTimer = null;
     let toastTimer = null;
     let suppressNextClick = false; // 线程行长按触发删除后,抑制紧随的 click(否则会顺手打开线程)
+    const baselineDone = new Set(); // 已打过 seen 基线的 worldKey(纯内存去重,免得每次 render 都读一次 meta)
+    let justUpdated = null;         // 刚生成完那一批 threadId;render 用掉一次就清,动效只播一回
+    let pendingScroll = null;       // 'anchor' = 下次渲染后跳到新内容分界线;null = 原地保持滚动位置
 
     function settings() {
         const cur = ctx.extensionSettings.orrery || {};
@@ -200,7 +222,7 @@ export function createShell(ctx, onExternalChange) {
 
     function currentWorldKey() { return computeWorldKey(ctx); }
 
-    // tip + 各 app 水位一起取,渲染网格/判断红点都从这一份派生——两个 app 各看各的水位。
+    // tip + 各 app 水位 + seen 表一起取,渲染网格/判断红点都从这一份派生——两个 app 各看各的水位。
     async function currentWorld() {
         const worldKey = currentWorldKey();
         const tip = ctx.chat && ctx.chat.length ? ctx.chat.length - 1 : -1;
@@ -208,7 +230,7 @@ export function createShell(ctx, onExternalChange) {
             return {
                 worldKey: null,
                 world: { contacts: new Map(), threads: new Map(), boards: new Map(), residents: new Map(), forumThreads: new Map() },
-                tip: -1, watermarks: { messenger: -1, forum: -1 },
+                tip: -1, watermarks: { messenger: -1, forum: -1 }, seen: {},
             };
         }
         const [entries, wmMessenger, wmForum] = await Promise.all([
@@ -216,7 +238,14 @@ export function createShell(ctx, onExternalChange) {
             store.getWatermark(worldKey, 'messenger'),
             store.getWatermark(worldKey, 'forum'),
         ]);
-        return { worldKey, world: foldWorld(entries), tip, watermarks: { messenger: wmMessenger, forum: wmForum } };
+        const world = foldWorld(entries);
+        // 基线必须赶在读 seen 之前——顺序反了,升级后的第一屏就是满屏未读,而且那一眼再也收不回来
+        if (!baselineDone.has(worldKey)) {
+            baselineDone.add(worldKey);
+            await store.initSeenBaseline(worldKey, seenBaselinePairs(world));
+        }
+        const seen = await store.getSeenMap(worldKey);
+        return { worldKey, world, tip, watermarks: { messenger: wmMessenger, forum: wmForum }, seen };
     }
 
     function profileLabel(profileId) {
@@ -249,11 +278,55 @@ export function createShell(ctx, onExternalChange) {
         }
     }
 
+    // ── 滚动位置:整屏 innerHTML 重建会把 scrollTop 抹成 0。不接管的话,酒馆来个事件、
+    // 长按删一条、调一下条数,她正在读的位置就被弹回顶部(她 2026-08-14 报的第 2 点)。
+    // 规则:同一块屏幕重渲染 → 原地保持;刚进屋 / 刚生成完 → 跳到新内容分界线。 ──
+    const SCROLLERS = '.or-chat-scroll, .or-forum-scroll, .or-thread-list, .or-forum-list, .or-list, .or-grid';
+    function screenKey(top) {
+        return [top.type, top.threadId || '', top.boardId || ''].join('|');
+    }
+    let lastScreenKey = null;
+
+    function applyScroll(keep, key) {
+        const scroller = screenEl.querySelector(SCROLLERS);
+        const want = pendingScroll;
+        pendingScroll = null;
+        if (!scroller) return;
+        // 生成是长事务,期间她完全可能已经退回列表页了——那次跳转的目标屏早就不在眼前,
+        // 认屏之后就不会把「跳到新回复」错兑现成把联系人列表拉到底。
+        if (want && want.key && want.key !== key) { if (keep != null) scroller.scrollTop = keep; return; }
+        if (want) {
+            const anchor = screenEl.querySelector('[data-new-anchor]');
+            if (anchor) {
+                // getBoundingClientRect 差值,不用 offsetTop——offsetParent 是 .or-phone 而不是滚动容器,
+                // offsetTop 量出来的是相对整部手机的距离,会把滚动条送到离目标很远的地方。
+                scroller.scrollTop += anchor.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 12;
+            } else if (want.fallback === 'top') {
+                scroller.scrollTop = 0;
+            } else {
+                scroller.scrollTop = scroller.scrollHeight;
+            }
+            return;
+        }
+        if (keep != null) scroller.scrollTop = keep;
+    }
+
     async function render() {
         if (!screenEl) return;
         applyTheme();
+        const { worldKey, world, tip, watermarks, seen } = await currentWorld();
+        // 换聊天=换了另一部手机:上一部停在谁的对话里,与这部毫无关系,退回网格重新开始。
+        // (导航状态本身是跨开合保留的,见 open();只有换世界才清。)
+        if (worldKey !== lastWorldKey) {
+            lastWorldKey = worldKey;
+            if (navStack.length > 1) navStack = [{ type: 'grid' }];
+        }
         const top = navStack[navStack.length - 1];
-        const { worldKey, world, tip, watermarks } = await currentWorld();
+        const key = screenKey(top);
+        // 只有「还停在同一块屏幕」才谈得上保持位置;换屏了旧的 scrollTop 毫无意义
+        const prevScroller = screenEl.querySelector(SCROLLERS);
+        const keepScroll = (lastScreenKey === key && prevScroller) ? prevScroller.scrollTop : null;
+        lastScreenKey = key;
 
         // 主人门:世界可用但还没认主 → 先过激活页,别的什么都看不到
         if (worldKey && top.type !== 'setup') {
@@ -265,24 +338,48 @@ export function createShell(ctx, onExternalChange) {
             }
         }
 
+        let markSeenAfter = null; // 进屋即已读,但要等这一帧画完再落库(别把渲染卡在 IndexedDB 上)
+
         if (top.type === 'setup') {
             screenEl.innerHTML = renderSetupHtml(ctx.name2 || '');
         } else if (top.type === 'grid') {
-            const dots = { messenger: watermarks.messenger < tip, forum: watermarks.forum < tip };
+            // 角标 = 有新楼层还没生成余波 ‖ 有生成好但她还没看过的内容(真手机的角标就是后者)
+            const dots = {
+                messenger: watermarks.messenger < tip || hasUnseenInApp('messenger', world, seen),
+                forum: watermarks.forum < tip || hasUnseenInApp('forum', world, seen),
+            };
             screenEl.innerHTML = renderGridHtml(dots, settings().theme || 'seasalt');
         } else if (top.type === 'messenger-list') {
-            screenEl.innerHTML = renderThreadListHtml({ world, busy });
+            screenEl.innerHTML = renderThreadListHtml({ world, busy: busy.messenger, seen, justUpdated });
         } else if (top.type === 'messenger-thread') {
             const thread = world.threads.get(top.threadId);
             const ok = thread && (thread.kind === 'group' ? !!thread.group : world.contacts.has(top.threadId));
             if (!ok) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚/删除清空
-            screenEl.innerHTML = renderThreadHtml({ thread, world, busy, worldNow: world.worldNow });
+            const seenKey = seenKeyForThread(top.threadId);
+            if (top.seenAt === undefined) { // 刚进屋:定格一次水位当分界线,并安排跳到新消息处
+                top.seenAt = seen[seenKey] || 0;
+                pendingScroll = { fallback: top.seenAt > 0 ? 'bottom' : 'top', key };
+            }
+            screenEl.innerHTML = renderThreadHtml({
+                thread, world, busy: busy.messenger, worldNow: world.worldNow,
+                seenAt: top.seenAt, replyBatch: settings().threadReplyBatch,
+            });
+            markSeenAfter = [seenKey, latestTsOfThread(thread)];
         } else if (top.type === 'forum-list') {
-            screenEl.innerHTML = renderForumListHtml({ world, busy, boardId: top.boardId || null });
+            screenEl.innerHTML = renderForumListHtml({ world, busy: busy.forum, boardId: top.boardId || null, seen, justUpdated });
         } else if (top.type === 'forum-thread') {
             const thread = world.forumThreads.get(top.threadId);
             if (!thread || !thread.title) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚/删除清空
-            screenEl.innerHTML = renderForumThreadHtml({ thread, world, busy, forumNow: world.forumNow });
+            const seenKey = seenKeyForForumThread(top.threadId);
+            if (top.seenAt === undefined) {
+                top.seenAt = seen[seenKey] || 0;
+                pendingScroll = { fallback: top.seenAt > 0 ? 'bottom' : 'top', key };
+            }
+            screenEl.innerHTML = renderForumThreadHtml({
+                thread, world, busy: busy.forum, forumNow: world.forumNow,
+                seenAt: top.seenAt, replyBatch: settings().forumReplyBatch,
+            });
+            markSeenAfter = [seenKey, latestTsOfForumThread(thread)];
         } else if (top.type === 'settings') {
             const s = settings();
             const owner = await store.getOwner(currentWorldKey());
@@ -291,6 +388,13 @@ export function createShell(ctx, onExternalChange) {
             const s = settings();
             const profiles = ctx.ConnectionManagerRequestService?.getSupportedProfiles?.() || [];
             screenEl.innerHTML = renderProfilePickerHtml(profiles, s.profileId);
+        }
+
+        applyScroll(keepScroll, key);
+        justUpdated = null; // 入场动效只播这一次;之后任何重渲染都不该再闪
+        if (markSeenAfter && worldKey) {
+            // 水位真的动了才通知外面——否则每次重渲染都白刷一遍魔杖菜单
+            if (await store.markSeen(worldKey, markSeenAfter[0], markSeenAfter[1])) onExternalChange?.();
         }
     }
 
@@ -318,48 +422,60 @@ export function createShell(ctx, onExternalChange) {
         no_thread: '这条线程已经不在了',
     };
 
-    // 四个生成入口共用的外壳。三条纪律都是真机踩出来的:
-    // ① busy 必须抢在第一个 await 之前——此前 `await store.getOwner()` 夹在 `if (busy) return`
+    // 四个生成入口共用的外壳。@param app 'messenger'|'forum',各持各的锁(一个 app 生成时另一个照常可用)。
+    // 三条纪律都是真机踩出来的:
+    // ① 上锁必须抢在第一个 await 之前——此前 `await store.getOwner()` 夹在 `if (busy) return`
     //    和 `busy = true` 中间,冷启动连点两下就能双开生成,白烧两次额度。
-    // ② render() 也要进 try——它要碰 IndexedDB,一旦 reject 就跳过 finally,busy 永久停在 true,
+    // ② render() 也要进 try——它要碰 IndexedDB,一旦 reject 就跳过 finally,锁永久停在 true,
     //    四个按钮集体变成转圈的死按钮,关手机重开都复位不了,只能刷新整个酒馆。
     // ③ 必须有 catch——此前只有 try/finally,任何意外抛错的表现就是「点了没反应」,连提示都没有。
     //    这正是最难自查的那类失败,不能再留。
-    async function runGeneration(run) {
-        if (busy) return;
-        busy = true;
+    async function runGeneration(app, run) {
+        if (busy[app]) return { skipped: 'busy' };
+        busy[app] = true;
         try {
             const worldKey = currentWorldKey();
-            if (!worldKey) return;
+            // 这三条早退在手机没开时(自动刷新)完全无声——她报的「自动刷新有时不生效」里,
+            // 有一档就是静默失败。留下控制台线索,排查时不必再靠猜。
+            if (!worldKey) { console.info('[Orrery] 生成跳过:当前聊天没有可用的 worldKey(群聊/未选卡)'); return { skipped: 'no_world' }; }
             const owner = await store.getOwner(worldKey);
-            if (!owner) { showToast('先设定手机主人'); return; }
+            if (!owner) { console.info('[Orrery] 生成跳过:这部手机还没设定主人'); showToast('先设定手机主人'); return { skipped: 'no_owner' }; }
             await render();
             const result = await run({ worldKey, owner, s: settings() });
-            if (!result) return;
+            if (!result) return { skipped: null };
             if (!result.ok) showToast(FAIL_TEXT[result.error] || '生成失败,请重试');
             else if (result.changed === false) showToast('还没有新的正文进展');
             else if (!result.added) showToast('这次没有新动静');
             else showToast(`小世界起了 ${result.added} 圈涟漪`);
+            return { skipped: null, result };
         } catch (err) {
             console.error('[Orrery] 生成出错', err);
             showToast(`生成出错:${err?.message || '未知错误'}`);
+            return { skipped: 'error' };
         } finally {
-            busy = false;
+            busy[app] = false;
             await render();
             // 降级警告排在结果提示之后播,别把「起了 N 圈涟漪」/「生成失败」直接顶掉
             // (一个会话只出现一次,晚两秒不影响它的作用)。
             setTimeout(checkPurificationDegraded, 2000);
+            // 生成期间被挡下的那次自动刷新,在锁刚释放的此刻补跑——见 autoQueued 的长注。
+            if (app === 'messenger' && autoQueued) {
+                autoQueued = false;
+                if (settings().autoRefresh) setTimeout(() => { autoGenerate(); }, 400);
+            }
         }
     }
 
     async function doGenerateMore() {
-        await runGeneration(async ({ worldKey, owner, s }) => {
+        return await runGeneration('messenger', async ({ worldKey, owner, s }) => {
             const result = await generateMore(ctx, store, {
                 worldKey, floorWindow: s.floorWindow, summaryThreshold: s.summaryThreshold,
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
                 excludeTags: s.excludeTags || '',
                 allowUserContact: !!s.allowUserContact,
             });
+            // 哪几条线程刚有了新动静——列表回来时给它们播一次入场动效,眼睛不用自己去找
+            if (result?.ok && result.touchedThreads) justUpdated = new Set(result.touchedThreads);
             onExternalChange?.();
             return result;
         });
@@ -368,11 +484,22 @@ export function createShell(ctx, onExternalChange) {
     async function doContinueThread() {
         const top = navStack[navStack.length - 1];
         if (top.type !== 'messenger-thread') return;
-        await runGeneration(({ worldKey, owner, s }) => continueThread(ctx, store, {
-            worldKey, threadId: top.threadId, floorWindow: s.floorWindow, summaryThreshold: s.summaryThreshold,
-            profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
-            excludeTags: s.excludeTags || '',
-        }));
+        await runGeneration('messenger', async ({ worldKey, owner, s }) => {
+            // 进屋时已经把水位推到当时最新了,所以这一刻的水位正好是「这批新消息之前」
+            const seenMap = await store.getSeenMap(worldKey);
+            const before = seenMap[seenKeyForThread(top.threadId)] || 0;
+            const result = await continueThread(ctx, store, {
+                worldKey, threadId: top.threadId, floorWindow: s.floorWindow, summaryThreshold: s.summaryThreshold,
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                excludeTags: s.excludeTags || '',
+                count: s.threadReplyBatch,
+            });
+            if (result?.ok && result.added > 0) {
+                top.seenAt = before; // 分界线挪到这批新消息前面,滚动条也跟着落在那儿
+                pendingScroll = { fallback: 'bottom', key: screenKey(top) };
+            }
+            return result;
+        });
     }
 
     async function doRevert(ts) {
@@ -389,7 +516,7 @@ export function createShell(ctx, onExternalChange) {
     // ── 论坛:独立水位的「刷新」/「生成更多」+ 反悔(单楼倒带同消息工法 / 整帖级联删)。 ──
 
     async function doGenerateMoreForum() {
-        await runGeneration(async ({ worldKey, owner, s }) => {
+        await runGeneration('forum', async ({ worldKey, owner, s }) => {
             const result = await generateMoreForum(ctx, store, {
                 worldKey, floorWindow: s.floorWindow,
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
@@ -404,12 +531,22 @@ export function createShell(ctx, onExternalChange) {
     async function doContinueForumThread() {
         const top = navStack[navStack.length - 1];
         if (top.type !== 'forum-thread') return;
-        await runGeneration(({ worldKey, owner, s }) => continueForumThread(ctx, store, {
-            worldKey, threadId: top.threadId, floorWindow: s.floorWindow,
-            profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
-            excludeTags: s.excludeTags || '',
-            allowUserContact: !!s.allowUserContact,
-        }));
+        await runGeneration('forum', async ({ worldKey, owner, s }) => {
+            const seenMap = await store.getSeenMap(worldKey);
+            const before = seenMap[seenKeyForForumThread(top.threadId)] || 0;
+            const result = await continueForumThread(ctx, store, {
+                worldKey, threadId: top.threadId, floorWindow: s.floorWindow,
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                excludeTags: s.excludeTags || '',
+                allowUserContact: !!s.allowUserContact,
+                count: s.forumReplyBatch,
+            });
+            if (result?.ok && result.added > 0) {
+                top.seenAt = before; // 同消息线程:分界线挪到这批新楼之前,不必自己往下翻
+                pendingScroll = { fallback: 'bottom', key: screenKey(top) };
+            }
+            return result;
+        });
     }
 
     async function doForumRevertFloor(ts) {
@@ -447,6 +584,9 @@ export function createShell(ctx, onExternalChange) {
         // 0 = 整本聊天(默认,与酒馆每轮实际发送的一致;旧楼层由预设正则自行收敛成摘要)
         if (field === 'floorWindow') s.floorWindow = Math.max(0, Math.min(20, s.floorWindow + delta));
         if (field === 'summaryThreshold') s.summaryThreshold = Math.max(10, Math.min(200, s.summaryThreshold + delta));
+        // 点单条数 1〜20:上限跟着输出预算走(65500 顶格,20 楼绰绰有余),下限 1——0 条的按钮没有意义
+        if (field === 'threadReplyBatch') s.threadReplyBatch = Math.max(1, Math.min(20, (s.threadReplyBatch || 3) + delta));
+        if (field === 'forumReplyBatch') s.forumReplyBatch = Math.max(1, Math.min(20, (s.forumReplyBatch || 3) + delta));
         saveSettings();
         render();
     }
@@ -649,7 +789,8 @@ export function createShell(ctx, onExternalChange) {
     function open() {
         if (!host) mount();
         host.style.display = 'block';
-        navStack = [{ type: 'grid' }]; // 不持久化导航状态,重开永远回网格页
+        // 导航状态跨开合保留(她 2026-08-14 点单):她是边聊边刷、靠悬浮球频繁开合的用法,
+        // 每次重开都弹回网格,等于每次都要重走「消息→点进那个人」。换聊天时才清,见 render()。
         requestAnimationFrame(() => root.classList.add('open'));
         render();
     }
@@ -665,9 +806,21 @@ export function createShell(ctx, onExternalChange) {
         if (isOpen()) render();
     }
 
-    /** 自动刷新入口(index.js 防抖后调):手机没开也能跑——render/toast 自带空目标保护。 */
+    /**
+     * 自动刷新入口(index.js 防抖后调):手机没开也能跑——render/toast 自带空目标保护。
+     *
+     * ⚠️撞上生成锁时**排队**,不是丢弃——她 2026-08-14 真机复现的「自动刷新有时不生效」就死在这里:
+     * 连发两条,第一条触发的生成要跑四十几秒,第二条的自动刷新在这期间撞锁。旧版直接静默丢弃,
+     * 那层楼从此没人管(除非又来新楼层);按次数重试也不行,重试窗口比一次生成还短,数完就放弃。
+     * 改成挂个标记,由 runGeneration 的 finally 在锁刚释放时补跑——生成多慢都等得到。
+     */
     async function autoGenerate() {
-        await doGenerateMore();
+        if (busy.messenger) {
+            autoQueued = true;
+            console.info('[Orrery] 自动刷新:上一批还在生成,已排队,生成结束后补跑');
+            return { skipped: 'busy', queued: true };
+        }
+        return await doGenerateMore();
     }
 
     return { open, close, toggle, isOpen, onWorldChanged, autoGenerate };

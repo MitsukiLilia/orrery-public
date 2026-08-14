@@ -19,7 +19,30 @@
     font-size: 12.5px; color: var(--or-cocoa-light);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.or-unread-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--or-salt-deep); flex-shrink: 0; }
+/* 未读徽标:圆点换成条数(真手机的语义),轻脉冲提示阅读——2.6s 一次、幅度很小,
+   放在列表里能被眼睛捕捉到,又不至于变成一直在闪的广告牌。 */
+/* 文字用 cocoa 不用 white:三套皮的 --or-salt-deep 都是柔和色,月夜那档更是浅粉(#F2C5D7),
+   白字压上去等于没有。深色字在三套皮上都读得清。 */
+.or-unread-badge {
+    min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; flex-shrink: 0;
+    background: var(--or-salt-deep); color: var(--or-cocoa);
+    font-size: 11.5px; font-weight: 700; line-height: 20px; text-align: center;
+    animation: or-unread-pulse 2.6s ease-in-out infinite;
+}
+@keyframes or-unread-pulse {
+    0%, 72%, 100% { transform: scale(1); }
+    82% { transform: scale(1.14); }
+}
+/* 未读的那几行整体加重一档,扫一眼就知道该点哪个 */
+.or-thread-row.unread .or-thread-name { font-weight: 700; }
+.or-thread-row.unread .or-thread-preview { color: var(--or-cocoa); }
+
+/* 刚刷出来的那几行:一次性入场(淡入上浮 + 一道扫过的高亮),播完就归位,重渲染不再闪。
+   keyframes or-row-arrive 定义在 ui/shell.css——论坛帖行也用同一支。 */
+.or-thread-row.just-arrived { animation: or-row-arrive .9s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+    .or-unread-badge, .or-thread-row.just-arrived { animation: none; }
+}
 
 /* ── 对话视图 ── */
 .or-chat-scroll {
@@ -82,9 +105,11 @@
 }
 .or-msg-row.show-revert .or-msg-revert { display: flex; }
 
+/* 底栏(消息/论坛共用):左边点单条数,右边生成按钮 */
 .or-chat-footer {
     flex-shrink: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
-    display: flex; justify-content: center; background: var(--or-cream-2);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--or-cream-2);
 }
 
 /* 生成中:药丸按钮内三点跳动 */

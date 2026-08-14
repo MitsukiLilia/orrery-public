@@ -263,6 +263,61 @@ export async function setWatermark(worldKey, app, floor) {
     await writeMeta(meta);
 }
 
+// ── 「我看过了」水位(seen):meta.seen = { 'messenger:<threadId>': ts, 'forum:<threadId>': ts }。──
+// 与上面的 watermarks 是两套东西:watermarks 记「哪些**楼层**已经生成过余波」(给红点和刷新用),
+// seen 记「哪些**内容**用户已经亲眼看过」(给未读数和 NEW 角标用)。也与 payload.read 无关(见 world.js 长注)。
+
+/** 整张 seen 表一次取出——渲染要挨个线程/帖子比对,逐 key 读库不划算。 */
+export async function getSeenMap(worldKey) {
+    if (!worldKey) return {};
+    const meta = await readMeta(worldKey);
+    return (meta.seen && typeof meta.seen === 'object') ? meta.seen : {};
+}
+
+/**
+ * 只增不减:回滚后剩余内容的 ts 只会更小,水位留在高处也不会误报未读,不必特意夹紧。
+ * @returns {Promise<boolean>} 水位是否真的动了——调用方靠它决定要不要去刷新外面那颗红点
+ */
+export async function markSeen(worldKey, key, ts) {
+    if (!worldKey || !key || !Number.isFinite(ts)) return false;
+    const meta = await readMeta(worldKey);
+    const seen = (meta.seen && typeof meta.seen === 'object') ? meta.seen : {};
+    if ((seen[key] || 0) >= ts) return false;
+    seen[key] = ts;
+    meta.seen = seen;
+    await writeMeta(meta);
+    return true;
+}
+
+/**
+ * 基线打过没有。手机外面那颗红点要靠它判断「未读」这件事此刻算不算数——
+ * 基线未打时整个账本都还没被认领过,任何未读判断都会把她早看过的旧内容误报成新的。
+ */
+export async function hasSeenBaseline(worldKey) {
+    if (!worldKey) return false;
+    return !!(await readMeta(worldKey)).seenBaseline;
+}
+
+/**
+ * 基线:seen 是新机制,老世界一条记录都没有——不打基线的话,升级后一开手机满屏未读和 NEW,
+ * 而那些内容她早就看过了。首次把当时已有的一切一次性记成看过,此后长出来的才算新。
+ * @param {Array<[string, number]>} pairs [seenKey, 该线程/帖子当前最新 ts]
+ * @returns {Promise<boolean>} 是否真的打了基线(已打过返回 false)
+ */
+export async function initSeenBaseline(worldKey, pairs) {
+    if (!worldKey) return false;
+    const meta = await readMeta(worldKey);
+    if (meta.seenBaseline) return false;
+    const seen = (meta.seen && typeof meta.seen === 'object') ? meta.seen : {};
+    for (const [key, ts] of pairs) {
+        if (key && Number.isFinite(ts) && (seen[key] || 0) < ts) seen[key] = ts;
+    }
+    meta.seen = seen;
+    meta.seenBaseline = true;
+    await writeMeta(meta);
+    return true;
+}
+
 /** 回滚夹紧:某层被删/被 swipe 后,所有 app 的水位都不能再声称自己"已处理到"这层之后。 */
 export async function clampWatermarks(worldKey, floor) {
     if (!worldKey) return;

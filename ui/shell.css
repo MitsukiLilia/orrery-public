@@ -205,6 +205,11 @@
 .or-row-note {
     font-size: 11px; color: var(--or-cocoa-light); padding: 0 18px 8px; line-height: 1.6; opacity: .85;
 }
+/* 开关行的说明:原来塞在 title 属性里,那是鼠标 hover 才弹的东西——手机触屏上等于没有说明,
+   而「允许叙事另一方登场」偏偏是全插件语义最重的一个开关。改成常驻小字。 */
+.or-row.with-note { flex-direction: column; align-items: stretch; gap: 7px; }
+.or-row-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.or-row.with-note .or-row-note { padding: 0; }
 .or-field {
     display: flex; flex-direction: column; gap: 5px;
     padding: 10px 18px; border-bottom: 1px solid var(--or-cream-2);
@@ -249,6 +254,36 @@
 
 /* ── 双语译文行(消息气泡内 / 论坛帖楼共用,M1 全局语言开关 ja_zh 档才会出现) ── */
 .or-zh { font-size: 12px; color: var(--or-cocoa-light); margin-top: 3px; line-height: 1.5; }
+
+/* ── 新内容分界线(消息线程 / 论坛帖内共用):进屋和生成完都停在它下面,不必自己往下翻。
+   比日期分隔更显眼(有色 + 两侧引线),但不喧宾夺主。 ── */
+.or-new-sep {
+    display: flex; align-items: center; gap: 8px; margin: 12px 2px 6px;
+    color: var(--or-salt-deep); font-size: 11px;
+}
+.or-new-sep::before, .or-new-sep::after {
+    content: ''; height: 1px; flex: 1; background: currentColor; opacity: .55;
+}
+.or-new-sep span { flex-shrink: 0; letter-spacing: .04em; }
+
+/* ── 底栏点单条数(消息/论坛共用):她点几条就生成几条,不再由模型自己决定要不要开口。 ── */
+.or-batch { display: flex; align-items: center; gap: 6px; }
+.or-batch button {
+    width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--or-cocoa-light);
+    background: none; color: var(--or-cocoa); display: flex; align-items: center; justify-content: center;
+    padding: 0; cursor: pointer;
+}
+.or-batch button:active { background: rgba(110, 90, 80, .08); }
+.or-batch button:disabled { opacity: .4; cursor: default; }
+.or-batch button svg { width: 12px; height: 12px; }
+.or-batch-value { min-width: 22px; text-align: center; font-size: 14px; font-weight: 600; color: var(--or-cocoa); }
+
+/* 刚刷出来那几行的一次性入场(消息线程行 / 论坛帖行共用) */
+@keyframes or-row-arrive {
+    0% { opacity: 0; transform: translateY(-6px); background-color: var(--or-salt); }
+    45% { opacity: 1; transform: translateY(0); background-color: var(--or-salt); }
+    100% { background-color: transparent; }
+}
 
 /* ── 轻提示 ── */
 .or-toast {
