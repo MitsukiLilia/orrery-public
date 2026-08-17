@@ -53,11 +53,16 @@ export function shortIdFor(residentId) {
 }
 
 /**
- * 账本 fold 成世界状态:{ contacts, groups, threads, worldNow, boards, residents, forumThreads, forumNow }。
+ * 账本 fold 成世界状态:{ contacts, groups, threads, worldNow, boards, residents, forumThreads, forumNow,
+ *   snsAccounts, tweets, snsNow }。
  * threads: threadId -> { threadId, kind:'dm'|'group', contactId?, group?, messages:[], summaries:[], unread, lastMessage }
  * dm 的 threadId===contactId;群聊的 threadId===groupId,成员内联在 group.members(不必是通讯录好友)。
  * forumThreads: threadId -> { threadId, boardId, title, authorId, body, zh?, worldTime, replies:[](按 worldTime 升序),
  *   replyCount, lastActiveTs } —— 论坛自己的账,不碰 threads/worldNow(两个 app 的水互不相扰,水位重构的初衷)。
+ * snsAccounts: accountId -> sns_account payload(同 accountId 重发即覆盖——entries 已按 ts 升序 fold,Map.set
+ *   天然「后写赢」,同 contacts 先例,不需要额外的"已存在就跳过"判断)。
+ * tweets: tweetId -> { tweetId, accountId, body, zh?, worldTime, likes, retweets, retweetOf?, replies:[](按
+ *   worldTime 升序), replyCount, lastActiveTs } —— SNS 自己的账,同样不碰 threads/forumThreads/worldNow/forumNow。
  */
 export function foldWorld(entries) {
     const contacts = new Map();
@@ -66,6 +71,8 @@ export function foldWorld(entries) {
     const boards = new Map();
     const residents = new Map();
     const forumThreads = new Map();
+    const snsAccounts = new Map();
+    const tweets = new Map();
 
     function ensureThread(threadId) {
         if (!threads.has(threadId)) {
@@ -78,6 +85,12 @@ export function foldWorld(entries) {
             forumThreads.set(threadId, { threadId, replies: [] });
         }
         return forumThreads.get(threadId);
+    }
+    function ensureTweet(tweetId) {
+        if (!tweets.has(tweetId)) {
+            tweets.set(tweetId, { tweetId, replies: [] });
+        }
+        return tweets.get(tweetId);
     }
 
     for (const e of entries) {
@@ -106,6 +119,14 @@ export function foldWorld(entries) {
             Object.assign(t, e.payload, { id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'forum_reply') {
             const t = ensureForumThread(e.payload.threadId);
+            t.replies.push({ ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'sns_account') {
+            snsAccounts.set(e.payload.accountId, { ...e.payload, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'tweet') {
+            const t = ensureTweet(e.payload.tweetId);
+            Object.assign(t, e.payload, { id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'tweet_reply') {
+            const t = ensureTweet(e.payload.tweetId);
             t.replies.push({ ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         }
     }
@@ -137,9 +158,19 @@ export function foldWorld(entries) {
         if (t.title) forumNow = Math.max(forumNow, t.lastActiveTs); // 帖子壳(无 title)是悬空回复,不计入时钟
     }
 
+    let snsNow = 0;
+    for (const t of tweets.values()) {
+        t.replies.sort((a, b) => (a.worldTime || a.ts) - (b.worldTime || b.ts));
+        t.replyCount = t.replies.length;
+        const times = [t.worldTime, ...t.replies.map(r => r.worldTime)].filter(Number.isFinite);
+        t.lastActiveTs = times.length ? Math.max(...times) : 0;
+        if (t.accountId) snsNow = Math.max(snsNow, t.lastActiveTs); // 推壳(无 accountId)是悬空回复,不计入时钟(同论坛 t.title 的判据)
+    }
+
     return {
         contacts, groups, threads, worldNow: worldNow || null,
         boards, residents, forumThreads, forumNow: forumNow || null,
+        snsAccounts, tweets, snsNow: snsNow || null,
     };
 }
 
@@ -151,6 +182,7 @@ export function foldWorld(entries) {
 
 export function seenKeyForThread(threadId) { return `messenger:${threadId}`; }
 export function seenKeyForForumThread(threadId) { return `forum:${threadId}`; }
+export function seenKeyForTweet(tweetId) { return `sns:${tweetId}`; }
 
 /** 线程里最新一条消息的入账 ts(空线程 0)——看过之后 seen 就记到这个值。 */
 export function latestTsOfThread(thread) {
@@ -180,11 +212,35 @@ export function newReplyCountOfForumThread(thread, seenTs) {
     return n;
 }
 
+/** 推的最新入账 ts:推本体与全部回复取最大(同 latestTsOfForumThread,推特回复串平铺无楼层)。 */
+export function latestTsOfTweet(tweet) {
+    let max = tweet.ts || 0;
+    for (const r of tweet.replies) if (r.ts > max) max = r.ts;
+    return max;
+}
+
+/** 上次看过之后这条推新增的回复数(照 newReplyCountOfForumThread 抄)。 */
+export function newReplyCountOfTweet(tweet, seenTs) {
+    let n = 0;
+    for (const r of tweet.replies) if (r.ts > (seenTs || 0)) n++;
+    return n;
+}
+
 /** 某个 app 里还有没有她没看过的东西——真手机的图标角标就是这个语义(有未读就亮)。 */
 export function hasUnseenInApp(app, world, seen) {
     if (app === 'messenger') {
         for (const t of world.threads.values()) {
             if (unreadCountOfThread(t, seen[seenKeyForThread(t.threadId)]) > 0) return true;
+        }
+        return false;
+    }
+    if (app === 'sns') {
+        // SNS 没有论坛那种「悬空回复壳」概念——tweet_reply 只会追加到已存在的推,t.accountId 恒真;
+        // 仍保留判据同论坛(t.accountId 缺失=畸形数据壳,不该亮角标)。没记录=NEW,有记录比回复数。
+        for (const t of world.tweets.values()) {
+            if (!t.accountId) continue;
+            const s = seen[seenKeyForTweet(t.tweetId)];
+            if (s === undefined || newReplyCountOfTweet(t, s) > 0) return true;
         }
         return false;
     }
@@ -196,7 +252,7 @@ export function hasUnseenInApp(app, world, seen) {
     return false;
 }
 
-/** 打基线用:当下每条线程/每个帖子的最新 ts,一次性记成「看过了」(见 store.initSeenBaseline)。 */
+/** 打基线用:当下每条线程/每个帖子/每条推的最新 ts,一次性记成「看过了」(见 store.initSeenBaseline)。 */
 export function seenBaselinePairs(world) {
     const pairs = [];
     for (const t of world.threads.values()) {
@@ -206,6 +262,10 @@ export function seenBaselinePairs(world) {
     for (const t of world.forumThreads.values()) {
         const ts = latestTsOfForumThread(t);
         if (ts) pairs.push([seenKeyForForumThread(t.threadId), ts]);
+    }
+    for (const t of world.tweets.values()) {
+        const ts = latestTsOfTweet(t);
+        if (ts) pairs.push([seenKeyForTweet(t.tweetId), ts]);
     }
     return pairs;
 }

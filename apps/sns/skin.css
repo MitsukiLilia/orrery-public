@@ -1,0 +1,124 @@
+/* SNS「Pulsar」皮肤——依赖 ui/shell.css 里定义的 --or-* token,自己不重定义。原创简约,不套仿真某个真实平台的皮。
+   头像用独立的 .or-sns-avatar(不借 messenger/skin.css 的 .or-avatar)——apps 互相零依赖,不能指望别的 app 的样式表已加载。 */
+
+/* ── 身份栏(header 下一行) ── */
+.or-sns-identity-wrap { flex-shrink: 0; position: relative; background: var(--or-cream-2); }
+.or-sns-identity, .or-sns-identity.static {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    border: none; background: none; font-family: inherit; cursor: pointer;
+    padding: 8px 14px 10px;
+}
+.or-sns-identity.static { cursor: default; }
+.or-sns-identity-name { font-size: 13.5px; font-weight: 600; color: var(--or-cocoa); display: inline-flex; align-items: center; gap: 4px; }
+.or-sns-identity-handle { font-size: 12px; color: var(--or-cocoa-light); }
+.or-sns-lock { display: inline-flex; color: var(--or-cocoa-light); }
+.or-sns-lock svg { width: 11px; height: 11px; }
+
+.or-sns-identity-menu {
+    position: absolute; left: 10px; right: 10px; top: 100%; z-index: 5;
+    background: var(--or-white); border-radius: 12px; box-shadow: 0 6px 20px var(--or-shadow);
+    padding: 4px; margin-top: 4px;
+}
+.or-sns-identity-option {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    border: none; background: none; font-family: inherit; cursor: pointer;
+    padding: 8px 10px; border-radius: 8px;
+}
+.or-sns-identity-option:active { background: rgba(110, 90, 80, .06); }
+.or-sns-identity-option.on { background: var(--or-cream-2); }
+
+/* ── 头像 ── */
+.or-sns-avatar {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--or-white); font-size: 13px; font-weight: 600;
+}
+.or-sns-avatar.lg { width: 64px; height: 64px; font-size: 24px; }
+
+/* ── 推文流(TL / 账号主页共用) ── */
+.or-sns-list { flex: 1; overflow-y: auto; }
+.or-sns-row {
+    padding: 12px 16px; border-bottom: 1px solid var(--or-cream-2); cursor: pointer;
+}
+.or-sns-row:active { background: rgba(110, 90, 80, .05); }
+.or-sns-row-tags { min-height: 14px; margin-bottom: 2px; }
+.or-sns-new {
+    display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: .06em;
+    color: var(--or-cocoa); background: var(--or-salt-deep);
+    padding: 2px 7px; border-radius: 999px;
+    animation: or-new-pulse 2.6s ease-in-out infinite;
+}
+@keyframes or-new-pulse {
+    0%, 72%, 100% { transform: scale(1); }
+    82% { transform: scale(1.12); }
+}
+.or-sns-row.just-arrived { animation: or-row-arrive .9s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+    .or-sns-new, .or-sns-row.just-arrived { animation: none; }
+}
+
+.or-sns-row-head { display: flex; align-items: center; gap: 4px; }
+.or-sns-row-avatarname {
+    display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;
+    border: none; background: none; font-family: inherit; cursor: pointer; padding: 0; text-align: left;
+}
+.or-sns-row-name {
+    font-size: 13.5px; font-weight: 600; color: var(--or-cocoa);
+    display: inline-flex; align-items: center; gap: 4px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.or-sns-row-handle { font-size: 12px; color: var(--or-cocoa-light); flex-shrink: 0; }
+.or-sns-row-time { font-size: 11px; color: var(--or-cocoa-light); flex-shrink: 0; margin-left: auto; }
+
+.or-sns-row-body {
+    font-size: 13.5px; color: var(--or-cocoa); line-height: 1.6;
+    margin-top: 6px; white-space: pre-wrap; word-break: break-word;
+}
+.or-sns-row-stats { font-size: 11px; color: var(--or-cocoa-light); margin-top: 8px; display: flex; align-items: center; gap: 16px; }
+.or-sns-stat { display: inline-flex; align-items: center; gap: 4px; }
+.or-sns-stat svg { width: 13px; height: 13px; opacity: .85; }
+.or-sns-newreply { color: var(--or-salt-deep); font-weight: 700; margin-left: 6px; }
+
+/* ── [写真:描述] 占位图框:中性灰底(token 化)+ 相机 SVG + 描述小字 ── */
+.or-photo-ph {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    margin-top: 8px; width: 100%; max-width: 220px; height: 120px; border-radius: 12px;
+    background: var(--or-photo-ph); color: var(--or-cocoa-light);
+}
+.or-photo-ph svg { width: 22px; height: 22px; }
+.or-photo-ph-desc { font-size: 11px; text-align: center; padding: 0 12px; line-height: 1.4; }
+
+/* ── 转发缩略块 ── */
+.or-sns-rt-block { margin-top: 8px; }
+.or-sns-rt-tag { font-size: 11px; font-weight: 700; color: var(--or-cocoa-light); margin-bottom: 4px; }
+.or-sns-rt-quote {
+    display: flex; flex-direction: column; gap: 3px;
+    border: 1px solid var(--or-cream-2); border-radius: 10px; padding: 8px 10px;
+}
+.or-sns-rt-quote.deleted { color: var(--or-cocoa-light); font-size: 12.5px; font-style: normal; }
+.or-sns-rt-author { font-size: 12.5px; font-weight: 600; color: var(--or-cocoa); }
+.or-sns-rt-body { font-size: 12.5px; color: var(--or-cocoa-light); line-height: 1.5; }
+
+/* ── 推文详情 ── */
+.or-sns-scroll { flex: 1; overflow-y: auto; background: var(--or-cream); }
+.or-sns-op { padding: 16px; border-bottom: 6px solid var(--or-cream-2); }
+.or-sns-op .or-sns-row-avatarname { flex: none; }
+.or-sns-op-time { font-size: 12px; color: var(--or-cocoa-light); margin-top: 8px; }
+.or-sns-op-body {
+    font-size: 15px; color: var(--or-cocoa); line-height: 1.7;
+    margin-top: 8px; white-space: pre-wrap; word-break: break-word;
+}
+.or-sns-op .or-sns-row-stats { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--or-cream-2); }
+
+.or-sns-replies { padding: 0 16px; }
+.or-sns-reply-row { padding: 12px 0; border-bottom: 1px solid var(--or-cream-2); }
+.or-sns-reply-head { display: flex; align-items: center; gap: 4px; }
+
+/* ── 账号主页 ── */
+.or-sns-profile-head {
+    flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 24px 20px; text-align: center; border-bottom: 6px solid var(--or-cream-2);
+}
+.or-sns-profile-name { font-size: 16px; font-weight: 700; color: var(--or-cocoa); display: inline-flex; align-items: center; gap: 5px; }
+.or-sns-profile-handle { font-size: 12.5px; color: var(--or-cocoa-light); }
+.or-sns-profile-bio { font-size: 12.5px; color: var(--or-cocoa-light); line-height: 1.6; margin-top: 4px; max-width: 260px; }

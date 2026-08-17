@@ -5,6 +5,8 @@
     --or-salt: #C7D7E1; --or-salt-deep: #A9C0CF;
     --or-cocoa: #6E5A50; --or-cocoa-light: #8B7568;
     --or-shadow: rgba(110, 90, 80, .12);
+    /* SNS(M2)配图占位框底色——cream 系深一档,比 --or-cream-2 再沉一点,和照片"缺席感"贴合 */
+    --or-photo-ph: #E3D8C3;
 }
 
 /* 墨白主题:韩系 ins 黑白灰,同一套 token 换值即换肤(波点/浪花由 JS 置 none) */
@@ -13,6 +15,7 @@
     --or-salt: #DCDCD8; --or-salt-deep: #999995;
     --or-cocoa: #2C2C2A; --or-cocoa-light: #83837F;
     --or-shadow: rgba(0, 0, 0, .10);
+    --or-photo-ph: #DCDCD8;
 }
 
 /* 月夜主题:Lunar Y2K 网络日记,月白蓝底+粉色点缀(salt-deep=粉,担当未读点/开关/选中态) */
@@ -21,6 +24,7 @@
     --or-salt: #C8D8E5; --or-salt-deep: #F2C5D7;
     --or-cocoa: #2F3136; --or-cocoa-light: #8A94A0;
     --or-shadow: rgba(47, 49, 54, .10);
+    --or-photo-ph: #E4E7EC;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -73,6 +77,42 @@
 .or-close-btn:active { background: rgba(110, 90, 80, .10); }
 .or-close-btn svg { width: 15px; height: 15px; }
 .or-statusbar-icons svg { height: 11px; width: auto; }
+
+/* ── 天象仪 spinner(v0.7.1 特色 A 案,三 app 生成中共用):外环=点线轨道慢转,内环=一段
+   运行中的弧反向快转——Orrery 自己的加载演出,不是地球手机的菊花。currentColor 随按钮
+   字色走,三主题免配;替代旧三点 dots(原 messenger/skin.css)。 ── */
+.or-orrery-spinner { position: relative; display: inline-block; width: 15px; height: 15px; vertical-align: -3px; }
+.or-orrery-spinner::before, .or-orrery-spinner::after { content: ''; position: absolute; border-radius: 50%; }
+.or-orrery-spinner::before { inset: 0; border: 1.2px dotted currentColor; opacity: .65; animation: or-orbit 3.2s linear infinite; }
+.or-orrery-spinner::after { inset: 3.5px; border: 1.4px solid transparent; border-top-color: currentColor; animation: or-orbit 1.4s linear infinite reverse; }
+@keyframes or-orbit { to { transform: rotate(360deg); } }
+
+/* ── 开机星尘(v0.7.2 特色 C 案):手机展开一瞬,几粒星点自中心散开淡去——跨次元投影落定的
+   痕迹。box-shadow 多点阵,峰值透明度极低,0.55s 一次性;动画挂 ::before,结束由 JS 摘层。 ── */
+.or-stardust { position: absolute; inset: 0; pointer-events: none; z-index: 6; overflow: hidden; border-radius: inherit; }
+.or-stardust::before {
+    content: ''; position: absolute; left: 50%; top: 42%; width: 2px; height: 2px; border-radius: 50%;
+    box-shadow:
+        -38px -22px 0 .6px var(--or-salt-deep), 30px -34px 0 0 var(--or-salt-deep),
+        52px 10px 0 .8px var(--or-salt-deep), -50px 18px 0 0 var(--or-salt-deep),
+        8px 40px 0 .5px var(--or-salt-deep), -14px -46px 0 0 var(--or-salt-deep),
+        44px -8px 0 .3px var(--or-salt-deep), -28px 36px 0 .4px var(--or-salt-deep);
+    opacity: 0; animation: or-stardust .55s ease-out;
+}
+@keyframes or-stardust {
+    0% { opacity: 0; transform: scale(.4); }
+    25% { opacity: .45; }
+    100% { opacity: 0; transform: scale(1.15); }
+}
+
+/* ── 置灰 app 点击反馈(v0.7.2 特色 E 案):按到实体石头般的轻微一晃 ── */
+.or-app.locked-shake { animation: or-locked-shake .3s; }
+@keyframes or-locked-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2.5px); }
+    55% { transform: translateX(2px); }
+    80% { transform: translateX(-1px); }
+}
 
 .or-homebar { flex-shrink: 0; display: flex; justify-content: center; padding: 8px 0 10px; }
 .or-homebar::after {

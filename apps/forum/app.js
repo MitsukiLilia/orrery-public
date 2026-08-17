@@ -30,8 +30,8 @@ function formatRelativeTime(ts, refNow) {
     return `${d.getMonth() + 1}月${d.getDate()}日`;
 }
 
-function genDotsHtml() {
-    return '<span class="or-generating-dots"><span></span><span></span><span></span></span>';
+function genSpinnerHtml() {
+    return '<span class="or-orrery-spinner"></span>'; // 天象仪加载演出,样式在 ui/shell.css
 }
 
 function handleWithId(world, residentId) {
@@ -77,7 +77,7 @@ export function renderForumListHtml({ world, busy, boardId, seen = {}, justUpdat
         <div class="or-header">
             <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
             <span class="or-header-title">论坛</span>
-            <button class="or-pill-btn small" data-action="forum-refresh" ${busy ? 'disabled' : ''}>${busy ? genDotsHtml() : '刷新'}</button>
+            <button class="or-pill-btn small" data-action="forum-refresh" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : '刷新'}</button>
         </div>
         ${chips}
         ${body}`;
@@ -127,6 +127,6 @@ export function renderForumThreadHtml({ thread, world, busy, forumNow, seenAt = 
                 <span class="or-batch-value">${replyBatch}</span>
                 <button data-action="stepper" data-field="forumReplyBatch" data-delta="1" ${busy ? 'disabled' : ''}>${ICON_PLUS}</button>
             </div>
-            <button class="or-pill-btn" data-action="forum-generate-more" ${busy ? 'disabled' : ''}>${busy ? genDotsHtml() : '生成回复'}</button>
+            <button class="or-pill-btn" data-action="forum-generate-more" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : '生成回复'}</button>
         </div>`;
 }

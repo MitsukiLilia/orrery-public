@@ -1,8 +1,9 @@
 // 世界账本:IndexedDB 持久化。全系统只认 RippleEntry(见 §3),这里不解释业务语义,只管存取。
 // 库名 orrery,两个 store:
 //   ledger — RippleEntry 本体,autoIncrement 主键;索引 worldKey(取某世界全部条目)、sourceFloor(极少单独用,配合内存过滤)
-//   meta   — 每个 worldKey 一条,{ worldKey, owner, watermarks: { messenger, forum } },各 app 独立水位(M1 水位重构,
-//            见 getWatermark/setWatermark/clampWatermarks;旧版单一 lastProcessedFloor + pendingFloors 已废除,读到旧格式时兼容迁移)
+//   meta   — 每个 worldKey 一条,{ worldKey, owner, watermarks: { messenger, forum, sns } },各 app 独立水位(M1 水位重构、
+//            M2 补 sns 档,见 getWatermark/setWatermark/clampWatermarks;旧版单一 lastProcessedFloor + pendingFloors 已废除,
+//            读到旧格式时兼容迁移)
 
 const DB_NAME = 'orrery';
 const DB_VERSION = 1;
@@ -196,6 +197,54 @@ export async function deleteForumThreadCascade(worldKey, threadId) {
     });
 }
 
+/**
+ * SNS 专用手术刀:整推级联删除——推本体(tweet)+ 全部回复(tweet_reply)。
+ * TL/账号主页长按/右键推行走这条路径;推详情内单条回复反悔走下面的 deleteTweetRepliesFrom(与消息线程/论坛楼同一工法)。
+ */
+export async function deleteTweetCascade(worldKey, tweetId) {
+    if (!worldKey) return;
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_LEDGER, 'readwrite');
+        const idx = tx.objectStore(STORE_LEDGER).index('worldKey');
+        const req = idx.openCursor(IDBKeyRange.only(worldKey));
+        req.onsuccess = () => {
+            const cursor = req.result;
+            if (!cursor) return;
+            const v = cursor.value;
+            const hit = (v.type === 'tweet' || v.type === 'tweet_reply') && v.payload?.tweetId === tweetId;
+            if (hit) cursor.delete();
+            cursor.continue();
+        };
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+/**
+ * 推文回复反悔:从选中回复起,该推下 ts >= fromTs 的 tweet_reply 全部删除(推本体保留,推可以没有回复)。
+ * 照 deleteThreadFrom 的形状,只匹配 type='tweet_reply' 且 payload.tweetId 相符(推特回复串平铺,无楼层引用)。
+ */
+export async function deleteTweetRepliesFrom(worldKey, tweetId, fromTs) {
+    if (!worldKey) return;
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_LEDGER, 'readwrite');
+        const idx = tx.objectStore(STORE_LEDGER).index('worldKey');
+        const req = idx.openCursor(IDBKeyRange.only(worldKey));
+        req.onsuccess = () => {
+            const cursor = req.result;
+            if (!cursor) return;
+            const v = cursor.value;
+            if (v.type === 'tweet_reply' && v.payload?.tweetId === tweetId
+                && (!Number.isFinite(v.ts) || v.ts >= fromTs)) cursor.delete();
+            cursor.continue();
+        };
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
 /** 抹掉这部手机:账本条目 + meta(含主人设定/水位)全删,世界回到未激活状态。 */
 export async function wipeWorld(worldKey) {
     if (!worldKey) return;
@@ -230,15 +279,15 @@ async function writeMeta(meta) {
     await withStore(STORE_META, 'readwrite', store => store.put(meta));
 }
 
-// 水位归一化:新格式({ messenger, forum })直接用;旧格式(单一 lastProcessedFloor,M0 遗留)
-// 一次性搬进 watermarks.messenger,forum 从 -1 起(旧数据里论坛这回事根本不存在)。
+// 水位归一化:新格式({ messenger, forum, sns })直接用;旧格式(单一 lastProcessedFloor,M0 遗留)
+// 一次性搬进 watermarks.messenger,forum/sns 从 -1 起(旧数据里论坛/SNS 这回事根本不存在)。
 // 旧 pendingFloors 字段直接丢弃——M1 已废除该机制,pending 完全靠水位推导(见 generator.js)。
 function normalizeWatermarks(meta) {
     if (meta.watermarks && typeof meta.watermarks === 'object') {
-        return { messenger: -1, forum: -1, ...meta.watermarks };
+        return { messenger: -1, forum: -1, sns: -1, ...meta.watermarks };
     }
     const messenger = Number.isFinite(meta.lastProcessedFloor) ? meta.lastProcessedFloor : -1;
-    return { messenger, forum: -1 };
+    return { messenger, forum: -1, sns: -1 };
 }
 
 /**

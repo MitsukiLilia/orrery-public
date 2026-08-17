@@ -2,20 +2,25 @@
 // 事件委托只挂一份在 .or-root 上,不随每次重渲染叠加监听器。
 import {
     computeWorldKey, foldWorld,
-    seenKeyForThread, seenKeyForForumThread, latestTsOfThread, latestTsOfForumThread,
+    seenKeyForThread, seenKeyForForumThread, seenKeyForTweet,
+    latestTsOfThread, latestTsOfForumThread, latestTsOfTweet,
     hasUnseenInApp, seenBaselinePairs,
 } from '../core/world.js';
 import * as store from '../core/store.js';
 import * as generator from '../core/generator.js';
-import { generateMore, continueThread, generateMoreForum, continueForumThread } from '../core/generator.js';
+import {
+    generateMore, continueThread, generateMoreForum, continueForumThread,
+    generateMoreSns, continueTweetReplies,
+} from '../core/generator.js';
 import { manualRevert } from '../core/rollback.js';
 import {
     ICON_BACK, ICON_CHEVRON_RIGHT, ICON_CHECK, ICON_MINUS, ICON_PLUS, ICON_CLOSE,
     ICON_APP_MESSENGER, ICON_APP_SETTINGS, ICON_APP_FORUM, ICON_APP_MEMO, ICON_APP_SNS, ICON_APP_GALLERY,
-    ICON_SIGNAL, ICON_BATTERY, dotPatternDataUri, scallopWaveDataUri,
+    ICON_HUD_STARS, ICON_HUD_RING, dotPatternDataUri, scallopWaveDataUri,
 } from './icons.js';
 import { renderThreadListHtml, renderThreadHtml, MESSENGER_SKIN_URL } from '../apps/messenger/app.js';
 import { renderForumListHtml, renderForumThreadHtml, FORUM_SKIN_URL } from '../apps/forum/app.js';
+import { renderSnsTlHtml, renderSnsTweetHtml, renderSnsProfileHtml, SNS_SKIN_URL } from '../apps/sns/app.js';
 
 const SHELL_CSS_URL = new URL('./shell.css', import.meta.url).href;
 
@@ -25,18 +30,18 @@ const DEFAULT_SETTINGS = {
     // 那一窗全落在「近消息」档、摘要恰好全被删光,于是永远只能凭最新几层反推关系 → OOC。
     floorWindow: 0, profileId: null, summaryThreshold: 40,
     autoRefresh: false, theme: 'seasalt', showFab: true, allowUserContact: false, language: 'zh', excludeTags: '',
-    // 帖内/线程内「生成」的点单条数(列表页的「刷新」不受此约束,那是世界自己起涟漪,该冷场就冷场)
-    threadReplyBatch: 3, forumReplyBatch: 3,
+    // 帖内/线程内/推文详情「生成」的点单条数(列表页的「刷新」不受此约束,那是世界自己起涟漪,该冷场就冷场)
+    threadReplyBatch: 3, forumReplyBatch: 3, snsReplyBatch: 3,
     customApi: { enabled: false, baseUrl: '', apiKey: '', model: '' },
 };
 
-// M1:论坛开通。messenger/设置/论坛可点,其余画出来但置灰——按参考图风格三色底轮换。
+// M2:SNS「Pulsar」开通。messenger/设置/论坛/SNS 可点,其余画出来但置灰——按参考图风格三色底轮换。
 const APPS = [
     { id: 'messenger', label: '消息', bg: 'salt', icon: ICON_APP_MESSENGER, enabled: true },
     { id: 'settings', label: '设置', bg: 'cocoa', icon: ICON_APP_SETTINGS, enabled: true },
     { id: 'forum', label: '论坛', bg: 'cream', icon: ICON_APP_FORUM, enabled: true },
     { id: 'memo', label: '备忘录', bg: 'salt', icon: ICON_APP_MEMO, enabled: false },
-    { id: 'sns', label: 'SNS', bg: 'cream', icon: ICON_APP_SNS, enabled: false },
+    { id: 'sns', label: 'SNS', bg: 'cream', icon: ICON_APP_SNS, enabled: true },
     { id: 'gallery', label: '相册', bg: 'cocoa', icon: ICON_APP_GALLERY, enabled: false },
 ];
 
@@ -178,8 +183,8 @@ export function createShell(ctx, onExternalChange) {
     let navStack = [{ type: 'grid' }];
     let lastWorldKey;               // 上次渲染时的世界;变了就把导航栈清回网格(见 render)
     // 生成锁按 app 分:她的用法是一边等消息生成一边去翻论坛,共用一把锁会把整部手机锁死。
-    // 两个 app 的账、水位、prompt 本来就各走各的,锁也该各管各的。
-    const busy = { messenger: false, forum: false };
+    // 三个 app 的账、水位、prompt 本来就各走各的,锁也该各管各的(M2 补 sns,照 forum 的接法)。
+    const busy = { messenger: false, forum: false, sns: false };
     let autoQueued = false;         // 生成锁占用期间被挡下的自动刷新,解锁后补跑一次(见 autoGenerate)
     let longPressTimer = null;
     let toastTimer = null;
@@ -222,21 +227,25 @@ export function createShell(ctx, onExternalChange) {
 
     function currentWorldKey() { return computeWorldKey(ctx); }
 
-    // tip + 各 app 水位 + seen 表一起取,渲染网格/判断红点都从这一份派生——两个 app 各看各的水位。
+    // tip + 各 app 水位 + seen 表一起取,渲染网格/判断红点都从这一份派生——三个 app 各看各的水位。
     async function currentWorld() {
         const worldKey = currentWorldKey();
         const tip = ctx.chat && ctx.chat.length ? ctx.chat.length - 1 : -1;
         if (!worldKey) {
             return {
                 worldKey: null,
-                world: { contacts: new Map(), threads: new Map(), boards: new Map(), residents: new Map(), forumThreads: new Map() },
-                tip: -1, watermarks: { messenger: -1, forum: -1 }, seen: {},
+                world: {
+                    contacts: new Map(), threads: new Map(), boards: new Map(), residents: new Map(), forumThreads: new Map(),
+                    snsAccounts: new Map(), tweets: new Map(),
+                },
+                tip: -1, watermarks: { messenger: -1, forum: -1, sns: -1 }, seen: {},
             };
         }
-        const [entries, wmMessenger, wmForum] = await Promise.all([
+        const [entries, wmMessenger, wmForum, wmSns] = await Promise.all([
             store.getEntriesForWorld(worldKey),
             store.getWatermark(worldKey, 'messenger'),
             store.getWatermark(worldKey, 'forum'),
+            store.getWatermark(worldKey, 'sns'),
         ]);
         const world = foldWorld(entries);
         // 基线必须赶在读 seen 之前——顺序反了,升级后的第一屏就是满屏未读,而且那一眼再也收不回来
@@ -245,7 +254,7 @@ export function createShell(ctx, onExternalChange) {
             await store.initSeenBaseline(worldKey, seenBaselinePairs(world));
         }
         const seen = await store.getSeenMap(worldKey);
-        return { worldKey, world, tip, watermarks: { messenger: wmMessenger, forum: wmForum }, seen };
+        return { worldKey, world, tip, watermarks: { messenger: wmMessenger, forum: wmForum, sns: wmSns }, seen };
     }
 
     function profileLabel(profileId) {
@@ -283,7 +292,7 @@ export function createShell(ctx, onExternalChange) {
     // 规则:同一块屏幕重渲染 → 原地保持;刚进屋 / 刚生成完 → 跳到新内容分界线。 ──
     const SCROLLERS = '.or-chat-scroll, .or-forum-scroll, .or-thread-list, .or-forum-list, .or-list, .or-grid';
     function screenKey(top) {
-        return [top.type, top.threadId || '', top.boardId || ''].join('|');
+        return [top.type, top.threadId || '', top.boardId || '', top.tweetId || '', top.accountId || ''].join('|');
     }
     let lastScreenKey = null;
 
@@ -347,6 +356,7 @@ export function createShell(ctx, onExternalChange) {
             const dots = {
                 messenger: watermarks.messenger < tip || hasUnseenInApp('messenger', world, seen),
                 forum: watermarks.forum < tip || hasUnseenInApp('forum', world, seen),
+                sns: watermarks.sns < tip || hasUnseenInApp('sns', world, seen),
             };
             screenEl.innerHTML = renderGridHtml(dots, settings().theme || 'seasalt');
         } else if (top.type === 'messenger-list') {
@@ -380,6 +390,29 @@ export function createShell(ctx, onExternalChange) {
                 seenAt: top.seenAt, replyBatch: settings().forumReplyBatch,
             });
             markSeenAfter = [seenKey, latestTsOfForumThread(thread)];
+        } else if (top.type === 'sns-tl') {
+            screenEl.innerHTML = renderSnsTlHtml({
+                world, busy: busy.sns, viewerRole: top.viewerRole || 'omote', identityOpen: !!top.identityOpen,
+                seen, justUpdated,
+            });
+            // TL 是浏览面,进 TL 不推 seen 水位——同论坛列表页语义(点进详情才算看过)。
+        } else if (top.type === 'sns-tweet') {
+            const tweet = world.tweets.get(top.tweetId);
+            if (!tweet || !tweet.accountId) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚/删除清空
+            const seenKey = seenKeyForTweet(top.tweetId);
+            if (top.seenAt === undefined) {
+                top.seenAt = seen[seenKey] || 0;
+                pendingScroll = { fallback: top.seenAt > 0 ? 'bottom' : 'top', key };
+            }
+            screenEl.innerHTML = renderSnsTweetHtml({
+                tweet, world, busy: busy.sns, snsNow: world.snsNow,
+                seenAt: top.seenAt, replyBatch: settings().snsReplyBatch,
+            });
+            markSeenAfter = [seenKey, latestTsOfTweet(tweet)];
+        } else if (top.type === 'sns-profile') {
+            const account = world.snsAccounts.get(top.accountId);
+            if (!account) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚清空(理论上账号不会被单删,防御性兜底)
+            screenEl.innerHTML = renderSnsProfileHtml({ account, world, snsNow: world.snsNow, seen });
         } else if (top.type === 'settings') {
             const s = settings();
             const owner = await store.getOwner(currentWorldKey());
@@ -408,10 +441,21 @@ export function createShell(ctx, onExternalChange) {
     function openApp(appId) {
         const app = APPS.find(a => a.id === appId);
         if (!app) return;
-        if (!app.enabled) { showToast('未开通'); return; }
+        if (!app.enabled) {
+            // 置灰 app 的观测系反馈(v0.7.2 特色 E 案):按到实体石头般轻晃一下,不弹地球手机的「未开放」
+            const btn = shadow?.querySelector(`.or-app[data-app="${appId}"]`);
+            if (btn) {
+                btn.classList.remove('locked-shake');
+                void btn.offsetWidth; // 连点也要能重播动画:先移除类并强制 reflow
+                btn.classList.add('locked-shake');
+            }
+            showToast('尚未观测到这一面');
+            return;
+        }
         if (appId === 'messenger') navPush({ type: 'messenger-list' });
         else if (appId === 'settings') navPush({ type: 'settings' });
         else if (appId === 'forum') navPush({ type: 'forum-list', boardId: null });
+        else if (appId === 'sns') navPush({ type: 'sns-tl', viewerRole: 'omote', identityOpen: false });
     }
 
     // 失败措辞分档:此前四个入口一律「生成失败,请重试」,把「模型没吐出能用的结果」「配置/网络出错」
@@ -443,9 +487,9 @@ export function createShell(ctx, onExternalChange) {
             await render();
             const result = await run({ worldKey, owner, s: settings() });
             if (!result) return { skipped: null };
-            if (!result.ok) showToast(FAIL_TEXT[result.error] || '生成失败,请重试');
+            if (!result.ok) showToast(FAIL_TEXT[result.error] || '观测中断了,请再试一次');
             else if (result.changed === false) showToast('还没有新的正文进展');
-            else if (!result.added) showToast('这次没有新动静');
+            else if (!result.added) showToast('这一刻,世界很安静');
             else showToast(`小世界起了 ${result.added} 圈涟漪`);
             return { skipped: null, result };
         } catch (err) {
@@ -579,6 +623,80 @@ export function createShell(ctx, onExternalChange) {
         render();
     }
 
+    // ── SNS「Pulsar」:独立水位的「刷新」/「生成回复」+ 反悔(单回复倒带同消息工法 / 整推级联删)。 ──
+
+    async function doGenerateMoreSns() {
+        await runGeneration('sns', async ({ worldKey, owner, s }) => {
+            const result = await generateMoreSns(ctx, store, {
+                worldKey, floorWindow: s.floorWindow,
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                excludeTags: s.excludeTags || '',
+                allowUserContact: !!s.allowUserContact,
+            });
+            onExternalChange?.();
+            return result;
+        });
+    }
+
+    async function doContinueTweetReplies() {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'sns-tweet') return;
+        await runGeneration('sns', async ({ worldKey, owner, s }) => {
+            const seenMap = await store.getSeenMap(worldKey);
+            const before = seenMap[seenKeyForTweet(top.tweetId)] || 0;
+            const result = await continueTweetReplies(ctx, store, {
+                worldKey, tweetId: top.tweetId, floorWindow: s.floorWindow,
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                excludeTags: s.excludeTags || '',
+                allowUserContact: !!s.allowUserContact,
+                count: s.snsReplyBatch,
+            });
+            if (result?.ok && result.added > 0) {
+                top.seenAt = before; // 同消息线程/论坛帖内:分界线挪到这批新回复之前,不必自己往下翻
+                pendingScroll = { fallback: 'bottom', key: screenKey(top) };
+            }
+            return result;
+        });
+    }
+
+    async function doDeleteTweet(tweetId) {
+        const worldKey = currentWorldKey();
+        if (!worldKey || !tweetId) return;
+        const confirmed = await ctx.callGenericPopup('删除这条推文和全部回复?剧情推进后可能会有新的动态出现。', ctx.POPUP_TYPE.CONFIRM);
+        if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
+        await store.deleteTweetCascade(worldKey, tweetId);
+        const top = navStack[navStack.length - 1];
+        if (top.type === 'sns-tweet' && top.tweetId === tweetId) navStack.pop();
+        await render();
+        onExternalChange?.();
+    }
+
+    async function doRevertTweetReply(ts) {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'sns-tweet' || !Number.isFinite(ts)) return;
+        const confirmed = await ctx.callGenericPopup('从这条起删除后面的所有回复?', ctx.POPUP_TYPE.CONFIRM);
+        if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        await store.deleteTweetRepliesFrom(worldKey, top.tweetId, ts); // 与消息线程/论坛楼同一反悔工法
+        await render();
+    }
+
+    function doSnsToggleIdentity() {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'sns-tl') return;
+        top.identityOpen = !top.identityOpen;
+        render();
+    }
+
+    function doSnsSelectViewer(role) {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'sns-tl') return;
+        top.viewerRole = role === 'ura' ? 'ura' : 'omote';
+        top.identityOpen = false;
+        render();
+    }
+
     function doStepper(field, delta) {
         const s = settings();
         // 0 = 整本聊天(默认,与酒馆每轮实际发送的一致;旧楼层由预设正则自行收敛成摘要)
@@ -587,6 +705,7 @@ export function createShell(ctx, onExternalChange) {
         // 点单条数 1〜20:上限跟着输出预算走(65500 顶格,20 楼绰绰有余),下限 1——0 条的按钮没有意义
         if (field === 'threadReplyBatch') s.threadReplyBatch = Math.max(1, Math.min(20, (s.threadReplyBatch || 3) + delta));
         if (field === 'forumReplyBatch') s.forumReplyBatch = Math.max(1, Math.min(20, (s.forumReplyBatch || 3) + delta));
+        if (field === 'snsReplyBatch') s.snsReplyBatch = Math.max(1, Math.min(20, (s.snsReplyBatch || 3) + delta));
         saveSettings();
         render();
     }
@@ -657,6 +776,12 @@ export function createShell(ctx, onExternalChange) {
             case 'forum-refresh': doGenerateMoreForum(); break;
             case 'forum-generate-more': doContinueForumThread(); break;
             case 'select-forum-board': doSelectForumBoard(el.dataset.boardId); break;
+            case 'open-sns-tweet': navPush({ type: 'sns-tweet', tweetId: el.dataset.tweetId }); break;
+            case 'open-sns-profile': navPush({ type: 'sns-profile', accountId: el.dataset.accountId }); break;
+            case 'sns-refresh': doGenerateMoreSns(); break;
+            case 'sns-generate-more': doContinueTweetReplies(); break;
+            case 'sns-identity-toggle': doSnsToggleIdentity(); break;
+            case 'sns-select-viewer': doSnsSelectViewer(el.dataset.role); break;
             case 'stepper': doStepper(el.dataset.field, Number(el.dataset.delta)); break;
             case 'toggle-field': { const s = settings(); s[el.dataset.field] = !s[el.dataset.field]; saveSettings(); render(); onExternalChange?.(); break; }
             case 'toggle-capi': { const s = settings(); s.customApi.enabled = !s.customApi.enabled; saveSettings(); render(); break; }
@@ -712,6 +837,22 @@ export function createShell(ctx, onExternalChange) {
                 suppressNextClick = true;
                 doForumRevertFloor(Number(floorRow.dataset.ts));
             }, 550);
+            return;
+        }
+        const snsRow = e.target.closest('.or-sns-row');
+        if (snsRow) {
+            longPressTimer = setTimeout(() => {
+                suppressNextClick = true;
+                doDeleteTweet(snsRow.dataset.tweetId);
+            }, 550);
+            return;
+        }
+        const snsReplyRow = e.target.closest('.or-sns-reply-row');
+        if (snsReplyRow) {
+            longPressTimer = setTimeout(() => {
+                suppressNextClick = true;
+                doRevertTweetReply(Number(snsReplyRow.dataset.ts));
+            }, 550);
         }
     }
     function onPointerClear() { clearTimeout(longPressTimer); }
@@ -734,6 +875,18 @@ export function createShell(ctx, onExternalChange) {
             doForumRevertFloor(Number(floorRow.dataset.ts));
             return;
         }
+        const snsRow = e.target.closest('.or-sns-row');
+        if (snsRow) {
+            e.preventDefault();
+            doDeleteTweet(snsRow.dataset.tweetId);
+            return;
+        }
+        const snsReplyRow = e.target.closest('.or-sns-reply-row');
+        if (snsReplyRow) {
+            e.preventDefault();
+            doRevertTweetReply(Number(snsReplyRow.dataset.ts));
+            return;
+        }
         const row = e.target.closest('.or-msg-row');
         if (!row) return;
         e.preventDefault();
@@ -748,7 +901,7 @@ export function createShell(ctx, onExternalChange) {
         document.body.appendChild(host);
         shadow = host.attachShadow({ mode: 'open' });
 
-        for (const href of [SHELL_CSS_URL, MESSENGER_SKIN_URL, FORUM_SKIN_URL]) {
+        for (const href of [SHELL_CSS_URL, MESSENGER_SKIN_URL, FORUM_SKIN_URL, SNS_SKIN_URL]) {
             const link = document.createElement('link');
             link.rel = 'stylesheet';
             link.href = href;
@@ -762,7 +915,7 @@ export function createShell(ctx, onExternalChange) {
             <div class="or-phone">
                 <div class="or-statusbar">
                     <span class="or-statusbar-label">Orrery</span>
-                    <span class="or-statusbar-icons">${ICON_SIGNAL}${ICON_BATTERY}</span>
+                    <span class="or-statusbar-icons">${ICON_HUD_STARS}${ICON_HUD_RING}</span>
                     <button class="or-close-btn" data-action="close-phone" title="收起手机">${ICON_CLOSE}</button>
                 </div>
                 <div class="or-screen"></div>
@@ -791,7 +944,19 @@ export function createShell(ctx, onExternalChange) {
         host.style.display = 'block';
         // 导航状态跨开合保留(她 2026-08-14 点单):她是边聊边刷、靠悬浮球频繁开合的用法,
         // 每次重开都弹回网格,等于每次都要重走「消息→点进那个人」。换聊天时才清,见 render()。
-        requestAnimationFrame(() => root.classList.add('open'));
+        requestAnimationFrame(() => {
+            root.classList.add('open');
+            // 开机一瞬的星尘散落(v0.7.2 特色 C 案,月月选星尘流派):跨次元投影落定的痕迹。
+            // 一次性、极淡、0.55s 自灭;点色走 --or-salt-deep,三主题免配(海盐=蓝/墨白=灰/月夜=粉)。
+            const phone = root.querySelector('.or-phone');
+            if (phone && !phone.querySelector('.or-stardust')) {
+                const dust = document.createElement('div');
+                dust.className = 'or-stardust';
+                phone.appendChild(dust);
+                dust.addEventListener('animationend', () => dust.remove(), { once: true });
+                setTimeout(() => dust.remove(), 1200); // animationend 万一被吞(display 切换),兜底自清
+            }
+        });
         render();
     }
     function close() {

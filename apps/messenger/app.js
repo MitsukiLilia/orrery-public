@@ -35,8 +35,8 @@ function formatDateSep(ts, refNow) {
     return `${d.getMonth() + 1}月${d.getDate()}日`;
 }
 
-function genDotsHtml() {
-    return '<span class="or-generating-dots"><span></span><span></span><span></span></span>';
+function genSpinnerHtml() {
+    return '<span class="or-orrery-spinner"></span>'; // 天象仪加载演出,样式在 ui/shell.css
 }
 
 function groupAvatarHtml(group) {
@@ -88,7 +88,7 @@ export function renderThreadListHtml({ world, busy, seen = {}, justUpdated = nul
         <div class="or-header">
             <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
             <span class="or-header-title">消息</span>
-            <button class="or-pill-btn small" data-action="refresh" ${busy ? 'disabled' : ''}>${busy ? genDotsHtml() : '刷新'}</button>
+            <button class="or-pill-btn small" data-action="refresh" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : '刷新'}</button>
         </div>
         ${body}`;
 }
@@ -170,6 +170,6 @@ export function renderThreadHtml({ thread, world, busy, worldNow, seenAt = 0, re
                 <span class="or-batch-value">${replyBatch}</span>
                 <button data-action="stepper" data-field="threadReplyBatch" data-delta="1" ${busy ? 'disabled' : ''}>${ICON_PLUS}</button>
             </div>
-            <button class="or-pill-btn" data-action="generate-more" ${busy ? 'disabled' : ''}>${busy ? genDotsHtml() : '生成消息'}</button>
+            <button class="or-pill-btn" data-action="generate-more" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : '生成消息'}</button>
         </div>`;
 }

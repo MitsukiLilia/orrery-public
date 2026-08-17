@@ -1,18 +1,18 @@
-// 余波生成:组 prompt → 调 LLM → 宽容解析 → 入账。SYSTEM 提示词(A/B/B_GROUP/C/F/G)逐字来自任务书 §5,
-// 不得改写/精简——这里只做 {{占位符}} 替换,原文一个字不动。M1 拍板:A/B/B_GROUP 原本写死的
-// 语言原则行,改成 {{LANG_RULE}} 占位,运行时按全局语言开关(zh/ja_zh)替换,其余一字未动。
+// 余波生成:组 prompt → 调 LLM → 宽容解析 → 入账。SYSTEM 提示词(A/B/B_GROUP/C/F/G)基底逐字来自任务书 §5。
+// M1 拍板:A/B/B_GROUP 原本写死的语言原则行,改成 {{LANG_RULE}} 占位,运行时按全局语言开关(zh/ja_zh)替换。
+// 2026-08-16 日系氛围强化落地(评审+圈选轨迹见 docs/2026-08-16-提示词日系强化.md);此外仍只做 {{占位符}} 替换。
 import { foldWorld, uncoveredMessages, monogramFor, colorForContact, resolveSender } from './world.js';
 
 export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」的手机。给你的材料:①故事正文的最新进展 ②这部手机的当前状态(联系人、已有聊天)。请推演:这段进展之后,这部手机上自然会出现哪些新动静。
 
 # 原则
 1. 余波,不是复述。正文里发生的事不要转述;写它在人际网络里激起的水纹——当事人的只言片语、身边人的反应、以及与事件无关的日常继续流动。
-2. 沉默是最高级的余波。已读不回、看到了却装没看到、隔很久才回一个单字,都比人人热情接话真实。允许部分线程这次毫无动静。
+2. 沉默是最高级的余波。善用日系社交的「既読無視」(已读不回)、读空气装没看到、隔很久才回一个单字或一枚敷衍的颜文字,都比人人热情接话真实。允许部分线程这次毫无动静。
 3. 视角纪律。每个人只知道自己视角内能知道的事(在场、被告知、公开可见)。不许任何人未卜先知。
-4. 消息像真人打字:短句、口语、省略,贴合各人身份与关系亲疏。不写小说腔,不用书面语转述剧情。
+4. 消息像真人用 LINE:短句连发、口语、省略主语,贴合各人身份与关系亲疏。颜文字与表情符号是调味不是主食——是否使用、用多少,必须贴合角色性格:冷淡寡言的角色几乎不用,活泼的角色才多用,性格永远优先于氛围。不写小说腔,不用书面语转述剧情。
 5. {{LANG_RULE}}
 6. 克制与规模感:本次共 2〜8 条消息,分布在 1〜3 个线程。通讯录是主人生活的横截面,不是无限清单——总量维持在真人手机的活跃规模(约 6〜12 个线程),接近上限时优先让已有线程发生新动静而不是添人。新联系人必须有名有姓有身份:优先从【人物设定参考】与原著既定事实里挖掘(上级、下属、家人、原著配角——关系疏远、冷淡、常年不联系的家人也是家人,催婚的、只发节日祝福的都很真实);故事开始前主人不是空心人。没有名字的路人不配进通讯录。一次最多新建 1 位(首次生成除外,首次可推断 2〜4 位初始化)。
-7. 联系人纪律(最重要,违反即全盘失败)。手机里只能出现主人**在剧情中已经认识、且合理交换过联系方式**的人。判断只看剧情事实,不看叙事结构:正文哪怕通篇是两个人的双线叙事,只要剧情里他们尚未相识,对方就绝不能出现在通讯录——素未谋面的人不会躺在彼此的手机里。不要被任何先验带偏(比如默认两位主角是恋人或熟人)。宁缺勿滥:联系人晚一点出现,永远比过早出现真实。
+7. 🚨联系人纪律(绝对红线,违反即全盘失败)。手机里只能出现主人**在剧情中已经认识、且合理交换过联系方式**的人。判断只看剧情事实,不看叙事结构:正文哪怕通篇是两个人的双线叙事,只要剧情里他们尚未相识,对方就绝不能出现在通讯录——素未谋面的人不会躺在彼此的手机里。不要被任何先验带偏(比如默认两位主角是恋人或熟人)。宁缺勿滥:联系人晚一点出现,永远比过早出现真实。
 8. 熟稔度纪律。就算是真联系人,消息的语气亲疏也必须匹配剧情当前的关系阶段:刚认识就客气生分,熟人才随意,恋人才亲昵。关系阶段以正文为准,不许自行升温。
 9. 群聊也是余波的舞台,而且群聊有谱系:对上的汇报群、对下的指挥群、家族群、朋友群、同好群——主人在不同群里露出不同的人格面(工作群拘谨、朋友群放松、家族群潜水)。建群要有剧情或原著设定依据,别只盯着一种群造;首次初始化最多 1 个,之后按需。主人可以全程潜水;群成员不必都是通讯录好友,但每个成员要有稳定的 id 和身份感。
 10. OOC 纪律。主线人物及其身边人的一切言行,必须符合【人物设定参考】与正文已确立的性格;参考里没有的地方保持克制,不得自行发明重大设定。
@@ -26,11 +26,11 @@ export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - read:sender 为 me 时表示对方是否已读;sender 为他人时表示主角是否已读。用它演出已读不回。`;
 
 export const PROMPT_B_GROUP = `你是 Orrery,叙事世界观测引擎。用户想继续围观主角「{{char}}」手机里的群聊「{{group}}」(成员:{{members}})。基于最近的聊天走向和各人身份,自然地续写{{COUNT_RULE}}
-遵守:消息像真人打字;每个人只知道自己视角内的事;不复述正文;{{LANG_RULE}}
+遵守:消息像真实的 LINE 聊天(短句连发、读空气、颜文字按角色性格取舍——冷淡角色几乎不用);每个人只知道自己视角内的事;不复述正文;{{LANG_RULE}}
 只输出 JSON:{"messages":[{"sender":"me 或成员id","text":"","delayMin":0,"read":true}]}`;
 
 export const PROMPT_B = `你是 Orrery,叙事世界观测引擎。用户想继续围观主角「{{char}}」手机里与「{{contact}}」的这段聊天。基于双方关系、最近的故事进展与聊天走向,自然地续写{{COUNT_RULE}}
-遵守:消息像真人打字;不复述正文;{{LANG_RULE}}
+遵守:消息像真实的 LINE 聊天(短句连发、读空气、颜文字按角色性格取舍——冷淡角色几乎不用);不复述正文;{{LANG_RULE}}
 只输出 JSON:{"messages":[{"sender":"me 或 {{contactId}}","text":"","delayMin":0,"read":true}]}`;
 
 export const PROMPT_C = `把下面这段聊天记录压缩成 5 行以内的中立摘要,保留:关系变化、约定与承诺、未解决的话题、双方情绪基调。只输出摘要正文。`;
@@ -41,10 +41,10 @@ export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎�
 1. 论坛不是新闻台。正文里的事件,以住民视角的碎片形式荡开:目击帖、八卦帖、吐槽帖、求助帖。不许复述正文,不许全知。
 2. 比例律:本批新帖约一半与主线人物/事件沾边;另一半是住民自己的生活(吐槽工作、求助、安利、闲聊)——但其中至少一帖的回复区,安排主线人物或其身边人以住民身份自然路过,不点破身份,让读者自己发现。
 3. 视角纪律:每个住民只知道公开可见或自己亲历的事。
-4. 匿名文化:住民用网名或名無し式的匿名口吻发言,身份感和口癖跨帖一致;故事人物的小号绝不自曝真身,发言风格要「像但不明说」。
-5. 说话像论坛,不像小说:短句、跟风、歪楼、抬杠、冷笑话。热帖才热闹,冷帖没人理。
+4. 匿名文化:住民多用「名無し」式默认名或个性网名,常带鲜明的役割語与口癖且跨帖一致;故事人物的小号绝不自曝真身,仅靠标志性口癖或颜文字透出「像但不明说」的网感。
+5. 说话像日系匿名揭示板(5ch 那一挂):短句、「w/草」、安价跟风、歪楼、抬杠、颜文字、冷笑话,绝不像小说。热帖才热闹,冷帖没人理。
 6. 克制:本批 2〜4 个新帖(每帖 0〜5 楼)+ 0〜6 条对已有帖的新回复;允许有的板块毫无动静。
-7. 主线人物纪律。主线人物及其身边人在论坛留下的一切痕迹(小号发言、被目击、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示——两人尚未相识,就不许出现「看到他们走在一起」这类目击或撮合式讨论。禁止 OOC。
+7. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在论坛留下的一切痕迹(小号发言、被目击、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示——两人尚未相识,就不许出现「看到他们走在一起」这类目击或撮合式讨论。禁止 OOC。
 8. {{LANG_RULE}}
 
 # 输出
@@ -56,19 +56,55 @@ export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - worldTime 从正文推断,只许向后走`;
 
 export const PROMPT_G = `你是 Orrery,叙事世界观测引擎。用户想继续围观这个帖子的后续。基于帖子走向和各住民的身份口癖,自然地续写{{COUNT_RULE}}
-遵守:像论坛不像小说;住民口癖跨帖一致;每人只知道自己知道的;故事人物的小号绝不自曝、言行不得OOC(以【人物设定参考】为准);不复述正文。
+遵守:像日系揭示板般跟风、歪楼、带「w/草」与颜文字,绝不像小说;住民的役割語/口癖跨帖一致;每人只知道自己知道的;故事人物的小号绝不自曝、言行不得OOC(以【人物设定参考】为准);不复述正文。
 {{LANG_RULE}}
 只输出 JSON:{"replies":[{"authorId":"已有住民id或新id","newResident":{"residentId":"","handle":"","persona":"","castName":"可省略"},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}`;
+
+// ── M2:SNS「Pulsar」提示词(H/I),任务书 §4 逐字嵌入,一个字都不许改写。 ──
+
+export const PROMPT_H = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里登录中的 SNS「Pulsar」——推特型的短文社交平台,属于故事世界本身,住民全部真实生活在这个世界里,没有人知道自己身处故事。给你的材料:①故事正文的最新进展 ②SNS 当前状态(账号、已有推文)。请推演 SNS 上自然会出现的新动静。
+
+# 原则
+1. 余波,不是复述。正文里的事件不许转述;写它在 SNS 上荡开的水纹——当事人若无其事的日常推、意味深长的空リプ、突然的沉默、以及与事件无关的日常继续流动。
+2. 社交面具与情绪裂缝(本 app 的灵魂)。表垢是对外的人格面(よそ行き):礼貌语或温和口语、体面、岁月静好,可带表情或 tag;裏垢是情绪的裂缝(壁打ち,面壁倾诉):语无伦次、全角半角混杂、甚至因情绪极化而失去词汇量(限界化,如「無理」「しんどい」),极少用表情。同一事件在表与裏的落差,是这里最高级的余波——大号一句「今日は暑かった」,锁着的小号五分钟前连发三条崩溃。但崩溃的方式也必须贴合角色性格——限界化是许可不是义务,性格永远优先于氛围。
+3. 裏垢按性格涌现,不保底。不是每个人都开小号:冷淡寡言、不擅表达的人可能一辈子只有一个账号,沉默也是人格。只有性格合适的人、且剧情推到某个情绪节点时,才会诞生裏垢——开号本身就是一次事件。主人的裏垢一旦诞生,默认带锁(鍵垢)。
+4. 比例律。本批推文约一半与主线人物/事件沾边;另一半是住民账号毫无营养的生活流水(おはよう/おやすみ打卡、抱怨通勤、天气、饭拍、安利、推活)——但其中至少一条的回复区,安排主线人物或其身边人的账号自然路过,不点破身份,让读者自己发现。
+5. 视角纪律。每个账号只知道公开可见或自己亲历的事,不许未卜先知。
+6. 说话像真实的日本推特:短文、体言止め、省略主语;连投、跟风梗;ハッシュタグ偶尔用不滥用。不点名、不艾特的空リプ最有味——对某事/某人发表感想,只给懂的人看,绝不提及具体特征。绝不像小说。颜文字与表情按账号人格取舍——冷淡账号几乎不用。
+7. 回复区的社交距离与恶意浓度。熟人随意接梗;陌生人搭话(尤其热推下)常带「FF外から失礼します」式客套;偶尔有不读空气的 KY 或抬杠,但恶意浓度保持低——对主线人物的失礼极少且轻微,一旦出现,很快有其他账号自然怼回或打圆场。
+8. RT 与数字。RT 是无言转发(不写引用评论),用 retweetOf 标记,转发本身就是态度。いいね/RT 是几〜几十的小数字,同人世界不通胀;三位数以上的爆推=剧情级事件才配有。
+9. 配图占位。推文可偶尔带图:在 body 里用「[写真:一句话描述画面]」占位,本批最多 1〜2 条带图,以饭拍、风景、日常小物为主;裏垢几乎不发图。
+10. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在 SNS 留下的一切痕迹(账号、发言、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示;两人尚未相识,就不许出现互动或撮合式讨论。故事人物的小号绝不自曝真身。禁止 OOC。
+11. {{LANG_RULE}}
+12. 克制:本批 3〜8 条新推 + 0〜6 条对已有推的新回复;允许有的账号毫无动静。首次初始化时创建主人的表垢 + 5〜8 个住民账号;之后每批最多新建 2 个账号。
+
+# 输出
+只输出一个 JSON 对象:
+{"worldTime":"YYYY-MM-DD HH:MM","newAccounts":[{"accountId":"","handle":"英数字ID(不带@)","displayName":"显示名","bio":"一句话简介","locked":false,"ownerRole":"仅主人的账号才写:omote 或 ura","castName":"仅当是故事人物的账号才写其真名,否则省略"}],"newTweets":[{"accountId":"","body":"","zh":"","delayMin":0,"likes":0,"retweets":0,"retweetOf":"仅转发时写已有推文id","replies":[{"accountId":"","body":"","zh":"","delayMin":0}]}],"newReplies":[{"tweetId":"","replies":[{"accountId":"","body":"","zh":"","delayMin":0}]}]}
+- newAccounts 里 ownerRole 与 castName 互斥;accountId 必须是已有或本批新建的
+- 首次初始化必建主人的表垢(ownerRole:"omote");裏垢(ownerRole:"ura")只在原则 3 的条件满足时才诞生
+- bio 与 displayName 都是余波舞台:情绪剧变或进入某事件时,可改 bio、或在 displayName 加状态后缀(低浮上、〇〇ロス式)作隐秘表达——用 newAccounts 重发同 accountId 覆盖即可
+- 转发推(带 retweetOf)的 body 留空
+- delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走`;
+
+export const PROMPT_I = `你是 Orrery,叙事世界观测引擎。用户想继续围观这条推文下的后续。基于推文内容和各账号的人格口癖,自然地续写{{COUNT_RULE}}
+遵守:像真实的日本推特回复串(短文、体言止め、跟风、歪楼),绝不像小说;严格保持社交距离感——熟人随意接梗,陌生人搭话(尤其热推下)常带「FF外から失礼します」式客套,偶尔有不读空气的 KY,但对主线人物的失礼极少且轻微、且很快有其他账号自然怼回或打圆场;账号口癖与人格跨推一致;每人只知道公开可见的事;故事人物的账号绝不自曝、言行不得OOC(以【人物设定参考】为准);表垢与裏垢的语气落差要守住;不复述正文。
+{{LANG_RULE}}
+只输出 JSON:{"replies":[{"accountId":"已有账号id或新id","newAccount":{"accountId":"","handle":"","displayName":"","bio":"","castName":"可省略"},"body":"","zh":"","delayMin":0}]}`;
 
 // ── 全局语言开关:{{LANG_RULE}} 运行时按档替换(任务书 §2,四段文案逐字照抄,不改写)。──
 const LANG_RULE = {
     messenger: {
         zh: '消息语言跟随正文语言,不要输出 zh 字段。',
-        ja_zh: '消息用日文书写(贴合角色所在世界的语言),每条同时给出中文翻译字段 zh。',
+        ja_zh: '消息用地道的日文网聊口语书写(LINE 风、多省略;敬语/常体与役割語严格贴合角色身份与关系亲疏),每条同时给出中文翻译字段 zh。',
     },
     forum: {
-        zh: '所有内容用中文书写,不要输出 zh 字段。',
-        ja_zh: '标题与正文用日文书写(这个论坛属于故事世界),每条同时给出中文翻译字段 zh。',
+        zh: '所有内容用中文书写,但要带日系论坛的翻译腔与二次元网感(如「草」「w」、颜文字、轻小说式吐槽),不要输出 zh 字段。',
+        ja_zh: '标题与正文用地道的日本匿名揭示板网语书写(含 w、草、颜文字与板上黑话;这个论坛属于故事世界),每条同时给出中文翻译字段 zh。',
+    },
+    sns: {
+        zh: '所有内容用中文书写,但必须带日推的翻译腔与网感:体言止め式短句、倒装、跟风排比,「草」「w」量级的口癖;严禁简中特有的网络流行语与内娱粉圈词,严格保持日式翻译腔。不要输出 zh 字段。',
+        ja_zh: '推文与回复用地道的日本推特口语书写(短文、体言止め、主语省略、深夜のテンション/病みツイ、限界化词汇、跟风梗;这个 SNS 属于故事世界),每条同时给出中文翻译字段 zh。',
     },
 };
 function langRule(scope, language) {
@@ -82,11 +118,15 @@ const COUNT_RULE_DEFAULT = {
     dm: ' 0〜5 条新消息。沉默合理时就沉默(返回空 messages)。',
     group: ' 0〜6 条新消息;允许有人潜水、允许冷场(返回空 messages),不必人人发言。',
     forum: ' 0〜6 楼新回复;热帖才热闹,冷场合理就冷场(返回空 replies)。',
+    sns: ' 0〜6 条新回复;热推才热闹,冷场合理就冷场(返回空 replies)。',
 };
 function countRule(scope, n) {
     if (!Number.isFinite(n) || n <= 0) return COUNT_RULE_DEFAULT[scope];
     if (scope === 'forum') {
         return ` ${n} 楼新回复——这是用户点的数量,请给足;可以让不同住民从不同角度接话、互相抬杠或歪楼,但不要为了凑数注水。`;
+    }
+    if (scope === 'sns') {
+        return ` ${n} 条新回复——这是用户点的数量,请给足;可以让不同账号从不同角度接话、跟风或歪楼,但不要为了凑数注水。`;
     }
     if (scope === 'group') {
         return ` ${n} 条新消息——这是用户点的数量,请给足;可以由不同成员分担,允许有人潜水,不必人人发言。`;
@@ -108,6 +148,12 @@ function cleanZh(zh, body, language) {
     const z = String(zh || '').trim();
     if (!z || z === String(body || '').trim()) return undefined;
     return z;
+}
+
+// SNS いいね/RT 数字消化时钳制(任务书 §1):0..999 整数,缺省 0,同人世界不通胀。
+function clampCount(n) {
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(999, Math.round(n)));
 }
 
 // ── 宽容解析:剥 ```json 围栏、剥前后杂文,失败返回 null 交调用方决定重试。──
@@ -689,6 +735,50 @@ function buildForumThreadDigestText(world, thread) {
     return parts.join('\n');
 }
 
+// ── M2:SNS 材料拼装(主生成用【SNS 当前状态】+ 续写用单推全文;castName 只在这里流动,UI 绝不读它)。──
+
+// 任务书 §2:账号名册每行 `accountId | @handle | displayName | bio | ownerRole/castName 标注 | locked`
+function accountRosterLine(a) {
+    const tag = a.ownerRole ? `ownerRole=${a.ownerRole}` : (a.castName ? `castName=${a.castName}` : '');
+    return `${a.accountId} | @${a.handle} | ${a.displayName} | ${a.bio || ''} | ${tag} | ${a.locked ? 'locked' : ''}`;
+}
+
+function buildSnsDigestText(world) {
+    if (!world.snsAccounts.size) return '(SNS 是空的,首次生成:请先创建主人的表垢并初始化 5〜8 个住民账号)';
+    const parts = [];
+    if (world.snsNow) parts.push(`[SNS 当前世界时刻] ${fmtWorldTime(world.snsNow)}(新的 worldTime 不得早于它)`);
+    parts.push('[账号名册]');
+    for (const a of world.snsAccounts.values()) parts.push(accountRosterLine(a));
+    // 任务书 §2:最近 8 条推(按 lastActiveTs 倒序):`tweetId | @handle | body 前 80 字 | 回复数 | likes/RT`;各推附最后 2 条回复
+    const recentTweets = [...world.tweets.values()]
+        .filter(t => t.accountId)
+        .sort((a, b) => (b.lastActiveTs || 0) - (a.lastActiveTs || 0))
+        .slice(0, 8);
+    for (const t of recentTweets) {
+        const handle = world.snsAccounts.get(t.accountId)?.handle || t.accountId;
+        const preview = (t.body || '').slice(0, 80);
+        parts.push(`\n[推 ${t.tweetId}] @${handle} | ${preview} | 回复${t.replyCount || 0} | ${t.likes || 0}/${t.retweets || 0}${t.retweetOf ? ` (RT of ${t.retweetOf})` : ''}`);
+        for (const r of t.replies.slice(-2)) {
+            const rHandle = world.snsAccounts.get(r.accountId)?.handle || r.accountId;
+            parts.push(`  @${rHandle}: ${r.body}`);
+        }
+    }
+    return parts.join('\n');
+}
+
+function buildSnsTweetDigestText(world, tweet) {
+    const parts = [];
+    const handle = world.snsAccounts.get(tweet.accountId)?.handle || tweet.accountId;
+    parts.push(`[推文] @${handle}: ${tweet.body}`);
+    tweet.replies.forEach((r) => {
+        const rHandle = world.snsAccounts.get(r.accountId)?.handle || r.accountId;
+        parts.push(`@${rHandle}: ${r.body}`);
+    });
+    parts.push('\n[账号名册]');
+    for (const a of world.snsAccounts.values()) parts.push(accountRosterLine(a));
+    return parts.join('\n');
+}
+
 // ── 水位 → 本批「新进展」的起点(messenger/forum 共用)。──
 // M1 水位重构后不靠事件累积,完全推导——冷启动的存量楼层、流式丢事件的楼层都自动补上。
 // 2026-08-13 起「新进展」与「上下文范围」彻底分家:上下文默认是整本聊天(见 buildFloorContextText),
@@ -1099,7 +1189,210 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWin
     return { ok: true, added: valid.length };
 }
 
-// ── 对外入口:UI 只认这四个。messenger 两个内部自动接总结检查;forum 没有总结机制(§2 拍板不用改 PROMPT_C)。──
+// ── M2:SNS 主生成:独立水位、独立触发(app 内「刷新」),消化 newAccounts/newTweets/newReplies。──
+
+async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags }) {
+    await ensureRegexEngine();
+    const watermark = await store.getWatermark(worldKey, 'sns');
+    const tip = ctx.chat.length - 1;
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    if (batchFloor === null) return { ok: true, changed: false };
+
+    const world = foldWorld(await store.getEntriesForWorld(worldKey));
+    const charName = owner || ctx.name2 || '主角';
+    // 同 messenger/forum 的点名警示,换成 SNS 语境的措辞(注册账号发言而非通讯录/住民小号)。
+    const userSideName = (ctx.name1 || '').trim();
+    const caution = (userSideName && userSideName !== charName)
+        ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。不得注册为账号发言(除非剧情确实如此);更不得在任何推文或回复中暗示 TA 与「${charName}」的关系——两人尚未相识/尚未交往时,连目击式的并排出现都不许写。\n\n`
+        : '';
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
+    const notes = await buildInjectedNotes(ctx);
+    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}【SNS 当前状态】\n${buildSnsDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
+    logContextShape('SNS生成', userContent, notes.keys);
+    const systemPrompt = PROMPT_H.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('sns', language));
+
+    // 任务书 §2 明写"水位/纪元,v0.6.15 加固那套"——forum 主生成没补这道闸(现状),SNS 照 messenger
+    // 的更硬版本补上:生成期间用户在酒馆里删楼/swipe,回滚代表更晚的意图,整批作废。
+    const epoch = store.getRollbackEpoch();
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
+    if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
+
+    let addedCount = 0;
+
+    // ── newAccounts:同 accountId 重发=更新(改 bio/改名文化,月月拍板收);ownerRole 全世界 omote/ura
+    //    各至多一个,重复出现按 ownerRole 归并到已有 accountId,别让主人长出两个表垢。 ──
+    for (const a of Array.isArray(parsed.newAccounts) ? parsed.newAccounts : []) {
+        if (!a?.accountId || !a?.handle) continue;
+        let ownerRole = (a.ownerRole === 'omote' || a.ownerRole === 'ura') ? a.ownerRole : undefined;
+        let castName = a.castName ? String(a.castName) : undefined;
+        if (ownerRole && castName) castName = undefined; // 两者都有则丢 castName(任务书 §1)
+
+        // ⭐user 硬防线:displayName 或 castName 匹配 ctx.name1 的新账号整条拒收(allowUserContact 开着才放行)
+        if (!allowUserContact && ((a.displayName && isUserSide(a.displayName, ctx)) || (castName && isUserSide(castName, ctx)))) {
+            console.warn('[Orrery] 已拦下叙事另一方越界注册SNS账号:', a.displayName || castName);
+            continue;
+        }
+
+        let accountId = String(a.accountId);
+        if (ownerRole) {
+            const existing = [...world.snsAccounts.values()].find(acc => acc.ownerRole === ownerRole);
+            if (existing && existing.accountId !== accountId) accountId = existing.accountId; // 归并到已有账号
+        }
+
+        const payload = {
+            accountId, handle: String(a.handle), displayName: String(a.displayName || a.handle),
+            bio: a.bio || '', locked: !!a.locked,
+        };
+        if (ownerRole) payload.ownerRole = ownerRole;
+        if (castName) payload.castName = castName;
+        const added = await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'sns', type: 'sns_account', payload });
+        world.snsAccounts.set(accountId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
+    }
+
+    const validAccount = (id) => !!id && world.snsAccounts.has(String(id)); // 查无此人的推/回复丢弃(任务书 §4)
+
+    // 新实体 id 不让 LLM 现造(M1 教训),照 makeForumThreadId 的思路自造。
+    function makeTweetId() {
+        return `tw_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    }
+    function makeTweetReplyId() {
+        return `tr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    }
+
+    // 锚=max(worldTime 解析值, snsNow)(任务书 §2),推自锚点按 delayMin 排开,回复再依推内 delayMin 排开。
+    const parsedWt = parseWorldTime(parsed.worldTime);
+    const anchor = Math.max(parsedWt ?? (world.snsNow ?? Date.now()), world.snsNow ?? 0);
+
+    // retweetOf 只认「已经入账的推」(同 forum 的 replyToFloor/threadId 纪律):自己这批新推的 id 还没生成,
+    // 模型不可能预知,天然不可能被合法引用——查无此推整条丢弃。
+    const validTweets = (Array.isArray(parsed.newTweets) ? parsed.newTweets : []).filter(t => {
+        if (!validAccount(t?.accountId)) {
+            if (t?.body || t?.retweetOf) console.warn('[Orrery] 新推账号查无此项,已丢弃');
+            return false;
+        }
+        if (t.retweetOf && !world.tweets.has(String(t.retweetOf))) {
+            console.warn('[Orrery] 转发指向的原推查无此项,已丢弃');
+            return false;
+        }
+        return true;
+    });
+    const tweetTimes = layoutWorldTimes(validTweets, anchor, world.snsNow || 0);
+
+    for (let i = 0; i < validTweets.length; i++) {
+        const t = validTweets[i];
+        const tweetId = makeTweetId();
+        const retweetOf = t.retweetOf ? String(t.retweetOf) : undefined;
+        const payload = {
+            tweetId, accountId: String(t.accountId),
+            body: retweetOf ? '' : String(t.body || ''), // 转发推(带 retweetOf)的 body 留空(任务书 §4)
+            worldTime: tweetTimes[i],
+            likes: clampCount(t.likes), retweets: clampCount(t.retweets),
+        };
+        if (retweetOf) payload.retweetOf = retweetOf;
+        { const z = cleanZh(t.zh, t.body, language); if (z && !retweetOf) payload.zh = z; }
+        await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'sns', type: 'tweet', payload });
+        addedCount++;
+        world.tweets.set(tweetId, { ...payload, replies: [] });
+
+        // 内联 replies → tweet_reply,推内依 delayMin 排开(锚=推自己的 worldTime)
+        const replies = (Array.isArray(t.replies) ? t.replies : []).filter(rp => rp?.body && validAccount(rp.accountId));
+        const rtimes = layoutWorldTimes(replies, tweetTimes[i], tweetTimes[i]);
+        for (let j = 0; j < replies.length; j++) {
+            const rp = replies[j];
+            const rpayload = { replyId: makeTweetReplyId(), tweetId, accountId: String(rp.accountId), body: String(rp.body), worldTime: rtimes[j] };
+            { const z = cleanZh(rp.zh, rp.body, language); if (z) rpayload.zh = z; }
+            await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'sns', type: 'tweet_reply', payload: rpayload });
+            addedCount++;
+            world.tweets.get(tweetId).replies.push(rpayload);
+        }
+    }
+
+    // ── newReplies:追加到已有推(tweetId 必须已存在,同 forum 的 newReplies) ──
+    for (const nr of Array.isArray(parsed.newReplies) ? parsed.newReplies : []) {
+        if (!nr?.tweetId) continue;
+        const tweet = world.tweets.get(String(nr.tweetId));
+        if (!tweet?.accountId) continue; // 推不存在,丢弃
+        const tweetId = tweet.tweetId;
+        const replies = (Array.isArray(nr.replies) ? nr.replies : []).filter(rp => rp?.body && validAccount(rp.accountId));
+        const tailTs = tweet.replies.length ? tweet.replies[tweet.replies.length - 1].worldTime : tweet.worldTime;
+        const times = layoutWorldTimes(replies, anchor, tailTs);
+        for (let i = 0; i < replies.length; i++) {
+            const rp = replies[i];
+            const rpayload = { replyId: makeTweetReplyId(), tweetId, accountId: String(rp.accountId), body: String(rp.body), worldTime: times[i] };
+            { const z = cleanZh(rp.zh, rp.body, language); if (z) rpayload.zh = z; }
+            await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'sns', type: 'tweet_reply', payload: rpayload });
+            addedCount++;
+            tweet.replies.push(rpayload);
+        }
+    }
+
+    await store.setWatermark(worldKey, 'sns', batchFloor);
+    return { ok: true, changed: true, added: addedCount };
+}
+
+// ── M2:SNS 回复续写:定向续写单条推,允许返回空;newAccount 一批最多新建 2 个(任务书 §4)。──
+
+async function runSnsTweetContinue(ctx, store, { worldKey, tweetId, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags, count }) {
+    await ensureRegexEngine();
+    const world = foldWorld(await store.getEntriesForWorld(worldKey));
+    const tweet = world.tweets.get(tweetId);
+    if (!tweet?.accountId) return { ok: false, error: 'no_thread' };
+
+    const systemPrompt = PROMPT_I
+        .replaceAll('{{LANG_RULE}}', langRule('sns', language))
+        .replaceAll('{{COUNT_RULE}}', countRule('sns', count));
+    // 同 runThreadContinue/runForumThreadContinue:续写也补上摘要与正文近况,否则账号只能凭一条推的
+    // 字面意思接话,主线人物的小号一开口就回到关系原点。
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), owner || ctx.name2);
+    const notes = await buildInjectedNotes(ctx);
+    const recent = buildFloorSection(ctx, { newFrom: null, floorWindow: floorWindow ?? 0, excludeTags, background: true });
+    const userContent = `${castRef}${notes.text}${recent}${buildSnsTweetDigestText(world, tweet)}`;
+    logContextShape('SNS回复续写', userContent, notes.keys);
+
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
+    if (!parsed || !Array.isArray(parsed.replies)) return { ok: false, error: 'parse_failed' };
+    if (!parsed.replies.length) return { ok: true, added: 0 };
+
+    const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
+    function makeTweetReplyId() {
+        return `tr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    }
+    let newAccountBudget = 2;
+    const valid = [];
+    for (const rp of parsed.replies) {
+        if (!rp?.body) continue;
+        const accountId = rp.accountId ? String(rp.accountId) : null;
+        if (!accountId) continue;
+        if (!world.snsAccounts.has(accountId)) {
+            const na = rp.newAccount;
+            if (!(na?.accountId && String(na.accountId) === accountId && newAccountBudget > 0)) continue; // 查无此人且非法新建,丢弃
+            if (!allowUserContact && ((na.displayName && isUserSide(na.displayName, ctx)) || (na.castName && isUserSide(na.castName, ctx)))) {
+                console.warn('[Orrery] 已拦下叙事另一方越界注册SNS账号(续写):', na.displayName || na.castName);
+                continue;
+            }
+            const payload = { accountId, handle: String(na.handle || '?'), displayName: String(na.displayName || na.handle || '?'), bio: na.bio || '' };
+            if (na.castName) payload.castName = String(na.castName);
+            const added = await store.addEntry({ worldKey, sourceFloor, app: 'sns', type: 'sns_account', payload });
+            world.snsAccounts.set(accountId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
+            newAccountBudget--;
+        }
+        valid.push(rp);
+    }
+    if (!valid.length) return { ok: true, added: 0 };
+
+    const anchor = tweet.replies.length ? tweet.replies[tweet.replies.length - 1].worldTime : (tweet.worldTime || Date.now());
+    const times = layoutWorldTimes(valid, anchor, anchor);
+    for (let i = 0; i < valid.length; i++) {
+        const rp = valid[i];
+        const rpayload = { replyId: makeTweetReplyId(), tweetId, accountId: String(rp.accountId), body: String(rp.body), worldTime: times[i] };
+        { const z = cleanZh(rp.zh, rp.body, language); if (z) rpayload.zh = z; }
+        await store.addEntry({ worldKey, sourceFloor, app: 'sns', type: 'tweet_reply', payload: rpayload });
+    }
+    return { ok: true, added: valid.length };
+}
+
+// ── 对外入口:UI 只认这六个。messenger 两个内部自动接总结检查;forum/sns 没有总结机制(§2 拍板不用改 PROMPT_C)。──
 
 export async function generateMore(ctx, store, opts) {
     const result = await runMainGeneration(ctx, store, opts);
@@ -1125,4 +1418,12 @@ export async function generateMoreForum(ctx, store, opts) {
 
 export async function continueForumThread(ctx, store, opts) {
     return await runForumThreadContinue(ctx, store, opts);
+}
+
+export async function generateMoreSns(ctx, store, opts) {
+    return await runSnsMainGeneration(ctx, store, opts);
+}
+
+export async function continueTweetReplies(ctx, store, opts) {
+    return await runSnsTweetContinue(ctx, store, opts);
 }

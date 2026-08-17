@@ -96,11 +96,13 @@
             <label class="mock-label"><input type="checkbox" id="fxBroken"> 模拟解析失败(两次都返回垃圾文本)</label><br>
             <label class="mock-label"><input type="checkbox" id="fxEmptyB"> 续聊/盖楼返回空 messages/replies(测试「暂无新动静」)</label><br>
             <p class="note" style="margin:8px 0 0;">
-                fixture 按 systemPrompt 内容自动路由:含「压缩成 5 行以内」→摘要(C)/含「匿名论坛」→论坛主生成(F)/
-                含「围观这个帖子」→论坛盖楼(G)/含「续写」→消息续聊(B/B_GROUP)/否则→消息主生成(A)。
-                论坛与消息的这套流程都从手机内点「刷新」「生成更多」触发,不用额外按钮。<br>
+                fixture 按 systemPrompt 内容自动路由(SNS 的两条排在「续写」检查之前,因为 PROMPT_I 本身也含「续写」二字):
+                含「压缩成 5 行以内」→摘要(C)/含「登录中的 SNS」→SNS 主生成(H,首刷/二刷两版按账本是否已有账号自动切换)/
+                含「围观这条推文」→SNS 回复续写(I)/含「匿名论坛」→论坛主生成(F)/含「围观这个帖子」→论坛盖楼(G)/
+                含「续写」→消息续聊(B/B_GROUP)/否则→消息主生成(A)。
+                SNS/论坛/消息这套流程都从手机内点「刷新」「生成更多」/「生成回复」触发,不用额外按钮。<br>
                 语言开关(zh/日中双语)直接在手机「设置」页切——fixture 会读同一份 extensionSettings,
-                切到日中双语后返回的消息/帖子会带 zh 字段。
+                切到日中双语后返回的消息/帖子/推文会带 zh 字段。
             </p>
         </fieldset>
 
@@ -250,15 +252,93 @@
         ] };
     }
 
+    // ── M2 SNS「Pulsar」fixture(H/I) ──
+    // FIXTURE_H(首刷):主人表垢 + 5 个住民账号(1 名带 castName 验证 UI 绝不渲染真名、1 名 locked:true 验证锁图标)。
+    // 4 条新推:1 条带 [写真:…] 占位、1 条带 replies 2 条、likes/retweets 带小数字、1 条 retweetOf。
+    // ⚠️tweetId 由插件自合成(任务书 §1),模型/fixture 永远不可能预先知道同批另一条推最终会分到哪个 id——
+    // retweetOf 语义上只能指向「已入账的推」,首刷时账本还是空的,天然没有可转发的目标。这里让它指向一个
+    // 不存在的 id,专门练「查无此推整条丢弃」这条消化路径(账本 dump 可见:4 条 newTweets 只落 3 条)。
+    // 一条真正能解出缩略块的转发,挪到下面 buildFixtureHRegrow——那时账本里已经有上一批的真实 tweetId 可引用。
+    function buildFixtureH() {
+        return {
+            worldTime: '2026-08-16 21:10',
+            newAccounts: [
+                { accountId: 'a_owner', handle: 'satoru_diary', displayName: '悟', bio: '普通の会社員です', locked: false, ownerRole: 'omote' },
+                { accountId: 'a_neko', handle: 'nyaa_life', displayName: 'にゃー', bio: '猫と暮らしてます' },
+                { accountId: 'a_bread', handle: 'panya_baito', displayName: 'ぱん子', bio: 'パン屋バイト中' },
+                { accountId: 'a_run', handle: 'run_mode', displayName: 'ラン', bio: '朝ランはじめました' },
+                // castName 故意取一个和任何 displayName/handle/bio 都不重叠的字符串——grep 验证「UI 绝不渲染真名」时不会跟 a_owner 的 displayName「悟」撞在一起、产生假阳性/假阴性。
+                { accountId: 'a_shadow', handle: 'kage_no_hito', displayName: '影', bio: '……', castName: 'ホシノ・リュウジ' },
+                // locked:true 放在会直接发推的账号身上(而不是只出现在回复里的 a_run)——这样锁图标能在
+                // TL 首刷这一屏就直接看见,不必再点进推文详情才验证得到。
+                { accountId: 'a_star', handle: 'hoshimi_note', displayName: '星見', bio: '空の写真ばかり撮ってる', locked: true },
+            ],
+            newTweets: [
+                { accountId: 'a_owner', ...withZhBody('今日は暑かった'), delayMin: 0, likes: 3, retweets: 0 },
+                { accountId: 'a_star', ...withZhBody('[写真:夕焼けの空]'), delayMin: 4, likes: 12, retweets: 2 },
+                { accountId: 'a_bread', ...withZhBody('また怒られた……'), delayMin: 6, likes: 5, retweets: 0,
+                  replies: [
+                      { accountId: 'a_neko', ...withZhBody('お疲れさま(小声)'), delayMin: 2 },
+                      // a_shadow(带 castName)在这里真的发言、真的会渲染到 UI——castName grep 验证才有意义
+                      // (它若从不出现在任何屏幕上,「UI 绝不渲染真名」这条自查就只是没有反例,不是真的测过)。
+                      { accountId: 'a_shadow', ...withZhBody('それは災難すぎる'), delayMin: 3 },
+                  ] },
+                { accountId: 'a_neko', body: '', delayMin: 3, likes: 0, retweets: 0, retweetOf: 'tw_ghost_does_not_exist' },
+            ],
+            newReplies: [],
+        };
+    }
+
+    // 二刷变体(已有账号时):ura 诞生(带锁)+ 2 条限界化连发 + 一条能真正解出缩略块的转发——验证身份栏切换出现。
+    // existingTweetId 从 userContent 的【SNS 当前状态】digest 里现取一个真实 tweetId(见 extractExistingTweetId)。
+    function buildFixtureHRegrow(existingTweetId) {
+        return {
+            worldTime: '2026-08-16 23:50',
+            newAccounts: [
+                { accountId: 'a_owner_ura', handle: 'sat_kagi', displayName: '悟', bio: '', locked: true, ownerRole: 'ura' },
+            ],
+            newTweets: [
+                { accountId: 'a_owner_ura', ...withZhBody('無理'), delayMin: 0, likes: 0, retweets: 0 },
+                { accountId: 'a_owner_ura', ...withZhBody('しんどい……もう無理かも'), delayMin: 1, likes: 0, retweets: 0 },
+                ...(existingTweetId ? [{ accountId: 'a_run', body: '', delayMin: 2, likes: 0, retweets: 0, retweetOf: existingTweetId }] : []),
+            ],
+            newReplies: [],
+        };
+    }
+
+    function buildFixtureI() {
+        return { replies: [
+            { accountId: 'a_bread', ...withZhBody('笑死，前排吃瓜'), delayMin: 1 },
+            { accountId: 'a_neko2', newAccount: { accountId: 'a_neko2', handle: 'tori_watch', displayName: 'とり', bio: '通りすがりです' }, ...withZhBody('FF外から失礼します、これは辛い'), delayMin: 3 },
+        ] };
+    }
+
     function wrapFenced(obj) {
         return `好的，这是本次生成结果：\n\`\`\`json\n${JSON.stringify(obj)}\n\`\`\`\n以上，希望符合要求！`;
     }
 
-    function mockGenerate(systemPrompt) {
+    // 从【SNS 当前状态】digest 里现取一个真实 tweetId(格式同 buildSnsDigestText 的 `[推 tw_xxx] ...`),
+    // 只有二刷才可能命中——首刷时账本还是空的,天然没有可转发的目标。
+    function extractExistingTweetId(userContent) {
+        const m = /\[推 (\S+)\]/.exec(userContent || '');
+        return m ? m[1] : null;
+    }
+
+    function mockGenerate(systemPrompt, userContent) {
         if (document.getElementById('fxBroken').checked) return '(不知道你在说什么，我拒绝回答。)';
         const fence = document.getElementById('fxFence').checked;
         const emptyMore = document.getElementById('fxEmptyB').checked;
         if (systemPrompt.includes('压缩成 5 行以内')) return FIXTURE_C;
+        // ⚠️必须排在「续写」检查之前:PROMPT_I 也含「续写」二字("自然地续写{{COUNT_RULE}}")。
+        if (systemPrompt.includes('登录中的 SNS')) {
+            const isFirstTime = (userContent || '').includes('SNS 是空的');
+            const body = isFirstTime ? buildFixtureH() : buildFixtureHRegrow(extractExistingTweetId(userContent));
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        if (systemPrompt.includes('围观这条推文')) {
+            const body = emptyMore ? { replies: [] } : buildFixtureI();
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
         if (systemPrompt.includes('匿名论坛')) {
             const body = buildFixtureF();
             return fence ? wrapFenced(body) : JSON.stringify(body);
@@ -275,9 +355,9 @@
         return fence ? wrapFenced(body) : JSON.stringify(body);
     }
 
-    async function generateRaw({ systemPrompt }) {
+    async function generateRaw({ prompt, systemPrompt }) {
         await new Promise(r => setTimeout(r, 250)); // 模拟网络延迟,便于观察"生成中"三点动画
-        return mockGenerate(systemPrompt || '');
+        return mockGenerate(systemPrompt || '', prompt || '');
     }
 
     const POPUP_TYPE = { CONFIRM: 2 };
@@ -304,8 +384,9 @@
         constructPrompt: (messages) => messages,
         async sendRequest(_profileId, prompt, _maxTokens) {
             const sys = Array.isArray(prompt) ? (prompt.find(m => m.role === 'system')?.content || '') : '';
+            const usr = Array.isArray(prompt) ? (prompt.find(m => m.role === 'user')?.content || '') : '';
             await new Promise(r => setTimeout(r, 250));
-            return { content: mockGenerate(sys) };
+            return { content: mockGenerate(sys, usr) };
         },
     };
 
@@ -334,16 +415,17 @@
 
     async function renderState() {
         const worldKey = `${characters[ctx.characterId].avatar}::${ctx.getCurrentChatId()}`;
-        const [wmMessenger, wmForum] = await Promise.all([
+        const [wmMessenger, wmForum, wmSns] = await Promise.all([
             store.getWatermark(worldKey, 'messenger'),
             store.getWatermark(worldKey, 'forum'),
+            store.getWatermark(worldKey, 'sns'),
         ]);
         const tip = chat.length - 1;
         document.getElementById('state').textContent =
             `worldKey = ${worldKey}\nchat.length = ${chat.length} (tip = ${tip})\n` +
-            `watermarks = { messenger: ${wmMessenger}, forum: ${wmForum} }\n` +
-            `messenger 落后 = ${wmMessenger < tip} / forum 落后 = ${wmForum < tip}` +
-            `(两个 app 各自独立——一个刷新不该清另一个的红点)`;
+            `watermarks = { messenger: ${wmMessenger}, forum: ${wmForum}, sns: ${wmSns} }\n` +
+            `messenger 落后 = ${wmMessenger < tip} / forum 落后 = ${wmForum < tip} / sns 落后 = ${wmSns < tip}` +
+            `(三个 app 各自独立——一个刷新不该清另一个的红点)`;
     }
 
     async function dumpLedger() {

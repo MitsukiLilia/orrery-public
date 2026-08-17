@@ -17,7 +17,7 @@ function waitForExtensionsMenu(cb) {
 
 // 自报家门:排查「更新了却在跑旧码」(酒馆本地/全局双副本、静默 pull 失败)时,
 // 让实际加载的这份代码自己在控制台亮明版本——比对扩展管理器显示的版本号即知真伪。
-export const ORRERY_VERSION = '0.6.18';
+export const ORRERY_VERSION = '0.7.2';
 console.info(`[Orrery] v${ORRERY_VERSION} 已加载 · 输出预算 65500`);
 
 function main() {
@@ -42,11 +42,12 @@ function main() {
         if (!worldKey) return false;
         const tip = ctx.chat.length - 1;
         if (tip < 0) return false;
-        const [wmMessenger, wmForum] = await Promise.all([
+        const [wmMessenger, wmForum, wmSns] = await Promise.all([
             store.getWatermark(worldKey, 'messenger'),
             store.getWatermark(worldKey, 'forum'),
+            store.getWatermark(worldKey, 'sns'),
         ]);
-        return wmMessenger < tip || wmForum < tip;
+        return wmMessenger < tip || wmForum < tip || wmSns < tip;
     }
 
     async function hasNewRipples() {
@@ -64,7 +65,7 @@ function main() {
             store.getSeenMap(worldKey),
         ]);
         const world = foldWorld(entries);
-        return hasUnseenInApp('messenger', world, seen) || hasUnseenInApp('forum', world, seen);
+        return hasUnseenInApp('messenger', world, seen) || hasUnseenInApp('forum', world, seen) || hasUnseenInApp('sns', world, seen);
     }
 
     async function refreshBadge() {
