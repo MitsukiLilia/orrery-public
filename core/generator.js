@@ -306,7 +306,7 @@ function buildChatEndpoint(baseUrl) {
     return u + '/v1/chat/completions';
 }
 
-// 有的中转无视 stream:false 强行回 SSE(她真机踩中:ST 服务端 .json() 解析「data: {…」直接炸)。
+// 有的 OpenAI 兼容网关会无视 stream:false 强行回 SSE(真机实测:服务端 .json() 解析「data: {…」直接炸)。
 // 独立 API 通道自带装甲:显式非流式 + 响应嗅探,收到 SSE 也逐行拼装出全文。
 function parseSseText(text) {
     let out = '';
