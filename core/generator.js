@@ -1,6 +1,7 @@
 // 余波生成:组 prompt → 调 LLM → 宽容解析 → 入账。SYSTEM 提示词(A/B/B_GROUP/C/F/G)基底逐字来自任务书 §5。
 // M1 拍板:A/B/B_GROUP 原本写死的语言原则行,改成 {{LANG_RULE}} 占位,运行时按全局语言开关(zh/ja_zh)替换。
 // 2026-08-16 日系氛围强化落地(评审+圈选轨迹见 docs/2026-08-16-提示词日系强化.md);此外仍只做 {{占位符}} 替换。
+// 2026-08-21 语言体系改版(月月拍板):ja(默认)/en/ja_zh 三档,zh 档退役;网感文化圈随语言档切换,细节以世界观为准。
 import { foldWorld, uncoveredMessages, monogramFor, colorForContact, resolveSender } from './world.js';
 
 export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」的手机。给你的材料:①故事正文的最新进展 ②这部手机的当前状态(联系人、已有聊天)。请推演:这段进展之后,这部手机上自然会出现哪些新动静。
@@ -39,7 +40,7 @@ export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 原则
 1. 论坛不是新闻台。正文里的事件,以住民视角的碎片形式荡开:目击帖、八卦帖、吐槽帖、求助帖。不许复述正文,不许全知。
-2. 比例律:本批新帖约一半与主线人物/事件沾边;另一半是住民自己的生活(吐槽工作、求助、安利、闲聊)——但其中至少一帖的回复区,安排主线人物或其身边人以住民身份自然路过,不点破身份,让读者自己发现。
+2. 比例律与视角合法性:本批新帖约一半与主线人物/事件沾边——但「沾边」只有两种合法视角:①当事人视角,主线人物本人或其身边人用自己的小号发亲历的事;②旁观视角,无关住民以目击/听说的第三方口吻聊公开可见的部分(「今日駅前で見かけた」式)。🚫绝不许无关住民把与主线雷同的经历当成自己的亲身经历发帖——这个世界不存在恰好经历同一件事的第二组人,雷同经历帖只会让读者误认发帖人。另一半是住民自己的生活(吐槽工作、求助、安利、闲聊,与主线毫无关系)——其中至少一帖的回复区,安排主线人物或其身边人以住民身份自然路过,不点破身份,让读者自己发现;这种路过只放在纯日常帖里,主线人物绝不会去回复与自己经历雷同的帖子。
 3. 视角纪律:每个住民只知道公开可见或自己亲历的事。
 4. 匿名文化:住民多用「名無し」式默认名或个性网名,常带鲜明的役割語与口癖且跨帖一致;故事人物的小号绝不自曝真身,仅靠标志性口癖或颜文字透出「像但不明说」的网感。
 5. 说话像日系匿名揭示板(5ch 那一挂):短句、「w/草」、安价跟风、歪楼、抬杠、颜文字、冷笑话,绝不像小说。热帖才热闹,冷帖没人理。
@@ -56,7 +57,7 @@ export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - worldTime 从正文推断,只许向后走`;
 
 export const PROMPT_G = `你是 Orrery,叙事世界观测引擎。用户想继续围观这个帖子的后续。基于帖子走向和各住民的身份口癖,自然地续写{{COUNT_RULE}}
-遵守:像日系揭示板般跟风、歪楼、带「w/草」与颜文字,绝不像小说;住民的役割語/口癖跨帖一致;每人只知道自己知道的;故事人物的小号绝不自曝、言行不得OOC(以【人物设定参考】为准);不复述正文。
+遵守:像日系揭示板般跟风、歪楼、带「w/草」与颜文字,绝不像小说;住民的役割語/口癖跨帖一致;每人只知道自己知道的;故事人物的小号绝不自曝、言行不得OOC(以【人物设定参考】为准);无关住民不得把与主线雷同的经历当成自己的亲历,主线人物也绝不回复与自己经历雷同的内容;不复述正文。
 {{LANG_RULE}}
 只输出 JSON:{"replies":[{"authorId":"已有住民id或新id","newResident":{"residentId":"","handle":"","persona":"","castName":"可省略"},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}`;
 
@@ -67,8 +68,8 @@ export const PROMPT_H = `你是 Orrery,一个隐形的叙事世界观测引擎�
 # 原则
 1. 余波,不是复述。正文里的事件不许转述;写它在 SNS 上荡开的水纹——当事人若无其事的日常推、意味深长的空リプ、突然的沉默、以及与事件无关的日常继续流动。
 2. 社交面具与情绪裂缝(本 app 的灵魂)。表垢是对外的人格面(よそ行き):礼貌语或温和口语、体面、岁月静好,可带表情或 tag;裏垢是情绪的裂缝(壁打ち,面壁倾诉):语无伦次、全角半角混杂、甚至因情绪极化而失去词汇量(限界化,如「無理」「しんどい」),极少用表情。同一事件在表与裏的落差,是这里最高级的余波——大号一句「今日は暑かった」,锁着的小号五分钟前连发三条崩溃。但崩溃的方式也必须贴合角色性格——限界化是许可不是义务,性格永远优先于氛围。
-3. 裏垢按性格涌现,不保底。不是每个人都开小号:冷淡寡言、不擅表达的人可能一辈子只有一个账号,沉默也是人格。只有性格合适的人、且剧情推到某个情绪节点时,才会诞生裏垢——开号本身就是一次事件。主人的裏垢一旦诞生,默认带锁(鍵垢)。
-4. 比例律。本批推文约一半与主线人物/事件沾边;另一半是住民账号毫无营养的生活流水(おはよう/おやすみ打卡、抱怨通勤、天气、饭拍、安利、推活)——但其中至少一条的回复区,安排主线人物或其身边人的账号自然路过,不点破身份,让读者自己发现。
+3. 裏垢按性格涌现,不保底。不是每个人都开小号:冷淡寡言、不擅表达的人可能一辈子只有一个账号,沉默也是人格。只有性格合适的人、且剧情推到某个情绪节点时,才会诞生裏垢——开号本身就是一次事件。主人的裏垢一旦诞生,默认带锁(鍵垢);而裏垢一旦存在就不许整批缺席:正文出现重大情绪/关系进展时,本批它必须有动静——发推、改 bio、displayName 加状态后缀都算,「隔了很久才发」可以,毫无痕迹不行。
+4. 比例律与视角合法性。本批推文约一半与主线人物/事件沾边——「沾边」只有两种合法视角:当事人(主线人物本人或身边人的账号,发与亲历相关的推)与旁观者(无关住民以目击/听说口吻聊公开可见的部分)。🚫绝不许无关住民把与主线雷同的经历当成自己的亲身经历发推——这个世界不存在恰好经历同一件事的第二组人。另一半是住民账号毫无营养的生活流水(おはよう/おやすみ打卡、抱怨通勤、天气、饭拍、安利、推活)——其中至少一条的回复区,安排主线人物或其身边人的账号自然路过,不点破身份,让读者自己发现;这种路过只放在纯日常推下,主线人物绝不会去回复与自己经历雷同的内容。
 5. 视角纪律。每个账号只知道公开可见或自己亲历的事,不许未卜先知。
 6. 说话像真实的日本推特:短文、体言止め、省略主语;连投、跟风梗;ハッシュタグ偶尔用不滥用。不点名、不艾特的空リプ最有味——对某事/某人发表感想,只给懂的人看,绝不提及具体特征。绝不像小说。颜文字与表情按账号人格取舍——冷淡账号几乎不用。
 7. 回复区的社交距离与恶意浓度。熟人随意接梗;陌生人搭话(尤其热推下)常带「FF外から失礼します」式客套;偶尔有不读空气的 KY 或抬杠,但恶意浓度保持低——对主线人物的失礼极少且轻微,一旦出现,很快有其他账号自然怼回或打圆场。
@@ -76,7 +77,7 @@ export const PROMPT_H = `你是 Orrery,一个隐形的叙事世界观测引擎�
 9. 配图占位。推文可偶尔带图:在 body 里用「[写真:一句话描述画面]」占位,本批最多 1〜2 条带图,以饭拍、风景、日常小物为主;裏垢几乎不发图。
 10. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在 SNS 留下的一切痕迹(账号、发言、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示;两人尚未相识,就不许出现互动或撮合式讨论。故事人物的小号绝不自曝真身。禁止 OOC。
 11. {{LANG_RULE}}
-12. 克制:本批 3〜8 条新推 + 0〜6 条对已有推的新回复;允许有的账号毫无动静。首次初始化时创建主人的表垢 + 5〜8 个住民账号;之后每批最多新建 2 个账号。
+12. 规模与下限:正文有新进展时,本批固定产出 5〜8 条新推——下限 5 条是硬性契约,其中至少 2 条从不同视角回应新进展(当事人的若无其事、身边人的反应、旁观者的只言片语都算),其余为日常流水;正文没有新进展的批次才允许 3 条以下的安静。沉默只能是账号级的(某个账号这批不发声),不能是时间线级的——用户按下刷新,是要看到世界在动的。另有 0〜6 条对已有推的新回复。首次初始化时创建主人的表垢 + 5〜8 个住民账号;之后每批最多新建 2 个账号。
 
 # 输出
 只输出一个 JSON 对象:
@@ -88,27 +89,36 @@ export const PROMPT_H = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走`;
 
 export const PROMPT_I = `你是 Orrery,叙事世界观测引擎。用户想继续围观这条推文下的后续。基于推文内容和各账号的人格口癖,自然地续写{{COUNT_RULE}}
-遵守:像真实的日本推特回复串(短文、体言止め、跟风、歪楼),绝不像小说;严格保持社交距离感——熟人随意接梗,陌生人搭话(尤其热推下)常带「FF外から失礼します」式客套,偶尔有不读空气的 KY,但对主线人物的失礼极少且轻微、且很快有其他账号自然怼回或打圆场;账号口癖与人格跨推一致;每人只知道公开可见的事;故事人物的账号绝不自曝、言行不得OOC(以【人物设定参考】为准);表垢与裏垢的语气落差要守住;不复述正文。
+遵守:像真实的日本推特回复串(短文、体言止め、跟风、歪楼),绝不像小说;严格保持社交距离感——熟人随意接梗,陌生人搭话(尤其热推下)常带「FF外から失礼します」式客套,偶尔有不读空气的 KY,但对主线人物的失礼极少且轻微、且很快有其他账号自然怼回或打圆场;账号口癖与人格跨推一致;每人只知道公开可见的事;故事人物的账号绝不自曝、言行不得OOC(以【人物设定参考】为准);表垢与裏垢的语气落差要守住;无关住民不得把与主线雷同的经历当成自己的亲历;不复述正文。
 {{LANG_RULE}}
 只输出 JSON:{"replies":[{"accountId":"已有账号id或新id","newAccount":{"accountId":"","handle":"","displayName":"","bio":"","castName":"可省略"},"body":"","zh":"","delayMin":0}]}`;
 
-// ── 全局语言开关:{{LANG_RULE}} 运行时按档替换(任务书 §2,四段文案逐字照抄,不改写)。──
+// ── 全局语言开关:{{LANG_RULE}} 运行时按档替换。──
+// 2026-08-21 改版(月月拍板):ja(默认)/en/ja_zh 三档,旧 zh 档退役——「中文书写+日系翻译腔」
+// 是指令与材料互相拉扯的档位(风格词全在往日文拉),混杂漂移是结构性的;全日语反而是最稳的档。
+// en 档同时承担文化圈换算:提示词基底的日系参照(LINE/揭示板/日推)换算成英语圈对应物。
 const LANG_RULE = {
     messenger: {
-        zh: '消息语言跟随正文语言,不要输出 zh 字段。',
+        ja: '消息用地道的日文网聊口语书写(LINE 风、多省略;敬语/常体与役割語严格贴合角色身份与关系亲疏)。不要输出 zh 字段。',
+        en: '消息用地道的英文网聊口语书写(iMessage/WhatsApp 那种短信感:短句连发、缩写、随性的小写与省略,语气贴合角色身份与关系亲疏)。本提示词里的日系社交参照一律换算成英语圈对应物:「既読無視」= left on read,同样是最高级的沉默。不要输出 zh 字段。',
         ja_zh: '消息用地道的日文网聊口语书写(LINE 风、多省略;敬语/常体与役割語严格贴合角色身份与关系亲疏),每条同时给出中文翻译字段 zh。',
     },
     forum: {
-        zh: '所有内容用中文书写,但要带日系论坛的翻译腔与二次元网感(如「草」「w」、颜文字、轻小说式吐槽),不要输出 zh 字段。',
+        ja: '标题与正文用地道的日本匿名揭示板网语书写(含 w、草、颜文字与板上黑话;这个论坛属于故事世界)。不要输出 zh 字段。',
+        en: '标题与正文用地道的英语网络论坛口语书写(Reddit/英语匿名版那一挂:玩梗、缩写、引用讽刺,shitpost 与认真长回复并存;这个论坛属于故事世界)。本提示词里的日系揭示板参照(5ch、w/草、名無し、役割語等)一律换算成英语圈对应物;住民网名用英语圈习惯,口癖照样跨帖一致。不要输出 zh 字段。',
         ja_zh: '标题与正文用地道的日本匿名揭示板网语书写(含 w、草、颜文字与板上黑话;这个论坛属于故事世界),每条同时给出中文翻译字段 zh。',
     },
     sns: {
-        zh: '所有内容用中文书写,但必须带日推的翻译腔与网感:体言止め式短句、倒装、跟风排比,「草」「w」量级的口癖;严禁简中特有的网络流行语与内娱粉圈词,严格保持日式翻译腔。不要输出 zh 字段。',
+        ja: '推文与回复用地道的日本推特口语书写(短文、体言止め、主语省略、深夜のテンション/病みツイ、限界化词汇、跟风梗;这个 SNS 属于故事世界)。不要输出 zh 字段。',
+        en: '推文与回复用地道的英文推特口语书写(短文、小写化、缩写与梗、vague-posting;这个 SNS 属于故事世界)。本提示词里的日推参照一律换算成英语圈对应物:裏垢= priv/alt 小号文化,「FF外から失礼します」= 陌生人搭话的客套开场,限界化=崩溃到失去词汇量的短推("i cant"、"no bc")。不要输出 zh 字段。',
         ja_zh: '推文与回复用地道的日本推特口语书写(短文、体言止め、主语省略、深夜のテンション/病みツイ、限界化词汇、跟风梗;这个 SNS 属于故事世界),每条同时给出中文翻译字段 zh。',
     },
 };
+// 世界观兜底(全档通用):哪天用日语玩 HP、或用英语玩日系原作,氛围细节听世界观的,别硬套黑话。
+const WORLDVIEW_NOTE = '若原作世界观的地域文化与上述语言圈明显不一致,网络氛围的细节以世界观为准——住民聊的是那个世界的生活,不硬套不属于那个世界的网络黑话。';
 function langRule(scope, language) {
-    return LANG_RULE[scope][language === 'ja_zh' ? 'ja_zh' : 'zh'];
+    const lang = (language === 'ja_zh' || language === 'en') ? language : 'ja'; // 存量 zh 及未知值一律落到默认 ja
+    return `${LANG_RULE[scope][lang]}${WORLDVIEW_NOTE}`;
 }
 
 // ── 点单条数:{{COUNT_RULE}} 同 LANG_RULE 的工法(占位替换,原文一字不动)。──
@@ -154,6 +164,19 @@ function cleanZh(zh, body, language) {
 function clampCount(n) {
     if (!Number.isFinite(n)) return 0;
     return Math.max(0, Math.min(999, Math.round(n)));
+}
+
+// @handle 反查兜底(forum 住民/sns 账号共用):模型偶尔拿 handle 当 id 用,此前一律按查无此人
+// 整条静默丢弃——她真机上「刷新一条都刷不出来」的一部分来源。名册就在手里,反查是零成本的宽恕。
+function resolveByHandle(map, id, idKey) {
+    if (!id) return null;
+    const s = String(id);
+    if (map.has(s)) return s;
+    const h = s.replace(/^@/, '').toLowerCase();
+    for (const v of map.values()) {
+        if (String(v.handle || '').toLowerCase() === h) return v[idKey];
+    }
+    return null;
 }
 
 // ── 宽容解析:剥 ```json 围栏、剥前后杂文,失败返回 null 交调用方决定重试。──
@@ -707,13 +730,19 @@ function buildForumDigestText(world) {
     for (const b of world.boards.values()) parts.push(`- id=${b.boardId} name=${b.name} desc=${b.desc || ''}`);
     parts.push('[住民名册]');
     for (const r of world.residents.values()) parts.push(residentRosterLine(r));
+    // 近 10 帖带一楼摘要(2026-08-21 月月点单):此前只给 5 帖、且只有标题,模型看不见一楼在聊什么,
+    // 撞话题是必然。更早的旧帖不再进上下文=自然沉底,newReplies 也只许指向这 10 帖——和真论坛一样。
     const recentThreads = [...world.forumThreads.values()]
         .filter(t => t.title)
         .sort((a, b) => (b.lastActiveTs || 0) - (a.lastActiveTs || 0))
-        .slice(0, 5);
+        .slice(0, 10);
+    if (recentThreads.length) {
+        parts.push('\n[最近的帖子(新帖不得与它们话题重复或高度相似;newReplies 只能指向这里列出的帖——更早的旧帖已沉底,不再理会)]');
+    }
     for (const t of recentThreads) {
         const authorHandle = world.residents.get(t.authorId)?.handle || t.authorId;
         parts.push(`\n[帖 ${t.threadId}] ${t.title}(作者 ${authorHandle})`);
+        if (t.body) parts.push(`  1F: ${String(t.body).slice(0, 120)}`);
         for (const r of t.replies.slice(-2)) {
             parts.push(`  ${world.residents.get(r.authorId)?.handle || r.authorId}: ${r.body}`);
         }
@@ -1073,7 +1102,12 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
         world.residents.set(residentId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
     }
 
-    const validAuthor = (id) => !!id && world.residents.has(String(id)); // 查无此人的楼丢弃(任务书 §4)
+    // 认领即归一:校验的同时把 handle 写法归位成 residentId(改写原对象);真查无此人才丢弃(任务书 §4)
+    const claimAuthor = (obj) => {
+        const rid = resolveByHandle(world.residents, obj?.authorId, 'residentId');
+        if (rid) obj.authorId = rid;
+        return !!rid;
+    };
 
     // newThreads 的 schema(PROMPT_F §5)没有 threadId 字段——新帖的 id 由模型现造是天然不稳定的,
     // Orrery 自己发一个(同 store.js 的 makeId 哲学,不查重,碰撞概率低到可以不管)。
@@ -1083,7 +1117,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     }
 
     for (const t of Array.isArray(parsed.newThreads) ? parsed.newThreads : []) {
-        if (!t?.boardId || !t?.title || !validAuthor(t.authorId) || !world.boards.has(String(t.boardId))) {
+        if (!t?.boardId || !t?.title || !claimAuthor(t) || !world.boards.has(String(t.boardId))) {
             // 丢弃是既定策略(查无此人/查无此板的帖不入账),但必须留声——否则又是「后端有、前端空」
             if (t?.title) console.warn('[Orrery] 新帖', t.title, '因板块或作者查无此项被丢弃');
             continue;
@@ -1098,7 +1132,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
         addedCount++;
         world.forumThreads.set(threadId, { ...payload, replies: [] });
 
-        const replies = (Array.isArray(t.replies) ? t.replies : []).filter(rp => rp?.body && validAuthor(rp.authorId));
+        const replies = (Array.isArray(t.replies) ? t.replies : []).filter(rp => rp?.body && claimAuthor(rp));
         const times = layoutWorldTimes(replies, anchor, anchor);
         for (let i = 0; i < replies.length; i++) {
             const rp = replies[i];
@@ -1115,7 +1149,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
         const thread = world.forumThreads.get(String(nr.threadId));
         if (!thread?.title) continue; // 帖不存在,丢弃
         const threadId = thread.threadId;
-        const replies = (Array.isArray(nr.replies) ? nr.replies : []).filter(rp => rp?.body && validAuthor(rp.authorId));
+        const replies = (Array.isArray(nr.replies) ? nr.replies : []).filter(rp => rp?.body && claimAuthor(rp));
         const tailTs = thread.replies.length ? thread.replies[thread.replies.length - 1].worldTime : thread.worldTime;
         const times = layoutWorldTimes(replies, anchor, tailTs);
         for (let i = 0; i < replies.length; i++) {
@@ -1161,8 +1195,11 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWin
     const valid = [];
     for (const rp of parsed.replies) {
         if (!rp?.body) continue;
-        const authorId = rp.authorId ? String(rp.authorId) : null;
+        let authorId = rp.authorId ? String(rp.authorId) : null;
         if (!authorId) continue;
+        // handle 写法先归位;归不上的才可能是本批合法新建的住民
+        const resolved = resolveByHandle(world.residents, authorId, 'residentId');
+        if (resolved) { authorId = resolved; rp.authorId = resolved; }
         if (!world.residents.has(authorId)) {
             const nr = rp.newResident;
             if (!(nr?.residentId && String(nr.residentId) === authorId && newResidentBudget > 0)) continue; // 查无此人且非法新建,丢弃
@@ -1250,7 +1287,12 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
         world.snsAccounts.set(accountId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
     }
 
-    const validAccount = (id) => !!id && world.snsAccounts.has(String(id)); // 查无此人的推/回复丢弃(任务书 §4)
+    // 认领即归一:校验的同时把 @handle 写法归位成 accountId(改写原对象);真查无此人才丢弃(任务书 §4)
+    const claimAccount = (obj) => {
+        const aid = resolveByHandle(world.snsAccounts, obj?.accountId, 'accountId');
+        if (aid) obj.accountId = aid;
+        return !!aid;
+    };
 
     // 新实体 id 不让 LLM 现造(M1 教训),照 makeForumThreadId 的思路自造。
     function makeTweetId() {
@@ -1267,7 +1309,7 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
     // retweetOf 只认「已经入账的推」(同 forum 的 replyToFloor/threadId 纪律):自己这批新推的 id 还没生成,
     // 模型不可能预知,天然不可能被合法引用——查无此推整条丢弃。
     const validTweets = (Array.isArray(parsed.newTweets) ? parsed.newTweets : []).filter(t => {
-        if (!validAccount(t?.accountId)) {
+        if (!claimAccount(t)) {
             if (t?.body || t?.retweetOf) console.warn('[Orrery] 新推账号查无此项,已丢弃');
             return false;
         }
@@ -1296,7 +1338,7 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
         world.tweets.set(tweetId, { ...payload, replies: [] });
 
         // 内联 replies → tweet_reply,推内依 delayMin 排开(锚=推自己的 worldTime)
-        const replies = (Array.isArray(t.replies) ? t.replies : []).filter(rp => rp?.body && validAccount(rp.accountId));
+        const replies = (Array.isArray(t.replies) ? t.replies : []).filter(rp => rp?.body && claimAccount(rp));
         const rtimes = layoutWorldTimes(replies, tweetTimes[i], tweetTimes[i]);
         for (let j = 0; j < replies.length; j++) {
             const rp = replies[j];
@@ -1314,7 +1356,7 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
         const tweet = world.tweets.get(String(nr.tweetId));
         if (!tweet?.accountId) continue; // 推不存在,丢弃
         const tweetId = tweet.tweetId;
-        const replies = (Array.isArray(nr.replies) ? nr.replies : []).filter(rp => rp?.body && validAccount(rp.accountId));
+        const replies = (Array.isArray(nr.replies) ? nr.replies : []).filter(rp => rp?.body && claimAccount(rp));
         const tailTs = tweet.replies.length ? tweet.replies[tweet.replies.length - 1].worldTime : tweet.worldTime;
         const times = layoutWorldTimes(replies, anchor, tailTs);
         for (let i = 0; i < replies.length; i++) {
@@ -1362,8 +1404,11 @@ async function runSnsTweetContinue(ctx, store, { worldKey, tweetId, floorWindow,
     const valid = [];
     for (const rp of parsed.replies) {
         if (!rp?.body) continue;
-        const accountId = rp.accountId ? String(rp.accountId) : null;
+        let accountId = rp.accountId ? String(rp.accountId) : null;
         if (!accountId) continue;
+        // @handle 写法先归位;归不上的才可能是本批合法新建的账号
+        const resolved = resolveByHandle(world.snsAccounts, accountId, 'accountId');
+        if (resolved) { accountId = resolved; rp.accountId = resolved; }
         if (!world.snsAccounts.has(accountId)) {
             const na = rp.newAccount;
             if (!(na?.accountId && String(na.accountId) === accountId && newAccountBudget > 0)) continue; // 查无此人且非法新建,丢弃

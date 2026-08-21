@@ -29,7 +29,9 @@ const DEFAULT_SETTINGS = {
     // 酒馆每轮本来就发整本,旧楼层由预设自己的正则按 depth 压成摘要;orrery 只喂尾部一窗时,
     // 那一窗全落在「近消息」档、摘要恰好全被删光,于是永远只能凭最新几层反推关系 → OOC。
     floorWindow: 0, profileId: null, summaryThreshold: 40,
-    autoRefresh: false, theme: 'seasalt', showFab: true, allowUserContact: false, language: 'zh', excludeTags: '',
+    // language: ja(全日语,默认)/en(全英文)/ja_zh(日语原文+中文翻译)。2026-08-21 月月拍板改版,旧 zh 档退役——
+    // 「中文+日系翻译腔」与整本日文浓度极高的正文互相拉扯,混杂漂移是结构性的;全日语才是最稳的档。
+    autoRefresh: false, theme: 'seasalt', showFab: true, allowUserContact: false, language: 'ja', excludeTags: '',
     // 帖内/线程内/推文详情「生成」的点单条数(列表页的「刷新」不受此约束,那是世界自己起涟漪,该冷场就冷场)
     threadReplyBatch: 3, forumReplyBatch: 3, snsReplyBatch: 3,
     customApi: { enabled: false, baseUrl: '', apiKey: '', model: '' },
@@ -100,7 +102,8 @@ function renderSettingsHtml(s, profileLabel, owner) {
             <div class="or-row">
                 <span class="or-row-label">语言</span>
                 <div class="or-theme-seg">
-                    <button class="${s.language !== 'ja_zh' ? 'on' : ''}" data-action="set-language" data-language="zh">中文</button>
+                    <button class="${s.language !== 'ja_zh' && s.language !== 'en' ? 'on' : ''}" data-action="set-language" data-language="ja">日本語</button>
+                    <button class="${s.language === 'en' ? 'on' : ''}" data-action="set-language" data-language="en">English</button>
                     <button class="${s.language === 'ja_zh' ? 'on' : ''}" data-action="set-language" data-language="ja_zh">日中双语</button>
                 </div>
             </div>
@@ -202,6 +205,8 @@ export function createShell(ctx, onExternalChange) {
             cur.floorWindow = 0;
             cur.floorWindowMigrated = true;
         }
+        // 2026-08-21 语言体系改版:zh 档退役,存量一律迁到新默认 ja(无需标记——zh 已不可再被设出来)。
+        if (cur.language === 'zh') cur.language = 'ja';
         ctx.extensionSettings.orrery = {
             ...DEFAULT_SETTINGS, ...cur,
             customApi: { ...DEFAULT_SETTINGS.customApi, ...(cur.customApi || {}) },
@@ -376,7 +381,7 @@ export function createShell(ctx, onExternalChange) {
             });
             markSeenAfter = [seenKey, latestTsOfThread(thread)];
         } else if (top.type === 'forum-list') {
-            screenEl.innerHTML = renderForumListHtml({ world, busy: busy.forum, boardId: top.boardId || null, seen, justUpdated });
+            screenEl.innerHTML = renderForumListHtml({ world, busy: busy.forum, boardId: top.boardId || null, page: top.page || 1, seen, justUpdated });
         } else if (top.type === 'forum-thread') {
             const thread = world.forumThreads.get(top.threadId);
             if (!thread || !thread.title) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚/删除清空
@@ -567,6 +572,10 @@ export function createShell(ctx, onExternalChange) {
                 excludeTags: s.excludeTags || '',
                 allowUserContact: !!s.allowUserContact,
             });
+            if (result?.ok && result.added > 0) {
+                const top = navStack[navStack.length - 1];
+                if (top.type === 'forum-list') top.page = 1; // 新帖按活跃排在最前,回到第一页迎接
+            }
             onExternalChange?.();
             return result;
         });
@@ -620,6 +629,17 @@ export function createShell(ctx, onExternalChange) {
         const top = navStack[navStack.length - 1];
         if (top.type !== 'forum-list') return;
         top.boardId = boardId || null; // 只是过滤态,不入栈,不当导航
+        top.page = 1;                  // 换板块=换了一份列表,页码归位
+        render();
+    }
+
+    // 论坛翻页(2026-08-21 月月点单,参考 Perigee 论坛分成多页):纯本地渲染,不耗生成。
+    // 目标页由按钮 data-page 给绝对值(渲染层按当下帖数钳制过),不做相对增减,反悔删帖后不会漂。
+    function doForumPage(page) {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'forum-list' || !Number.isFinite(page) || page < 1) return;
+        top.page = page;
+        pendingScroll = { fallback: 'top', key: screenKey(top) }; // 新一页从头看起
         render();
     }
 
@@ -776,6 +796,7 @@ export function createShell(ctx, onExternalChange) {
             case 'forum-refresh': doGenerateMoreForum(); break;
             case 'forum-generate-more': doContinueForumThread(); break;
             case 'select-forum-board': doSelectForumBoard(el.dataset.boardId); break;
+            case 'forum-page': doForumPage(parseInt(el.dataset.page, 10)); break;
             case 'open-sns-tweet': navPush({ type: 'sns-tweet', tweetId: el.dataset.tweetId }); break;
             case 'open-sns-profile': navPush({ type: 'sns-profile', accountId: el.dataset.accountId }); break;
             case 'sns-refresh': doGenerateMoreSns(); break;

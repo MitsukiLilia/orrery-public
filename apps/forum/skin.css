@@ -41,6 +41,23 @@
 /* 看过的帖子又被盖了新楼:不挂 NEW,只在 meta 行末尾报个数 */
 .or-forum-newreply { color: var(--or-salt-deep); font-weight: 700; margin-left: 6px; }
 
+/* ── 分页条(列表底部常驻,不随帖子滚动;单页时渲染层直接不出这块) ── */
+.or-forum-pager {
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 14px;
+    padding: 8px 0 10px; border-top: 1px solid var(--or-cream-2); background: var(--or-cream);
+}
+.or-forum-page-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border: none; border-radius: 50%;
+    background: var(--or-cream-2); color: var(--or-cocoa); cursor: pointer;
+}
+.or-forum-page-btn.next { transform: rotate(180deg); } /* 复用返回箭头 SVG,镜像当「下一页」 */
+.or-forum-page-btn:disabled { opacity: .3; cursor: default; }
+.or-forum-page-num {
+    font-size: 12px; color: var(--or-cocoa-light); min-width: 48px; text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
 .or-forum-row.just-arrived { animation: or-row-arrive .9s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
     .or-forum-new, .or-forum-row.just-arrived { animation: none; }

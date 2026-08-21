@@ -39,16 +39,23 @@ function handleWithId(world, residentId) {
     return r ? `${r.handle} #${shortIdFor(residentId)}` : String(residentId);
 }
 
+// 每页帖数(2026-08-21 月月点单分页,参考 Perigee 论坛):翻页纯本地渲染,不耗生成。
+const THREADS_PER_PAGE = 10;
+
 /**
- * 帖子列表(论坛首屏,板块 chip 过滤 + 按 lastActiveTs 倒序)。
+ * 帖子列表(论坛首屏,板块 chip 过滤 + 按 lastActiveTs 倒序 + 分页)。
  * @param seen 「我看过了」水位表:某帖没有记录=她从没点进去过=新帖(挂 NEW),有记录就比对回复数
  * @param justUpdated 刚这一次刷新里新增/被盖楼的 threadId 集合——只用来播一次入场动效
+ * @param page 1 起的页码;越界时钳回有效范围(反悔删帖把最后一页删空也不会白屏)
  */
-export function renderForumListHtml({ world, busy, boardId, seen = {}, justUpdated = null }) {
+export function renderForumListHtml({ world, busy, boardId, page = 1, seen = {}, justUpdated = null }) {
     const boards = [...world.boards.values()];
     const threads = [...world.forumThreads.values()]
         .filter(t => t.title && (!boardId || t.boardId === boardId))
         .sort((a, b) => (b.lastActiveTs || 0) - (a.lastActiveTs || 0));
+    const totalPages = Math.max(1, Math.ceil(threads.length / THREADS_PER_PAGE));
+    const curPage = Math.min(Math.max(1, page), totalPages);
+    const pageThreads = threads.slice((curPage - 1) * THREADS_PER_PAGE, curPage * THREADS_PER_PAGE);
 
     const chips = `<div class="or-forum-chips">
         <button class="or-forum-chip ${!boardId ? 'on' : ''}" data-action="select-forum-board" data-board-id="">全部</button>
@@ -56,7 +63,7 @@ export function renderForumListHtml({ world, busy, boardId, seen = {}, justUpdat
     </div>`;
 
     const body = threads.length
-        ? `<div class="or-forum-list">${threads.map(t => {
+        ? `<div class="or-forum-list">${pageThreads.map(t => {
             const board = world.boards.get(t.boardId);
             const seenTs = seen[seenKeyForForumThread(t.threadId)];
             const neverOpened = seenTs === undefined;              // 一次都没点进去过 = 这帖对她来说是新的
@@ -73,6 +80,13 @@ export function renderForumListHtml({ world, busy, boardId, seen = {}, justUpdat
         }).join('')}</div>`
         : `<div class="or-empty">论坛还没有人气。点「刷新」,让这个世界开始说话。</div>`;
 
+    // 分页条:单页时不占地方;prev/next 给绝对页码,shell 侧不做相对运算
+    const pager = totalPages > 1 ? `<div class="or-forum-pager">
+        <button class="or-forum-page-btn" data-action="forum-page" data-page="${curPage - 1}" ${curPage <= 1 ? 'disabled' : ''}>${ICON_BACK}</button>
+        <span class="or-forum-page-num">${curPage} / ${totalPages}</span>
+        <button class="or-forum-page-btn next" data-action="forum-page" data-page="${curPage + 1}" ${curPage >= totalPages ? 'disabled' : ''}>${ICON_BACK}</button>
+    </div>` : '';
+
     return `
         <div class="or-header">
             <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
@@ -80,7 +94,8 @@ export function renderForumListHtml({ world, busy, boardId, seen = {}, justUpdat
             <button class="or-pill-btn small" data-action="forum-refresh" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : '刷新'}</button>
         </div>
         ${chips}
-        ${body}`;
+        ${body}
+        ${pager}`;
 }
 
 /**
