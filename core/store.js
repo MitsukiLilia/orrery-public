@@ -245,6 +245,33 @@ export async function deleteTweetRepliesFrom(worldKey, tweetId, fromTs) {
     });
 }
 
+/**
+ * 浏览器专用倒带:search_query/browse_visit 两型一起,payload.worldTime >= fromWorldTime 的全删
+ * (任务书 §2)。工法同 deleteTweetRepliesFrom(游标扫世界、条件命中就删),但比对字段是 worldTime
+ * 不是 ts——两 tab 按世界时间混排展示,长按定位到的是"这一条在时间轴上的位置",反悔边界也该按
+ * 这条线切,而不是两型各自的入账序号(检索与它带出的浏览往往同一批入账、ts 挨得很近但 worldTime
+ * 才是她在屏幕上认出来的那条时间线)。缺 worldTime 的畸形条目保守地一并删掉(同 deleteThreadFrom 的先例)。
+ */
+export async function deleteBrowserFrom(worldKey, fromWorldTime) {
+    if (!worldKey) return;
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_LEDGER, 'readwrite');
+        const idx = tx.objectStore(STORE_LEDGER).index('worldKey');
+        const req = idx.openCursor(IDBKeyRange.only(worldKey));
+        req.onsuccess = () => {
+            const cursor = req.result;
+            if (!cursor) return;
+            const v = cursor.value;
+            const isBrowserType = v.type === 'search_query' || v.type === 'browse_visit';
+            if (isBrowserType && (!Number.isFinite(v.payload?.worldTime) || v.payload.worldTime >= fromWorldTime)) cursor.delete();
+            cursor.continue();
+        };
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
 /** 抹掉这部手机:账本条目 + meta(含主人设定/水位)全删,世界回到未激活状态。 */
 export async function wipeWorld(worldKey) {
     if (!worldKey) return;
@@ -284,10 +311,10 @@ async function writeMeta(meta) {
 // 旧 pendingFloors 字段直接丢弃——M1 已废除该机制,pending 完全靠水位推导(见 generator.js)。
 function normalizeWatermarks(meta) {
     if (meta.watermarks && typeof meta.watermarks === 'object') {
-        return { messenger: -1, forum: -1, sns: -1, ...meta.watermarks };
+        return { messenger: -1, forum: -1, sns: -1, browser: -1, ...meta.watermarks };
     }
     const messenger = Number.isFinite(meta.lastProcessedFloor) ? meta.lastProcessedFloor : -1;
-    return { messenger, forum: -1, sns: -1 };
+    return { messenger, forum: -1, sns: -1, browser: -1 };
 }
 
 /**

@@ -93,6 +93,27 @@ export const PROMPT_I = `你是 Orrery,叙事世界观测引擎。用户想继�
 {{LANG_RULE}}
 只输出 JSON:{"replies":[{"accountId":"已有账号id或新id","newAccount":{"accountId":"","handle":"","displayName":"","bio":"","castName":"可省略"},"body":"","zh":"","delayMin":0}]}`;
 
+// ── M3:浏览器「Astrolabe」提示词(J),任务书-M3 §3 逐字嵌入,一个字都不许改写。──
+
+export const PROMPT_J = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里的浏览器「Astrolabe」——检索记录与浏览历史,属于故事世界本身。检索栏是比日记更诚实的地方:不敢问出口的、解不开的、放不下的,都会在这里留下痕迹。给你的材料:①故事正文的最新进展 ②浏览器当前状态(已有的检索与浏览记录)。请推演这段进展之后,检索栏与历史里自然会新增的痕迹。
+
+# 原则
+1. 侧写,不复述。检索词写的是正文事件在主人心里留下的「解不开的部分」——不敢当面问的、需要偷偷确认的、假装不在意却查了的。绝不把正文剧情写成检索词。
+2. 检索像真人打字:关键词并列、省略、口语;偶尔连搜两条相近的(第一条没搜到想要的,加词细化或换个说法再搜)——笨拙本身就是心事的形状。深夜时刻的检索,本身就是叙事。
+3. 性格优先。崩溃型的人查「眠れない どうすれば」,实务型的人查「駅前 薬局 営業時間」;不是每个人都把情绪交给检索栏,冷静的人可能只查正事。检索的「诚实」必须贴合主人的性格,以【人物设定参考】为准。
+4. 视角与关系阶段纪律。只能检索主人亲历、被告知或公开可见的事,正文里尚未发生的事绝不出现;对叙事另一方相关的检索同理——两人尚未相识就绝不许检索其名;相识后,检索对方提过的只言片语(病症、喜好、随口说的地名),是这个 app 最高级的余波。
+5. 浏览历史是检索的影子。一部分检索会带 1〜2 条「点进去的页面」(visits):标题像真实网页(Q&A、まとめ、攻略 wiki、商品页那一挂),站名是这个世界里的网站、贴合世界观,不写现实世界的真实网站名;另一部分浏览是与心事无关的日常惯性(天气、新闻、兴趣、购物),让历史像真人的手机。
+6. {{LANG_RULE}}
+7. 规模与下限:正文有新进展时,本批 3〜6 条新检索(其中至少 2 条与新进展相关)+ 0〜4 条独立浏览;没有新进展的批次才允许 1〜2 条的安静。用户按下刷新,是要看到痕迹的。
+8. 🚨OOC 纪律:一切检索与浏览必须符合【人物设定参考】与正文已确立的性格和关系阶段,不得自行发明重大设定,不许未卜先知。
+
+# 输出
+只输出一个 JSON 对象:
+{"worldTime":"YYYY-MM-DD HH:MM","newSearches":[{"text":"检索词","zh":"","delayMin":0,"visits":[{"title":"页面标题","site":"站名","zh":"","delayMin":0}]}],"newVisits":[{"title":"","site":"","zh":"","delayMin":0}]}
+- delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走
+- visits 挂在某条检索下=从那条检索点进去的页面;newVisits=与检索无关的独立浏览
+- 转发式、艾特式的社交行为不存在于这里——浏览器是完全无声的独处空间`;
+
 // ── 全局语言开关:{{LANG_RULE}} 运行时按档替换。──
 // 2026-08-21 改版(月月拍板):ja(默认)/en/ja_zh 三档,旧 zh 档退役——「中文书写+日系翻译腔」
 // 是指令与材料互相拉扯的档位(风格词全在往日文拉),混杂漂移是结构性的;全日语反而是最稳的档。
@@ -112,6 +133,13 @@ const LANG_RULE = {
         ja: '推文与回复用地道的日本推特口语书写(短文、体言止め、主语省略、深夜のテンション/病みツイ、限界化词汇、跟风梗;这个 SNS 属于故事世界)。不要输出 zh 字段。',
         en: '推文与回复用地道的英文推特口语书写(短文、小写化、缩写与梗、vague-posting;这个 SNS 属于故事世界)。本提示词里的日推参照一律换算成英语圈对应物:裏垢= priv/alt 小号文化,「FF外から失礼します」= 陌生人搭话的客套开场,限界化=崩溃到失去词汇量的短推("i cant"、"no bc")。不要输出 zh 字段。',
         ja_zh: '推文与回复用地道的日本推特口语书写(短文、体言止め、主语省略、深夜のテンション/病みツイ、限界化词汇、跟风梗;这个 SNS 属于故事世界),每条同时给出中文翻译字段 zh。',
+    },
+    // M3 浏览器「Astrolabe」(任务书-M3 §3 逐字):检索词是"真实网页产物",语式与聊天/帖子完全不同——
+    // 日文是关键词并列式,英文是口语搜索式,不是完整句。走同一个 langRule() 拿 ja 默认与世界观兜底。
+    browser: {
+        ja: '检索词用地道的日文检索语式书写——关键词并列式(「頭痛 治らない 原因」),不是完整句;页面标题用地道的日文网页标题腔(Q&A/まとめ/攻略 wiki/商品页那一挂)。不要输出 zh 字段。',
+        en: '检索词用地道的英文搜索语式书写("how to apologize without making it weird" 式的口语搜索或关键词并列);页面标题用英语圈网页标题腔(Q&A/论坛帖/wiki/评测那一挂)。本提示词里的日系检索参照一律换算成英语圈对应物。不要输出 zh 字段。',
+        ja_zh: '检索词用地道的日文检索语式书写——关键词并列式(「頭痛 治らない 原因」),不是完整句;页面标题用地道的日文网页标题腔(Q&A/まとめ/攻略 wiki/商品页那一挂),每条同时给出中文翻译字段 zh。',
     },
 };
 // 世界观兜底(全档通用):哪天用日语玩 HP、或用英语玩日系原作,氛围细节听世界观的,别硬套黑话。
@@ -808,6 +836,24 @@ function buildSnsTweetDigestText(world, tweet) {
     return parts.join('\n');
 }
 
+// ── M3:浏览器「Astrolabe」材料拼装(任务书-M3 §3)。两型平铺,没有名册可查——这个 app 没有
+//    resolveByHandle 的事,也没有单条续写用的"单帖/单推全文"拼装函数(v1 没有详情页)。 ──
+
+function buildBrowserDigestText(world) {
+    if (!world.searches.size && !world.visits.size) return '(浏览器是空的,这是第一次生成)';
+    const parts = [];
+    if (world.browserNow) {
+        parts.push(`[浏览器当前世界时刻] ${fmtWorldTime(world.browserNow)}(新的 worldTime 不得早于它;新检索不得与已有记录重复或高度相似)`);
+    }
+    // 两型按世界时间混排,最近 15 条,最新在前(同 recentTweets/recentThreads 的排序习惯)。
+    const mixed = [
+        ...[...world.searches.values()].map(s => ({ worldTime: s.worldTime || 0, line: `[検索] ${s.text}` })),
+        ...[...world.visits.values()].map(v => ({ worldTime: v.worldTime || 0, line: `[閲覧] ${v.title}(${v.site || ''})` })),
+    ].sort((a, b) => b.worldTime - a.worldTime).slice(0, 15);
+    for (const m of mixed) parts.push(m.line);
+    return parts.join('\n');
+}
+
 // ── 水位 → 本批「新进展」的起点(messenger/forum 共用)。──
 // M1 水位重构后不靠事件累积,完全推导——冷启动的存量楼层、流式丢事件的楼层都自动补上。
 // 2026-08-13 起「新进展」与「上下文范围」彻底分家:上下文默认是整本聊天(见 buildFloorContextText),
@@ -1437,7 +1483,95 @@ async function runSnsTweetContinue(ctx, store, { worldKey, tweetId, floorWindow,
     return { ok: true, added: valid.length };
 }
 
-// ── 对外入口:UI 只认这六个。messenger 两个内部自动接总结检查;forum/sns 没有总结机制(§2 拍板不用改 PROMPT_C)。──
+// ── M3:浏览器主生成:独立水位、独立触发(app 内「刷新」),消化 newSearches(含内联 visits)/newVisits。
+//    没有续写/续聊入口——v1 没有详情页,只有主刷新(任务书-M3 §1)。 ──
+
+async function runBrowserMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, excludeTags }) {
+    await ensureRegexEngine();
+    const watermark = await store.getWatermark(worldKey, 'browser');
+    const tip = ctx.chat.length - 1;
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    if (batchFloor === null) return { ok: true, changed: false };
+
+    const world = foldWorld(await store.getEntriesForWorld(worldKey));
+    const charName = owner || ctx.name2 || '主角';
+    // 同 messenger/forum/sns 的点名警示,换成浏览器语境的措辞(检索视角而非注册身份)。
+    const userSideName = (ctx.name1 || '').trim();
+    const caution = (userSideName && userSideName !== charName)
+        ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。不得出现以「${userSideName}」视角的检索;两人尚未相识时,连「${userSideName}」的名字都不许出现在检索词里。\n\n`
+        : '';
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
+    const notes = await buildInjectedNotes(ctx);
+    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}【浏览器当前状态】\n${buildBrowserDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
+    logContextShape('浏览器生成', userContent, notes.keys);
+    const systemPrompt = PROMPT_J.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('browser', language));
+
+    // 回滚纪元闸照 SNS 补上(任务书-M3 §3):生成期间用户在酒馆里删楼/swipe,回滚代表更晚的意图,整批作废。
+    const epoch = store.getRollbackEpoch();
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
+    if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
+
+    let addedCount = 0;
+    // 新实体 id 不让 LLM 现造(M1 教训),照 makeTweetId/makeForumThreadId 的思路自造。
+    function makeQueryId() { return `sq_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
+    function makeVisitId() { return `bv_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
+
+    // 锚=max(worldTime 解析值, browserNow)(同 SNS 的锚点写法),新检索自锚点按 delayMin 排开。
+    const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? (world.browserNow ?? Date.now()), world.browserNow ?? 0);
+
+    const validSearches = [];
+    for (const s of Array.isArray(parsed.newSearches) ? parsed.newSearches : []) {
+        if (s?.text) validSearches.push(s);
+        else console.warn('[Orrery] 新检索缺少 text,已丢弃'); // 静默丢弃教训:留声,不连累其余条目
+    }
+    const searchTimes = layoutWorldTimes(validSearches, anchor, world.browserNow || 0);
+
+    for (let i = 0; i < validSearches.length; i++) {
+        const s = validSearches[i];
+        const queryId = makeQueryId();
+        const payload = { queryId, text: String(s.text), worldTime: searchTimes[i] };
+        { const z = cleanZh(s.zh, s.text, language); if (z) payload.zh = z; }
+        await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'browser', type: 'search_query', payload });
+        addedCount++;
+
+        // visits 挂在这条检索下:从这条检索点进去的页面,锚=检索自己的 worldTime 再依 delayMin 排开。
+        const visits = [];
+        for (const v of Array.isArray(s.visits) ? s.visits : []) {
+            if (v?.title) visits.push(v);
+            else console.warn('[Orrery] 浏览记录缺少 title,已丢弃');
+        }
+        const vtimes = layoutWorldTimes(visits, searchTimes[i], searchTimes[i]);
+        for (let j = 0; j < visits.length; j++) {
+            const v = visits[j];
+            const vpayload = { visitId: makeVisitId(), title: String(v.title), site: String(v.site || ''), worldTime: vtimes[j], fromQueryId: queryId };
+            { const z = cleanZh(v.zh, v.title, language); if (z) vpayload.zh = z; }
+            await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'browser', type: 'browse_visit', payload: vpayload });
+            addedCount++;
+        }
+    }
+
+    // newVisits:与检索无关的独立浏览,锚点同新检索一样排开。
+    const validVisits = [];
+    for (const v of Array.isArray(parsed.newVisits) ? parsed.newVisits : []) {
+        if (v?.title) validVisits.push(v);
+        else console.warn('[Orrery] 独立浏览记录缺少 title,已丢弃');
+    }
+    const visitTimes = layoutWorldTimes(validVisits, anchor, world.browserNow || 0);
+    for (let i = 0; i < validVisits.length; i++) {
+        const v = validVisits[i];
+        const payload = { visitId: makeVisitId(), title: String(v.title), site: String(v.site || ''), worldTime: visitTimes[i] };
+        { const z = cleanZh(v.zh, v.title, language); if (z) payload.zh = z; }
+        await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'browser', type: 'browse_visit', payload });
+        addedCount++;
+    }
+
+    await store.setWatermark(worldKey, 'browser', batchFloor);
+    return { ok: true, changed: true, added: addedCount };
+}
+
+// ── 对外入口:UI 只认这七个。messenger 两个内部自动接总结检查;forum/sns/browser 没有总结机制
+//    (§2 拍板不用改 PROMPT_C)。browser 只有一个入口——v1 没有详情页,自然也没有续写。──
 
 export async function generateMore(ctx, store, opts) {
     const result = await runMainGeneration(ctx, store, opts);
@@ -1471,4 +1605,8 @@ export async function generateMoreSns(ctx, store, opts) {
 
 export async function continueTweetReplies(ctx, store, opts) {
     return await runSnsTweetContinue(ctx, store, opts);
+}
+
+export async function generateMoreBrowser(ctx, store, opts) {
+    return await runBrowserMainGeneration(ctx, store, opts);
 }

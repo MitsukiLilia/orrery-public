@@ -54,7 +54,7 @@ export function shortIdFor(residentId) {
 
 /**
  * 账本 fold 成世界状态:{ contacts, groups, threads, worldNow, boards, residents, forumThreads, forumNow,
- *   snsAccounts, tweets, snsNow }。
+ *   snsAccounts, tweets, snsNow, searches, visits, browserNow }。
  * threads: threadId -> { threadId, kind:'dm'|'group', contactId?, group?, messages:[], summaries:[], unread, lastMessage }
  * dm 的 threadId===contactId;群聊的 threadId===groupId,成员内联在 group.members(不必是通讯录好友)。
  * forumThreads: threadId -> { threadId, boardId, title, authorId, body, zh?, worldTime, replies:[](按 worldTime 升序),
@@ -63,6 +63,9 @@ export function shortIdFor(residentId) {
  *   天然「后写赢」,同 contacts 先例,不需要额外的"已存在就跳过"判断)。
  * tweets: tweetId -> { tweetId, accountId, body, zh?, worldTime, likes, retweets, retweetOf?, replies:[](按
  *   worldTime 升序), replyCount, lastActiveTs } —— SNS 自己的账,同样不碰 threads/forumThreads/worldNow/forumNow。
+ * searches: queryId -> search_query payload(+id/sourceFloor/ts)。visits: visitId -> browse_visit payload
+ *   (+id/sourceFloor/ts,可选 fromQueryId 指回某条检索)——M3 浏览器「Astrolabe」自己的账,两型平铺、不嵌套,
+ *   UI 按 worldTime 各自排序;同样不碰 threads/forumThreads/tweets/worldNow/forumNow/snsNow。
  */
 export function foldWorld(entries) {
     const contacts = new Map();
@@ -73,6 +76,8 @@ export function foldWorld(entries) {
     const forumThreads = new Map();
     const snsAccounts = new Map();
     const tweets = new Map();
+    const searches = new Map();
+    const visits = new Map();
 
     function ensureThread(threadId) {
         if (!threads.has(threadId)) {
@@ -128,6 +133,10 @@ export function foldWorld(entries) {
         } else if (e.type === 'tweet_reply') {
             const t = ensureTweet(e.payload.tweetId);
             t.replies.push({ ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'search_query') {
+            searches.set(e.payload.queryId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'browse_visit') {
+            visits.set(e.payload.visitId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         }
     }
 
@@ -167,10 +176,17 @@ export function foldWorld(entries) {
         if (t.accountId) snsNow = Math.max(snsNow, t.lastActiveTs); // 推壳(无 accountId)是悬空回复,不计入时钟(同论坛 t.title 的判据)
     }
 
+    // 浏览器时钟:两型平铺(不像 forum/sns 有"壳"概念——search_query/browse_visit 都是插件自合成 id,
+    // 一入账就是完整条目),缺 worldTime 的畸形条目不计入。
+    let browserNow = 0;
+    for (const s of searches.values()) if (Number.isFinite(s.worldTime)) browserNow = Math.max(browserNow, s.worldTime);
+    for (const v of visits.values()) if (Number.isFinite(v.worldTime)) browserNow = Math.max(browserNow, v.worldTime);
+
     return {
         contacts, groups, threads, worldNow: worldNow || null,
         boards, residents, forumThreads, forumNow: forumNow || null,
         snsAccounts, tweets, snsNow: snsNow || null,
+        searches, visits, browserNow: browserNow || null,
     };
 }
 
@@ -183,6 +199,8 @@ export function foldWorld(entries) {
 export function seenKeyForThread(threadId) { return `messenger:${threadId}`; }
 export function seenKeyForForumThread(threadId) { return `forum:${threadId}`; }
 export function seenKeyForTweet(tweetId) { return `sns:${tweetId}`; }
+// 浏览器不按线程/帖子/推分 key——整个 app 一把快照(任务书 §1「新内容标记」),单键固定不带参数。
+export function seenKeyForBrowser() { return 'browser:app'; }
 
 /** 线程里最新一条消息的入账 ts(空线程 0)——看过之后 seen 就记到这个值。 */
 export function latestTsOfThread(thread) {
@@ -226,6 +244,14 @@ export function newReplyCountOfTweet(tweet, seenTs) {
     return n;
 }
 
+/** 浏览器全部条目(检索+浏览)里最新的入账 ts——整 app 一把 seen 快照,打点/打基线都靠这一个数。 */
+export function latestTsOfBrowser(world) {
+    let max = 0;
+    for (const s of world.searches.values()) if (s.ts > max) max = s.ts;
+    for (const v of world.visits.values()) if (v.ts > max) max = v.ts;
+    return max;
+}
+
 /** 某个 app 里还有没有她没看过的东西——真手机的图标角标就是这个语义(有未读就亮)。 */
 export function hasUnseenInApp(app, world, seen) {
     if (app === 'messenger') {
@@ -243,6 +269,11 @@ export function hasUnseenInApp(app, world, seen) {
             if (s === undefined || newReplyCountOfTweet(t, s) > 0) return true;
         }
         return false;
+    }
+    if (app === 'browser') {
+        const latest = latestTsOfBrowser(world);
+        if (!latest) return false; // 浏览器还是空的,不该为它亮角标
+        return (seen[seenKeyForBrowser()] || 0) < latest;
     }
     for (const t of world.forumThreads.values()) {
         if (!t.title) continue; // 帖子壳(悬空回复)不是能点开的东西,不该为它亮角标
@@ -267,6 +298,8 @@ export function seenBaselinePairs(world) {
         const ts = latestTsOfTweet(t);
         if (ts) pairs.push([seenKeyForTweet(t.tweetId), ts]);
     }
+    const browserTs = latestTsOfBrowser(world);
+    if (browserTs) pairs.push([seenKeyForBrowser(), browserTs]);
     return pairs;
 }
 

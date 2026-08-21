@@ -99,9 +99,10 @@
                 fixture 按 systemPrompt 内容自动路由(SNS 的两条排在「续写」检查之前,因为 PROMPT_I 本身也含「续写」二字):
                 含「压缩成 5 行以内」→摘要(C)/含「登录中的 SNS」→SNS 主生成(H,首刷/二刷两版按账本是否已有账号自动切换)/
                 含「围观这条推文」→SNS 回复续写(I)/含「匿名论坛」→论坛主生成(F)/含「围观这个帖子」→论坛盖楼(G)/
+                含「浏览器「Astrolabe」」→浏览器主生成(J,没有续写入口,只有这一条)/
                 含「续写」→消息续聊(B/B_GROUP)/否则→消息主生成(A)。
-                SNS/论坛/消息这套流程都从手机内点「刷新」「生成更多」/「生成回复」触发,不用额外按钮。<br>
-                语言开关(zh/日中双语)直接在手机「设置」页切——fixture 会读同一份 extensionSettings,
+                SNS/论坛/消息/浏览器这套流程都从手机内点「刷新」「生成更多」/「生成回复」触发,不用额外按钮。<br>
+                语言开关(日本語/English/日中双语)直接在手机「设置」页切——fixture 会读同一份 extensionSettings,
                 切到日中双语后返回的消息/帖子/推文会带 zh 字段。
             </p>
         </fieldset>
@@ -313,6 +314,32 @@
         ] };
     }
 
+    // ── M3 浏览器「Astrolabe」fixture(J,没有续写入口,只有一个主生成)──
+    // 字段名是 title 不是 text/body,单独给一个,别复用 withZh/withZhBody 撞错字段名。
+    function withZhTitle(title) { return langIsJaZh() ? { title, zh: `（中译）${title}` } : { title }; }
+    // 3 条新检索:第 1/3 条各带 1 条挂靠的 visits(验证「←检索」淡标记)、第 2 条没有 visits(纯检索,
+    // 练"検索有、閲覧无"这条路径);2 条独立 newVisits(与心事无关的日常惯性浏览,不挂 fromQueryId)。
+    function buildFixtureJ() {
+        return {
+            worldTime: '2026-08-20 23:40',
+            newSearches: [
+                {
+                    ...withZh('頭痛 治らない 原因'), delayMin: 0,
+                    visits: [{ ...withZhTitle('頭痛が続くときに疑うべき5つの原因まとめ'), site: 'すこやかナビ', delayMin: 2 }],
+                },
+                { ...withZh('頭痛 薬 飲みすぎ'), delayMin: 6, visits: [] },
+                {
+                    ...withZh('駅前 薬局 営業時間'), delayMin: 40,
+                    visits: [{ ...withZhTitle('まちの薬局 営業時間・アクセス'), site: 'まちの薬局公式', delayMin: 1 }],
+                },
+            ],
+            newVisits: [
+                { ...withZhTitle('明日の天気ー東京'), site: 'そら模様', delayMin: 5 },
+                { ...withZhTitle('通販サイトのタイムセール一覧'), site: 'カイモノ市場', delayMin: 20 },
+            ],
+        };
+    }
+
     function wrapFenced(obj) {
         return `好的，这是本次生成结果：\n\`\`\`json\n${JSON.stringify(obj)}\n\`\`\`\n以上，希望符合要求！`;
     }
@@ -341,6 +368,10 @@
         }
         if (systemPrompt.includes('匿名论坛')) {
             const body = buildFixtureF();
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        if (systemPrompt.includes('浏览器「Astrolabe」')) {
+            const body = buildFixtureJ();
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
         if (systemPrompt.includes('围观这个帖子')) {
@@ -415,17 +446,18 @@
 
     async function renderState() {
         const worldKey = `${characters[ctx.characterId].avatar}::${ctx.getCurrentChatId()}`;
-        const [wmMessenger, wmForum, wmSns] = await Promise.all([
+        const [wmMessenger, wmForum, wmSns, wmBrowser] = await Promise.all([
             store.getWatermark(worldKey, 'messenger'),
             store.getWatermark(worldKey, 'forum'),
             store.getWatermark(worldKey, 'sns'),
+            store.getWatermark(worldKey, 'browser'),
         ]);
         const tip = chat.length - 1;
         document.getElementById('state').textContent =
             `worldKey = ${worldKey}\nchat.length = ${chat.length} (tip = ${tip})\n` +
-            `watermarks = { messenger: ${wmMessenger}, forum: ${wmForum}, sns: ${wmSns} }\n` +
-            `messenger 落后 = ${wmMessenger < tip} / forum 落后 = ${wmForum < tip} / sns 落后 = ${wmSns < tip}` +
-            `(三个 app 各自独立——一个刷新不该清另一个的红点)`;
+            `watermarks = { messenger: ${wmMessenger}, forum: ${wmForum}, sns: ${wmSns}, browser: ${wmBrowser} }\n` +
+            `messenger 落后 = ${wmMessenger < tip} / forum 落后 = ${wmForum < tip} / sns 落后 = ${wmSns < tip} / browser 落后 = ${wmBrowser < tip}` +
+            `(四个 app 各自独立——一个刷新不该清另一个的红点)`;
     }
 
     async function dumpLedger() {

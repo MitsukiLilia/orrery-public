@@ -1,0 +1,63 @@
+/* Astrolabe(浏览器)皮肤——依赖 ui/shell.css 里定义的 --or-* token,自己不重定义。
+   apps 互相零依赖:日期分隔条不借 messenger/skin.css 的 .or-date-sep,自己独立一份同款式。 */
+
+/* ── 品牌条:星盘图标 + "Astrolabe" 字标,做成地址栏那样的胶囊——只读装饰,不是输入框 ── */
+.or-browser-brand { flex-shrink: 0; display: flex; justify-content: center; padding: 10px 14px 8px; background: var(--or-cream-2); }
+.or-browser-brand-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--or-white); color: var(--or-cocoa-light);
+    padding: 7px 20px; border-radius: 999px; box-shadow: 0 1px 3px var(--or-shadow);
+}
+.or-browser-brand-pill svg { width: 15px; height: 15px; flex-shrink: 0; }
+.or-browser-brand-pill span { font-size: 12.5px; font-weight: 600; letter-spacing: .02em; color: var(--or-cocoa); }
+
+/* ── tab 切换(搜索记录/浏览历史):纯本地渲染,不入导航栈 ── */
+.or-browser-tabs { flex-shrink: 0; display: flex; gap: 6px; padding: 0 14px 10px; background: var(--or-cream-2); }
+.or-browser-tabs button {
+    flex: 1; border: none; background: var(--or-cream); color: var(--or-cocoa-light);
+    font-size: 12.5px; font-weight: 600; padding: 8px 0; border-radius: 999px; cursor: pointer; font-family: inherit;
+}
+.or-browser-tabs button.on { background: var(--or-cocoa); color: var(--or-white); }
+
+/* ── 列表 ── */
+.or-browser-list { flex: 1; overflow-y: auto; }
+.or-browser-date-sep { text-align: center; margin: 10px 0 4px; }
+.or-browser-date-sep span {
+    background: var(--or-cream-2); color: var(--or-cocoa-light);
+    font-size: 11px; padding: 3px 12px; border-radius: 12px;
+}
+.or-browser-row {
+    display: flex; align-items: flex-start; gap: 10px; padding: 11px 16px;
+    border-bottom: 1px solid var(--or-cream-2); position: relative;
+}
+.or-browser-row-icon {
+    flex-shrink: 0; width: 20px; height: 20px; margin-top: 1px;
+    display: flex; align-items: center; justify-content: center; color: var(--or-cocoa-light);
+}
+.or-browser-row-icon svg { width: 14px; height: 14px; }
+.or-browser-row-body { flex: 1; min-width: 0; }
+.or-browser-row-text {
+    font-size: 13.5px; color: var(--or-cocoa); line-height: 1.5; word-break: break-word;
+}
+.or-browser-row-site { font-size: 11.5px; color: var(--or-cocoa-light); margin-top: 2px; }
+.or-browser-row-time { flex-shrink: 0; font-size: 11px; color: var(--or-cocoa-light); margin-top: 1px; }
+
+/* 从某条检索点进去的浏览行:极淡的小标记,不抢正文视觉重量 */
+.or-browser-from-query {
+    display: inline-block; font-size: 10px; color: var(--or-cocoa-light); opacity: .6;
+    margin-left: 6px; font-weight: 500; white-space: nowrap;
+}
+
+/* 新内容小圆点:森 forum/sns 的 NEW 徽标的低调版,不占位置只挂一个点 */
+.or-browser-dot {
+    flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; margin-top: 5px;
+    background: var(--or-salt-deep);
+    animation: or-browser-dot-pulse 2.6s ease-in-out infinite;
+}
+@keyframes or-browser-dot-pulse {
+    0%, 72%, 100% { transform: scale(1); }
+    82% { transform: scale(1.3); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .or-browser-dot { animation: none; }
+}
