@@ -1,8 +1,9 @@
 // 浏览器「Astrolabe」:纯渲染,不碰 ctx、不挂事件监听——事件委托统一在 ui/shell.js(同 forum/sns/messenger 的模式)。
 // 用户只读:零输入框,唯二操作走 shell 的 data-action(刷新/切 tab)+ 长按/右键反悔(两 tab 一起倒带)。
 // v1 没有详情页——搜索记录/浏览历史都是终点,没有 open-xxx 的事,行本身不可点击,只能长按。
-import { ICON_BACK, ICON_LOCK, ICON_SEARCH_SM } from '../../ui/icons.js';
+import { ICON_BACK, ICON_LOCK, ICON_SEARCH_SM, ICON_STAR, ICON_STAR_FILL } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
+import { starKeyForVisit } from '../../core/world.js';
 
 export const BROWSER_APP_ID = 'browser';
 export const BROWSER_SKIN_URL = new URL('./skin.css', import.meta.url).href;
@@ -75,7 +76,7 @@ export function renderBrowserHtml({ world, busy, tab = 'search', seenAt = 0, bro
             }
             const zhLine = it.zh && it.zh !== it.title ? `<div class="or-zh">${escapeHtml(it.zh)}</div>` : '';
             const fromTag = it.fromQueryId ? '<span class="or-browser-from-query">←检索</span>' : '';
-            return `<div class="or-browser-row" data-ts="${it.worldTime}">
+            return `<div class="or-browser-row clickable" data-ts="${it.worldTime}" data-action="open-web-page" data-visit-id="${escapeHtml(it.visitId)}">
                 ${dotHtml}
                 <div class="or-browser-row-body">
                     <div class="or-browser-row-text">${escapeHtml(it.title)}${fromTag}${zhLine}</div>
@@ -101,5 +102,63 @@ export function renderBrowserHtml({ world, busy, tab = 'search', seenAt = 0, bro
             <button class="${isSearch ? 'on' : ''}" data-action="browser-select-tab" data-tab="search">搜索记录</button>
             <button class="${!isSearch ? 'on' : ''}" data-action="browser-select-tab" data-tab="visits">浏览历史</button>
         </div>
+        ${body}`;
+}
+
+// ── v0.14 网页快照(task-007 她拍板:AI 直出整页 HTML)。渲染前两道闸:①这里的白名单式消毒
+// (拔脚本/外链/事件属性,href 全改死链)②iframe sandbox=""(空值=全禁,脚本层保险)。
+// 她要的趣味在 <style> 排版自由——消毒只拔危险面,不动样式创意。──
+function sanitizeSnapshotHtml(html) {
+    if (typeof DOMParser === 'undefined') return ''; // 非浏览器环境(冒烟测试)不渲染
+    const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    // ⚠️HTML 解析器会把裸 <style> 收进 <head>,而最终只取 body.innerHTML——不搬回去,页面的
+    // 排版(她拍板的趣味所在)会整个静默丢失(Chrome 实测抓到的坑)。reverse+insertBefore 保原序。
+    for (const st of [...doc.head.querySelectorAll('style')].reverse()) doc.body.insertBefore(st, doc.body.firstChild);
+    doc.querySelectorAll('script, iframe, frame, object, embed, link, meta, base, svg use').forEach(el => el.remove());
+    for (const el of doc.body.querySelectorAll('*')) {
+        for (const attr of [...el.attributes]) {
+            const n = attr.name.toLowerCase();
+            if (n.startsWith('on') || n === 'src' || n === 'srcset' || n === 'xlink:href' || n === 'action' || n === 'formaction' || n === 'poster' || n === 'background') el.removeAttribute(attr.name);
+            else if (n === 'href') el.setAttribute('href', '#');
+            else if (n === 'style' && /url\s*\(|expression\s*\(|@import/i.test(attr.value)) el.removeAttribute(attr.name);
+        }
+    }
+    doc.querySelectorAll('style').forEach(st => {
+        st.textContent = String(st.textContent || '').replace(/url\s*\(/gi, 'noop(').replace(/@import/gi, '/*import*/');
+    });
+    return doc.body.innerHTML;
+}
+
+/**
+ * 快照页:omnibox 显示世界自己报的 URL(壳拟真闭环)+ sandbox iframe 装页面 + 星标(可收进星图)。
+ * 无快照时:busy=接收骨架(点开触发的生成正在跑);非 busy=信号中断+重试。
+ */
+export function renderWebPageHtml({ visit, snapshot, busy, starred = {} }) {
+    const starKey = starKeyForVisit(visit.visitId);
+    const on = !!starred[starKey];
+    const starBtn = snapshot ? `<button class="or-star ${on ? 'on' : ''}" data-action="toggle-star" data-star-key="${escapeHtml(starKey)}" title="${on ? '从星图移除' : '加入星图'}">${on ? ICON_STAR_FILL : ICON_STAR}</button>` : '';
+    let body;
+    if (snapshot) {
+        const clean = sanitizeSnapshotHtml(snapshot.html);
+        const srcdoc = `<style>a{cursor:not-allowed !important}body{margin:0;padding:14px;box-sizing:border-box;overflow-wrap:break-word}</style>${clean}`;
+        body = `<div class="or-webpage-body">
+            <iframe class="or-webpage-frame" sandbox="" srcdoc="${escapeHtml(srcdoc)}"></iframe>
+            ${snapshot.zh ? `<div class="or-webpage-zh">${escapeHtml(snapshot.zh)}</div>` : ''}
+        </div>`;
+    } else if (busy) {
+        body = `<div class="or-empty">${genSpinnerHtml()}<br>接收信号中…页面正在跨越次元抵达。</div>`;
+    } else {
+        body = `<div class="or-empty">信号中断了。<br><button class="or-pill-btn" data-action="open-web-page" data-visit-id="${escapeHtml(visit.visitId)}">重新接收</button></div>`;
+    }
+    return `
+        <div class="or-header">
+            <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
+            <span class="or-header-title">${escapeHtml(visit.title)}</span>
+            ${starBtn}
+        </div>
+        <div class="or-browser-brand"><div class="or-browser-omnibox">
+            <span class="or-omnibox-lock">${ICON_LOCK}</span>
+            <span class="or-omnibox-url">${snapshot?.url ? escapeHtml(snapshot.url) : `<span class="or-omnibox-scheme">astrolabe://</span>receiving…`}</span>
+        </div></div>
         ${body}`;
 }

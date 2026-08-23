@@ -17,7 +17,7 @@ function waitForExtensionsMenu(cb) {
 
 // 自报家门:排查「更新了却在跑旧码」(酒馆本地/全局双副本、静默 pull 失败)时,
 // 让实际加载的这份代码自己在控制台亮明版本——比对扩展管理器显示的版本号即知真伪。
-export const ORRERY_VERSION = '0.13.0';
+export const ORRERY_VERSION = '0.14.0';
 console.info(`[Orrery] v${ORRERY_VERSION} 已加载 · 输出预算 65500`);
 
 function main() {

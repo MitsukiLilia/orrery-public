@@ -82,10 +82,11 @@ export const PROMPT_H = `你是 Orrery,一个隐形的叙事世界观测引擎�
 10. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在 SNS 留下的一切痕迹(账号、发言、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示;两人尚未相识,就不许出现互动或撮合式讨论。故事人物的小号绝不自曝真身。禁止 OOC。
 11. {{LANG_RULE}}
 12. 规模与下限:正文有新进展时,本批固定产出 5〜8 条新推——下限 5 条是硬性契约,其中至少 2 条从不同视角回应新进展(当事人的若无其事、身边人的反应、旁观者的只言片语都算),其余为日常流水;正文没有新进展的批次才允许 3 条以下的安静。沉默只能是账号级的(某个账号这批不发声),不能是时间线级的——用户按下刷新,是要看到世界在动的。另有 0〜6 条对已有推的新回复。首次初始化时创建主人的表垢 + 5〜8 个住民账号;之后每批最多新建 2 个账号。
+13. 検索の影(suggestedSearches):随每批给出 2〜4 条主人此刻会在 Pulsar 搜索栏输入的词——在意的人的话题、放不下的事、与情绪相关的 tag。与检索栏同一哲学:问不出口的,都会先出现在搜索栏。必须贴合主人性格与当下心境,是检索语式的短词组(语言随语言规则);没有可信的词就给空数组,不硬凑。
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newAccounts":[{"accountId":"","handle":"英数字ID(不带@)","displayName":"显示名","bio":"一句话简介","locked":false,"ownerRole":"仅主人的账号才写:omote 或 ura","castName":"仅当是故事人物的账号才写其真名,否则省略"}],"newTweets":[{"accountId":"","body":"","zh":"","delayMin":0,"likes":0,"retweets":0,"retweetOf":"仅转发时写已有推文id","replies":[{"accountId":"","body":"","zh":"","delayMin":0}]}],"newReplies":[{"tweetId":"","replies":[{"accountId":"","body":"","zh":"","delayMin":0}]}]}
+{"worldTime":"YYYY-MM-DD HH:MM","newAccounts":[{"accountId":"","handle":"英数字ID(不带@)","displayName":"显示名","bio":"一句话简介","locked":false,"ownerRole":"仅主人的账号才写:omote 或 ura","castName":"仅当是故事人物的账号才写其真名,否则省略"}],"newTweets":[{"accountId":"","body":"","zh":"","delayMin":0,"likes":0,"retweets":0,"retweetOf":"仅转发时写已有推文id","replies":[{"accountId":"","body":"","zh":"","delayMin":0}]}],"newReplies":[{"tweetId":"","replies":[{"accountId":"","body":"","zh":"","delayMin":0}]}],"suggestedSearches":["",""]}
 - newAccounts 里 ownerRole 与 castName 互斥;accountId 必须是已有或本批新建的
 - 首次初始化必建主人的表垢(ownerRole:"omote");裏垢(ownerRole:"ura")只在原则 3 的条件满足时才诞生
 - bio 与 displayName 都是余波舞台:情绪剧变或进入某事件时,可改 bio、或在 displayName 加状态后缀(低浮上、〇〇ロス式)作隐秘表达——用 newAccounts 重发同 accountId 覆盖即可
@@ -164,6 +165,29 @@ export const PROMPT_L = `你是 Orrery,一个隐形的叙事世界观测引擎�
 // 2026-08-21 改版(月月拍板):ja(默认)/en/ja_zh 三档,旧 zh 档退役——「中文书写+日系翻译腔」
 // 是指令与材料互相拉扯的档位(风格词全在往日文拉),混杂漂移是结构性的;全日语反而是最稳的档。
 // en 档同时承担文化圈换算:提示词基底的日系参照(LINE/揭示板/日推)换算成英语圈对应物。
+// ── v0.14 生成双面(task-007 她拍板):M=网页快照(Astrolabe 点开浏览记录),N=Pulsar 搜索结果。──
+
+export const PROMPT_M = `你是 Orrery,一个隐形的叙事世界观测引擎。主人「{{char}}」的浏览器历史里有一条记录,用户点开了它——请把那个页面完整地呈现出来:这是故事世界里一张真实存在的网页的静态快照。
+
+# 原则
+1. 页面是公共物。它写给这个世界的所有人看,不是写给主人的——内容与主线剧情无关,除非这条记录本身就指向它(检索病症点进的医疗页,内容就是医疗科普)。绝不复述正文,绝不写出只有剧情当事人才知道的事。
+2. 忠于记录。页面内容必须与给你的[页面标题][站名](以及来源检索词,若有)严丝合缝——标题承诺了什么,页面就交付什么。
+3. 像真实的网页。日本互联网的页面千姿百态:Q&A 的采纳答案与回答楼、まとめ的引用块配色、个人博客的碎碎念、企业页的规整、攻略 wiki 的表格——按站名与标题判断这是哪一挂,用 HTML 加内联 <style> 自由还原它的排版气质。配色与排版可以大胆,网页的「土味」与「个性」本身就是趣味。
+4. 技术边界:输出单一 HTML 片段(不含 <html>/<head>/<body> 外壳,从内容元素直接开始);样式写在一个 <style> 块或 style 属性里;🚫绝不写 <script>,🚫绝不引用任何外部资源——图片一律用带一句文字说明的色块 <div> 代替,不用 <img>;链接可以有(没有链接的网页不真实),但它们都不会被点通。
+5. 篇幅:一屏到两屏的信息量(正文 300〜800 字级),不写巨型长文。
+6. {{LANG_RULE}}
+
+# 输出
+只输出一个 JSON 对象:
+{"url":"https://…","html":"页面 HTML 片段"}
+- url=这张页面的完整网址:域名贴合站名、路径像真的,但不得使用现实世界真实存在的网站域名`;
+
+export const PROMPT_N = `你是 Orrery,叙事世界观测引擎。主人「{{char}}」在 SNS「Pulsar」的搜索栏搜了一个词,用户想看搜索结果——请推演这个世界里,这个词下**已经存在**的推文(都是过去发出的,不是此刻新发的)。
+
+遵守:结果 3〜6 条,大多来自与主线无关的住民(围绕这个词的日常:吐槽、安利、跟风、抱怨),账号优先用已有名册,确需新账号最多 2 个;若搜索词与主线人物/事件相关,只许当事人亲历或旁观目击两种视角,旁观推按吃瓜天性写错位夸张的推论——🚫绝不复述正文、绝不写出未公开的事、绝不提前暗示尚未发生的关系;主人自己的账号绝不出现在新生成的结果里;说话像真实的日本推特(短文、体言止め、跟风梗),绝不像小说;{{LANG_RULE}}
+只输出 JSON:{"newAccounts":[{"accountId":"","handle":"英数字ID(不带@)","displayName":"","bio":"一句话","castName":"仅故事人物的账号才写其真名,否则省略"}],"tweets":[{"accountId":"已有或本批新建的账号id","body":"","zh":"","hoursAgo":1,"likes":0,"retweets":0}]}
+- hoursAgo=这条推是几小时前发的(1〜72,搜索翻出来的都是旧推)`;
+
 const LANG_RULE = {
     messenger: {
         ja: '消息用地道的日文网聊口语书写(LINE 风、多省略;敬语/常体与役割語严格贴合角色身份与关系亲疏)。不要输出 zh 字段。',
@@ -186,6 +210,13 @@ const LANG_RULE = {
         ja: '检索词用地道的日文检索语式书写——关键词并列式(「頭痛 治らない 原因」),不是完整句;页面标题用地道的日文网页标题腔(Q&A/まとめ/攻略 wiki/商品页那一挂)。不要输出 zh 字段。',
         en: '检索词用地道的英文搜索语式书写("how to apologize without making it weird" 式的口语搜索或关键词并列);页面标题用英语圈网页标题腔(Q&A/论坛帖/wiki/评测那一挂)。本提示词里的日系检索参照一律换算成英语圈对应物。不要输出 zh 字段。',
         ja_zh: '检索词用地道的日文检索语式书写——关键词并列式(「頭痛 治らない 原因」),不是完整句;页面标题用地道的日文网页标题腔(Q&A/まとめ/攻略 wiki/商品页那一挂),每条同时给出中文翻译字段 zh。',
+    },
+    // v0.14 网页快照(task-007):整页 HTML 的语言档。zh 档给的是「大意」不是整页翻译——
+    // 整页翻译又贵又破坏排版,大意小字挂在页面下方即可。
+    webpage: {
+        ja: '页面全文用地道的日文网页文体书写(标题腔、正文、按钮小字都像真实的日本网页)。不要输出 zh 字段。',
+        en: '页面全文用地道的英文网页文体书写;本提示词里的日系站型参照一律换算成英语圈对应物。不要输出 zh 字段。',
+        ja_zh: '页面全文用地道的日文网页文体书写(标题腔、正文、按钮小字都像真实的日本网页);同时给出 zh 字段=页面主要内容的两三句中文大意(不是整页翻译)。',
     },
     // M4 相册/备忘录(任务书-M4 §三逐字):gallery/memo 两个新 scope。
     gallery: {
@@ -1545,8 +1576,117 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
         }
     }
 
+    // task-007「猜你想搜索」:联想词搭主生成的便车(零额外调用),整批一条入账,fold 后写覆盖=只留最新——
+    // 主人此刻会搜什么跟着剧情走,旧批词条自然过期。
+    const sugg = (Array.isArray(parsed.suggestedSearches) ? parsed.suggestedSearches : [])
+        .map(w => String(w || '').trim()).filter(Boolean).slice(0, 6);
+    if (sugg.length) {
+        await store.addEntry({
+            worldKey, sourceFloor: batchFloor, app: 'sns', type: 'sns_suggest',
+            payload: { suggestId: `sg_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, words: sugg, worldTime: anchor },
+        });
+    }
+
     await store.setWatermark(worldKey, 'sns', batchFloor);
     return { ok: true, changed: true, added: addedCount };
+}
+
+// ── v0.14:Pulsar 搜索结果生成(task-007 她的翻转:「猜你想搜索」——词条是主人侧生成的,观测者
+//    只点选看哪条,与「继续围观」同构,零输入铁律无伤)。同词只生成一次,之后永远读缓存。──
+
+async function runSnsSearchGeneration(ctx, store, { worldKey, word, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags }) {
+    await ensureRegexEngine();
+    const world = foldWorld(await store.getEntriesForWorld(worldKey));
+    word = String(word || '').trim();
+    if (!word) return { ok: false, error: 'parse_failed' };
+    if ([...world.tweets.values()].some(t => t.fromSearch === word)) return { ok: true, changed: false }; // 缓存命中
+
+    const charName = owner || ctx.name2 || '主角';
+    const userSideName = (ctx.name1 || '').trim();
+    const caution = (userSideName && userSideName !== charName)
+        ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。不得注册为账号发言(除非剧情确实如此);更不得在任何推文中暗示 TA 与「${charName}」的关系。\n\n`
+        : '';
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
+    const notes = await buildInjectedNotes(ctx);
+    const recent = buildFloorSection(ctx, { newFrom: null, floorWindow: floorWindow ?? 0, excludeTags, background: true });
+    const userContent = `${caution}${castRef}${notes.text}${recent}【SNS 当前状态】\n${buildSnsDigestText(world)}\n\n【主人搜索的词】${word}`;
+    logContextShape('SNS搜索', userContent, notes.keys);
+    const systemPrompt = PROMPT_N.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('sns', language));
+
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
+    if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
+
+    const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
+    // 新账号 ≤2(同续写纪律);搜索绝不铸造主人的账号(ownerRole 一律剥除);isUserSide 硬闸照守
+    let accountBudget = 2;
+    for (const a of Array.isArray(parsed.newAccounts) ? parsed.newAccounts : []) {
+        if (!a?.accountId || !a?.handle || accountBudget <= 0) continue;
+        const accountId = String(a.accountId);
+        if (world.snsAccounts.has(accountId)) continue;
+        if (!allowUserContact && a.castName && isUserSide(a.castName, ctx)) { console.warn('[Orrery] 已拦下叙事另一方越界注册账号(搜索):', a.castName); continue; }
+        const payload = { accountId, handle: String(a.handle), displayName: String(a.displayName || a.handle), bio: a.bio || '' };
+        if (a.castName) payload.castName = String(a.castName);
+        const added = await store.addEntry({ worldKey, sourceFloor, app: 'sns', type: 'sns_account', payload });
+        world.snsAccounts.set(accountId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
+        accountBudget--;
+    }
+
+    // 结果推=世界里已存在的旧推:worldTime 按 hoursAgo 落在 snsNow 之前,不搅时间线;
+    // 带 fromSearch 标记——TL 过滤它(搜索不灌时间线),发帖者主页不过滤(旧推出现在主页天经地义)。
+    const baseNow = world.snsNow ?? Date.now();
+    let added = 0;
+    for (const t of Array.isArray(parsed.tweets) ? parsed.tweets : []) {
+        if (!t?.body || !t?.accountId) continue;
+        let accountId = String(t.accountId);
+        const resolved = resolveByHandle(world.snsAccounts, accountId, 'accountId');
+        if (resolved) accountId = resolved;
+        const acc = world.snsAccounts.get(accountId);
+        if (!acc) continue;                    // 查无此号,丢弃
+        if (acc.ownerRole) continue;           // 主人的账号绝不出现在新生成结果里(提示词+代码双闸)
+        const hoursAgo = Number.isFinite(t.hoursAgo) ? Math.min(Math.max(1, t.hoursAgo), 168) : (added + 1) * 3;
+        const tweetId = `tw_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+        const payload = {
+            tweetId, accountId, body: String(t.body), worldTime: baseNow - hoursAgo * 3600000,
+            likes: clampCount(t.likes), retweets: clampCount(t.retweets), fromSearch: word,
+        };
+        { const z = cleanZh(t.zh, t.body, language); if (z) payload.zh = z; }
+        await store.addEntry({ worldKey, sourceFloor, app: 'sns', type: 'tweet', payload });
+        added++;
+    }
+    return { ok: true, changed: true, added };
+}
+
+// ── v0.14:网页快照生成(task-007 她拍板:AI 直出整页 HTML,不用预置模板;点开才生成一次,
+//    入账永久缓存;消毒与沙箱渲染在 UI 层,这里存原始 html)。──
+
+async function runBrowserPageGeneration(ctx, store, { worldKey, visitId, profileId, customApi, owner, language }) {
+    await ensureRegexEngine();
+    const world = foldWorld(await store.getEntriesForWorld(worldKey));
+    const visit = world.visits.get(visitId);
+    if (!visit) return { ok: false, error: 'no_thread' };
+    if (world.snapshots.has(visitId)) return { ok: true, changed: false }; // 缓存命中,不再花一分 token
+
+    const charName = owner || ctx.name2 || '主角';
+    // 材料刻意不给人物设定与正文:页面是公共物(原则1),给了反而诱导它为主角定制内容;
+    // 世界观靠注记(世界书/作者注释)兜着。
+    const notes = await buildInjectedNotes(ctx);
+    const fromQuery = visit.fromQueryId ? world.searches.get(visit.fromQueryId)?.text : null;
+    const userContent = `${notes.text}【页面标题】${visit.title}\n【站名】${visit.site || '(未知)'}${fromQuery ? `\n【来源检索词】${fromQuery}(主人搜了它,从结果里点进了这一页)` : ''}`;
+    logContextShape('网页快照', userContent, notes.keys);
+    const systemPrompt = PROMPT_M.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('webpage', language));
+
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
+    if (!parsed || typeof parsed !== 'object' || !parsed.html) return { ok: false, error: 'parse_failed' };
+
+    const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
+    const payload = {
+        snapshotId: `ws_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+        visitId, url: String(parsed.url || '').slice(0, 300), html: String(parsed.html),
+        worldTime: visit.worldTime,
+    };
+    if (language === 'ja_zh' && parsed.zh) payload.zh = String(parsed.zh); // 大意不是整页翻译,cleanZh 的等值判断不适用
+    await store.addEntry({ worldKey, sourceFloor, app: 'browser', type: 'web_snapshot', payload });
+    return { ok: true, changed: true, added: 1 };
 }
 
 // ── M2:SNS 回复续写:定向续写单条推,允许返回空;newAccount 一批最多新建 2 个(任务书 §4)。──
@@ -1876,6 +2016,14 @@ export async function continueTweetReplies(ctx, store, opts) {
 
 export async function generateMoreBrowser(ctx, store, opts) {
     return await runBrowserMainGeneration(ctx, store, opts);
+}
+
+export async function generateSnsSearch(ctx, store, opts) {
+    return await runSnsSearchGeneration(ctx, store, opts);
+}
+
+export async function generateWebSnapshot(ctx, store, opts) {
+    return await runBrowserPageGeneration(ctx, store, opts);
 }
 
 export async function generateMoreGallery(ctx, store, opts) {

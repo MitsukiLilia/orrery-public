@@ -145,3 +145,24 @@
 }
 .or-sns-role-seg button.on { background: var(--or-cocoa); color: var(--or-white); font-weight: 700; }
 .or-sns-op .or-sns-row-stats .or-star { margin-left: auto; }
+
+/* ── v0.14「猜你想搜索」:header 图标钮 + 只读搜索框 + 联想词列表 ── */
+.or-iconbtn {
+    border: none; background: none; padding: 6px; margin-right: 2px; cursor: pointer;
+    color: var(--or-cocoa-light); display: inline-flex; align-items: center; flex-shrink: 0;
+}
+.or-iconbtn svg { width: 16px; height: 16px; }
+.or-sns-searchbox {
+    flex-shrink: 0; display: flex; align-items: center; gap: 8px; margin: 10px 14px;
+    background: var(--or-cream); border-radius: 999px; padding: 9px 14px; color: var(--or-cocoa-light);
+}
+.or-sns-searchbox svg { width: 14px; height: 14px; }
+.or-sns-searchbox-ph { font-size: 12.5px; }
+.or-sns-suggest-list { flex: 1; overflow-y: auto; padding: 2px 0 16px; }
+.or-sns-suggest-cap { font-size: 10.5px; color: var(--or-cocoa-light); letter-spacing: .05em; padding: 8px 20px 4px; }
+.or-sns-suggest-row {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    border: none; background: none; cursor: pointer; padding: 12px 20px;
+    font-size: 13.5px; color: var(--or-cocoa); border-bottom: 1px solid var(--or-cream-2);
+}
+.or-sns-suggest-row svg { width: 14px; height: 14px; color: var(--or-cocoa-light); flex-shrink: 0; }

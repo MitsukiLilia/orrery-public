@@ -264,7 +264,7 @@ export async function deleteBrowserFrom(worldKey, fromWorldTime) {
             const cursor = req.result;
             if (!cursor) return;
             const v = cursor.value;
-            const isBrowserType = v.type === 'search_query' || v.type === 'browse_visit';
+            const isBrowserType = v.type === 'search_query' || v.type === 'browse_visit' || v.type === 'web_snapshot';
             if (isBrowserType && (!Number.isFinite(v.payload?.worldTime) || v.payload.worldTime >= fromWorldTime)) cursor.delete();
             cursor.continue();
         };

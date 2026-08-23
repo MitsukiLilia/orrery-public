@@ -91,6 +91,8 @@ export function foldWorld(entries) {
     const visits = new Map();
     const photosById = new Map(); // 内部工作表,最终按 worldTime 排序输出为 photos 数组(见 return)
     const memos = new Map();
+    const snapshots = new Map();  // v0.14 网页快照:visitId -> web_snapshot(一 visit 一张,后写覆盖)
+    let snsSuggest = null;        // v0.14 搜索联想:整批一条,后写覆盖=只留最新一批
 
     function ensureThread(threadId) {
         if (!threads.has(threadId)) {
@@ -155,6 +157,10 @@ export function foldWorld(entries) {
             searches.set(e.payload.queryId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'browse_visit') {
             visits.set(e.payload.visitId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'web_snapshot') {
+            snapshots.set(e.payload.visitId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'sns_suggest') {
+            snsSuggest = { ...e.payload, ts: e.ts };
         } else if (e.type === 'photo') {
             photosById.set(e.payload.photoId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'memo_note') {
@@ -232,7 +238,7 @@ export function foldWorld(entries) {
         contacts, groups, threads, worldNow: worldNow || null,
         boards, residents, forumThreads, forumNow: forumNow || null,
         snsAccounts, tweets, snsNow: snsNow || null,
-        searches, visits, browserNow: browserNow || null,
+        searches, visits, browserNow: browserNow || null, snapshots, snsSuggest,
         photos, galleryNow: galleryNow || null,
         memos, memoNow: memoNow || null,
     };
@@ -254,6 +260,7 @@ export function seenKeyForBrowser() { return 'browser:app'; }
 // starred 表存在 meta 里,不进账本、不进 LLM 上下文(零输入铁律,星星只属于观测者)。 ──
 export function starKeyForTweet(tweetId) { return `tw:${tweetId}`; }
 export function starKeyForForumThread(threadId) { return `ft:${threadId}`; }
+export function starKeyForVisit(visitId) { return `wv:${visitId}`; }
 // M4 相册/备忘录同浏览器的整 app 一把快照工法(任务书-M4 §2)。
 export function seenKeyForGallery() { return 'gallery:app'; }
 export function seenKeyForMemo() { return 'memo:app'; }

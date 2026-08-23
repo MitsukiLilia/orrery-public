@@ -1,7 +1,7 @@
 // SNS「Pulsar」:纯渲染,不碰 ctx、不挂事件监听——事件委托统一在 ui/shell.js(同 apps/forum/messenger 的模式)。
 // 用户只读:零输入框,唯二操作走 shell 的 data-action(刷新/生成回复)+ 长按/右键反悔。
 // castName 只活在 core/世界数据层,这个文件从不读它——账号条目与住民条目一视同仁,UI 只用 handle/displayName/locked。
-import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_LOCK, ICON_CAMERA, ICON_REPLY_SM, ICON_RT_SM, ICON_MOON, ICON_STAR, ICON_STAR_FILL } from '../../ui/icons.js';
+import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_LOCK, ICON_CAMERA, ICON_REPLY_SM, ICON_RT_SM, ICON_MOON, ICON_STAR, ICON_STAR_FILL, ICON_SEARCH_SM } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
 import { monogramFor, colorForContact, seenKeyForTweet, newReplyCountOfTweet, starKeyForTweet } from '../../core/world.js';
 
@@ -137,6 +137,7 @@ export function renderSnsTlHtml({ world, busy, seen = {}, starred = {}, justUpda
     const tweets = [...world.tweets.values()]
         .filter(t => t.accountId)
         .filter(t => t.accountId !== ura?.accountId)
+        .filter(t => !t.fromSearch) // 搜索翻出来的旧推不灌时间线(发帖者主页不过滤,旧推在主页天经地义)
         .sort((a, b) => (b.lastActiveTs || 0) - (a.lastActiveTs || 0));
 
     const body = tweets.length
@@ -147,6 +148,7 @@ export function renderSnsTlHtml({ world, busy, seen = {}, starred = {}, justUpda
         <div class="or-header">
             <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
             <span class="or-header-title">Pulsar</span>
+            <button class="or-iconbtn" data-action="sns-search-open" title="搜索">${ICON_SEARCH_SM}</button>
             <button class="or-pill-btn small" data-action="sns-refresh" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : '刷新'}</button>
         </div>
         ${body}
@@ -283,6 +285,48 @@ export function renderSnsProfileHtml({ account, world, snsNow, seen = {}, starre
             <div class="or-sns-profile-name">${escapeHtml(account.displayName)}${lockIconHtml(account)}</div>
             <div class="or-sns-profile-handle">@${escapeHtml(account.handle)}</div>
             ${account.bio ? `<div class="or-sns-profile-bio">${escapeHtml(account.bio)}</div>` : ''}
+        </div>
+        ${body}`;
+}
+
+/**
+ * 搜索页(task-007 她的翻转「猜你(char)想搜索」):搜索框是只读装饰,词条是主人此刻会搜的词
+ * (随每批主生成更新,搭便车零调用)——观测者只点选看哪一条,与「继续围观」同构,零输入铁律无伤。
+ */
+export function renderSnsSearchHtml({ world }) {
+    const words = (world.snsSuggest?.words || []).filter(Boolean);
+    const list = words.length
+        ? `<div class="or-sns-suggest-list">
+            <div class="or-sns-suggest-cap">TA 可能在搜</div>
+            ${words.map(w => `<button class="or-sns-suggest-row" data-action="sns-search-word" data-word="${escapeHtml(w)}">${ICON_SEARCH_SM}<span>${escapeHtml(w)}</span></button>`).join('')}
+        </div>`
+        : `<div class="or-empty">搜索联想还没长出来。<br>回时间线刷新一批——主人在想什么,这里就会出现什么。</div>`;
+    return `
+        <div class="or-header">
+            <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
+            <span class="or-header-title">搜索</span>
+        </div>
+        <div class="or-sns-searchbox">${ICON_SEARCH_SM}<span class="or-sns-searchbox-ph">検索</span></div>
+        ${list}`;
+}
+
+/** 搜索结果页:该词下的推文(fromSearch 标记,一次生成永久缓存);行解剖同 TL,点开/收藏/回复全通。 */
+export function renderSnsSearchResultHtml({ word, world, busy, seen = {}, starred = {}, snsNow }) {
+    const tweets = [...world.tweets.values()]
+        .filter(t => t.accountId && t.fromSearch === word)
+        .sort((a, b) => (b.lastActiveTs || 0) - (a.lastActiveTs || 0));
+    let body;
+    if (tweets.length) {
+        body = `<div class="or-sns-list">${tweets.map(t => renderTweetRowHtml(t, world, { snsNow, seen, starred })).join('')}</div>`;
+    } else if (busy) {
+        body = `<div class="or-empty">${genSpinnerHtml()}<br>正在接收「${escapeHtml(word)}」的信号…</div>`;
+    } else {
+        body = `<div class="or-empty">信号中断了。<br><button class="or-pill-btn" data-action="sns-search-word" data-word="${escapeHtml(word)}">再试一次</button></div>`;
+    }
+    return `
+        <div class="or-header">
+            <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
+            <span class="or-header-title">「${escapeHtml(word)}」</span>
         </div>
         ${body}`;
 }

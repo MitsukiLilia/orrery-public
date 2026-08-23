@@ -13,7 +13,7 @@ import * as generator from '../core/generator.js';
 import {
     generateMore, continueThread, generateMoreForum, continueForumThread,
     generateMoreSns, continueTweetReplies, generateMoreBrowser,
-    generateMoreGallery, generateMoreMemo,
+    generateMoreGallery, generateMoreMemo, generateSnsSearch, generateWebSnapshot,
 } from '../core/generator.js';
 import { manualRevert } from '../core/rollback.js';
 import { escapeHtml } from '../core/escape.js';
@@ -25,8 +25,8 @@ import {
 } from './icons.js';
 import { renderThreadListHtml, renderThreadHtml, MESSENGER_SKIN_URL } from '../apps/messenger/app.js';
 import { renderForumListHtml, renderForumThreadHtml, FORUM_SKIN_URL } from '../apps/forum/app.js';
-import { renderSnsTlHtml, renderSnsTweetHtml, renderSnsProfileHtml, renderSnsMyPageHtml, SNS_SKIN_URL } from '../apps/sns/app.js';
-import { renderBrowserHtml, BROWSER_SKIN_URL } from '../apps/browser/app.js';
+import { renderSnsTlHtml, renderSnsTweetHtml, renderSnsProfileHtml, renderSnsMyPageHtml, renderSnsSearchHtml, renderSnsSearchResultHtml, SNS_SKIN_URL } from '../apps/sns/app.js';
+import { renderBrowserHtml, renderWebPageHtml, BROWSER_SKIN_URL } from '../apps/browser/app.js';
 import { renderGalleryListHtml, renderGalleryPhotoHtml, GALLERY_SKIN_URL } from '../apps/gallery/app.js';
 import { renderMemoListHtml, renderMemoNoteHtml, MEMO_SKIN_URL } from '../apps/memo/app.js';
 
@@ -309,9 +309,10 @@ export function createShell(ctx, onExternalChange) {
     // 长按删一条、调一下条数,她正在读的位置就被弹回顶部(她 2026-08-14 报的第 2 点)。
     // 规则:同一块屏幕重渲染 → 原地保持;刚进屋 / 刚生成完 → 跳到新内容分界线。 ──
     const SCROLLERS = '.or-chat-scroll, .or-forum-scroll, .or-thread-list, .or-forum-list, .or-browser-list, .or-list, .or-grid, '
-        + '.or-gallery-list, .or-memo-list, .or-gallery-detail-scroll, .or-memo-detail-scroll, .or-sns-list, .or-sns-scroll, .or-aster-list';
+        + '.or-gallery-list, .or-memo-list, .or-gallery-detail-scroll, .or-memo-detail-scroll, .or-sns-list, .or-sns-scroll, .or-aster-list, '
+        + '.or-sns-suggest-list, .or-webpage-body';
     function screenKey(top) {
-        return [top.type, top.threadId || '', top.boardId || '', top.tweetId || '', top.accountId || '', top.photoId || '', top.noteId || '', top.tab || ''].join('|');
+        return [top.type, top.threadId || '', top.boardId || '', top.tweetId || '', top.accountId || '', top.photoId || '', top.noteId || '', top.tab || '', top.word || '', top.visitId || ''].join('|');
     }
     let lastScreenKey = null;
 
@@ -469,6 +470,14 @@ export function createShell(ctx, onExternalChange) {
             const note = world.memos.get(top.noteId);
             if (!note) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚/反悔清空
             screenEl.innerHTML = renderMemoNoteHtml({ note });
+        } else if (top.type === 'sns-search') {
+            screenEl.innerHTML = renderSnsSearchHtml({ world });
+        } else if (top.type === 'sns-search-result') {
+            screenEl.innerHTML = renderSnsSearchResultHtml({ word: top.word, world, busy: busy.sns, seen, starred, snsNow: world.snsNow });
+        } else if (top.type === 'webPage') {
+            const visit = world.visits.get(top.visitId);
+            if (!visit) { navStack = [{ type: 'grid' }]; return render(); } // 已被倒带清空
+            screenEl.innerHTML = renderWebPageHtml({ visit, snapshot: world.snapshots.get(top.visitId), busy: busy.browser, starred });
         } else if (top.type === 'asterism') {
             screenEl.innerHTML = renderAsterismHtml({ world, starred });
         } else if (top.type === 'settings') {
@@ -778,6 +787,37 @@ export function createShell(ctx, onExternalChange) {
         render();
     }
 
+    // ── v0.14 生成双面(task-007 她拍板):搜索结果与网页快照都是「点开才生成一次,入账永久缓存」。──
+
+    async function doOpenSnsSearch(word) {
+        word = (word || '').trim();
+        if (!word) return;
+        const top = navStack[navStack.length - 1];
+        if (!(top.type === 'sns-search-result' && top.word === word)) navPush({ type: 'sns-search-result', word });
+        const { world } = await currentWorld();
+        if ([...world.tweets.values()].some(t => t.fromSearch === word)) return; // 缓存命中,纯本地
+        await runGeneration('sns', async ({ worldKey, owner, s }) => {
+            return await generateSnsSearch(ctx, store, {
+                worldKey, word, floorWindow: s.floorWindow,
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                excludeTags: s.excludeTags || '', allowUserContact: !!s.allowUserContact,
+            });
+        });
+    }
+
+    async function doOpenWebPage(visitId) {
+        if (!visitId) return;
+        const top = navStack[navStack.length - 1];
+        if (!(top.type === 'webPage' && top.visitId === visitId)) navPush({ type: 'webPage', visitId });
+        const { world } = await currentWorld();
+        if (!world.visits.get(visitId) || world.snapshots.get(visitId)) return; // 无此记录/缓存命中
+        await runGeneration('browser', async ({ worldKey, owner, s }) => {
+            return await generateWebSnapshot(ctx, store, {
+                worldKey, visitId, profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+            });
+        });
+    }
+
     // ── Asterism 星图(task-007 P0):观测者的收藏,点亮/熄灭——纯用户侧数据,世界毫无感知。──
     async function doToggleStar(key) {
         const worldKey = currentWorldKey();
@@ -807,6 +847,14 @@ export function createShell(ctx, onExternalChange) {
                     title = acc?.displayName || t.accountId;
                     body = (t.body || '').slice(0, 100);
                     action = 'open-sns-tweet'; attrs = `data-tweet-id="${escapeHtml(t.tweetId)}"`;
+                } else gone = true;
+            } else if (key.startsWith('wv:')) {
+                badge = 'Astrolabe';
+                const v = world.visits.get(key.slice(3));
+                if (v) {
+                    title = v.title;
+                    body = world.snapshots.get(v.visitId)?.url || v.site || '';
+                    action = 'open-web-page'; attrs = `data-visit-id="${escapeHtml(v.visitId)}"`;
                 } else gone = true;
             } else if (key.startsWith('ft:')) {
                 badge = '论坛';
@@ -1030,6 +1078,9 @@ export function createShell(ctx, onExternalChange) {
             case 'sns-tab': doSnsSelectTab(el.dataset.tab); break;
             case 'sns-select-viewer': doSnsSelectViewer(el.dataset.role); break;
             case 'toggle-star': doToggleStar(el.dataset.starKey); break;
+            case 'sns-search-open': navPush({ type: 'sns-search' }); break;
+            case 'sns-search-word': doOpenSnsSearch(el.dataset.word); break;
+            case 'open-web-page': doOpenWebPage(el.dataset.visitId); break;
             case 'open-asterism': navPush({ type: 'asterism' }); break;
             case 'browser-refresh': doGenerateMoreBrowser(); break;
             case 'browser-select-tab': doBrowserSelectTab(el.dataset.tab); break;
