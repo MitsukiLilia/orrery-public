@@ -446,6 +446,30 @@ export async function initSeenBaseline(worldKey, pairs) {
     return true;
 }
 
+// ── Asterism 星图(v0.13.0 task-007):观测者自己的收藏,与 seen 同层的用户侧数据——
+// 不进账本、不进 LLM 上下文,世界对"哪颗星被点亮"毫无感知(零输入铁律)。
+// key 由 world.js 的 starKeyFor* 给('tw:<id>'/'ft:<id>'),值存点亮时刻——
+// 这是观测者的现实时间,不是世界时间,星图按它倒序排(最近点亮的在最上)。
+
+export async function getStarred(worldKey) {
+    if (!worldKey) return {};
+    const meta = await readMeta(worldKey);
+    return (meta.starred && typeof meta.starred === 'object') ? meta.starred : {};
+}
+
+/** @returns {Promise<boolean>} 现在是否点亮(true=刚点亮,false=刚熄灭) */
+export async function toggleStar(worldKey, key) {
+    if (!worldKey || !key) return false;
+    const meta = await readMeta(worldKey);
+    const starred = (meta.starred && typeof meta.starred === 'object') ? meta.starred : {};
+    let on;
+    if (starred[key]) { delete starred[key]; on = false; }
+    else { starred[key] = { at: Date.now() }; on = true; }
+    meta.starred = starred;
+    await writeMeta(meta);
+    return on;
+}
+
 /** 回滚夹紧:某层被删/被 swipe 后,所有 app 的水位都不能再声称自己"已处理到"这层之后。 */
 export async function clampWatermarks(worldKey, floor) {
     if (!worldKey) return;

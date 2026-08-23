@@ -61,3 +61,15 @@
 @media (prefers-reduced-motion: reduce) {
     .or-browser-dot { animation: none; }
 }
+
+/* ── task-007 壳拟真:omnibox 假地址栏(只读装饰,锁头+协议+品牌位)。真浏览器的形,
+   Astrolabe 的魂——虚拟 URL 留给网页快照版由世界自己报(不本地捏假域名)。 ── */
+.or-browser-omnibox {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: var(--or-cream); border-radius: 999px; padding: 8px 14px;
+}
+.or-browser-omnibox svg { width: 13px; height: 13px; flex-shrink: 0; }
+.or-omnibox-lock { display: inline-flex; color: var(--or-cocoa-light); }
+.or-omnibox-url { flex: 1; font-size: 12px; color: var(--or-cocoa); letter-spacing: .02em; white-space: nowrap; overflow: hidden; }
+.or-omnibox-scheme { color: var(--or-cocoa-light); }
+.or-omnibox-glass { display: inline-flex; color: var(--or-cocoa-light); }

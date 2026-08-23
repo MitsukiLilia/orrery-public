@@ -1,7 +1,7 @@
 // 浏览器「Astrolabe」:纯渲染,不碰 ctx、不挂事件监听——事件委托统一在 ui/shell.js(同 forum/sns/messenger 的模式)。
 // 用户只读:零输入框,唯二操作走 shell 的 data-action(刷新/切 tab)+ 长按/右键反悔(两 tab 一起倒带)。
 // v1 没有详情页——搜索记录/浏览历史都是终点,没有 open-xxx 的事,行本身不可点击,只能长按。
-import { ICON_BACK, ICON_APP_BROWSER, ICON_SEARCH_SM } from '../../ui/icons.js';
+import { ICON_BACK, ICON_LOCK, ICON_SEARCH_SM } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
 
 export const BROWSER_APP_ID = 'browser';
@@ -92,7 +92,11 @@ export function renderBrowserHtml({ world, busy, tab = 'search', seenAt = 0, bro
             <span class="or-header-title">浏览器</span>
             <button class="or-pill-btn small" data-action="browser-refresh" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : '刷新'}</button>
         </div>
-        <div class="or-browser-brand"><div class="or-browser-brand-pill">${ICON_APP_BROWSER}<span>Astrolabe</span></div></div>
+        <div class="or-browser-brand"><div class="or-browser-omnibox">
+            <span class="or-omnibox-lock">${ICON_LOCK}</span>
+            <span class="or-omnibox-url"><span class="or-omnibox-scheme">astrolabe://</span>observatory</span>
+            <span class="or-omnibox-glass">${ICON_SEARCH_SM}</span>
+        </div></div>
         <div class="or-browser-tabs">
             <button class="${isSearch ? 'on' : ''}" data-action="browser-select-tab" data-tab="search">搜索记录</button>
             <button class="${!isSearch ? 'on' : ''}" data-action="browser-select-tab" data-tab="visits">浏览历史</button>

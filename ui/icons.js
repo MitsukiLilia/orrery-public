@@ -58,3 +58,7 @@ export function scallopWaveDataUri(color = '#FBF9F4') {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10"><path d="M0,0 Q5,10 10,0 Q15,10 20,0 L20,10 L0,10 Z" fill="${color}"/></svg>`;
     return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
+
+// v0.13.0 Asterism 星图件:空心星=未收藏,实心星=已点亮(观测者的收藏符号——月相属于世界,星星属于观测者)
+export const ICON_STAR = '<svg viewBox="0 0 24 24"><path d="M12 3.6l2.47 5.46 5.93.62-4.43 4.02 1.24 5.84L12 16.56l-5.21 2.98 1.24-5.84-4.43-4.02 5.93-.62Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+export const ICON_STAR_FILL = '<svg viewBox="0 0 24 24"><path d="M12 3.6l2.47 5.46 5.93.62-4.43 4.02 1.24 5.84L12 16.56l-5.21 2.98 1.24-5.84-4.43-4.02 5.93-.62Z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';

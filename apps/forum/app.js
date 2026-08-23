@@ -1,9 +1,9 @@
 // 论坛:纯渲染,不碰 ctx、不挂事件监听——事件委托统一在 ui/shell.js(同 apps/messenger/app.js 的模式)。
 // 用户只读:零输入框,唯二操作走 shell 的 data-action(刷新/生成更多)+ 长按/右键反悔。
 // castName 只活在 core/世界数据层,这个文件从不读它——住民短 ID 用 world.shortIdFor,不暴露真名。
-import { ICON_BACK, ICON_MINUS, ICON_PLUS } from '../../ui/icons.js';
+import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_STAR, ICON_STAR_FILL } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
-import { shortIdFor, seenKeyForForumThread, newReplyCountOfForumThread } from '../../core/world.js';
+import { shortIdFor, seenKeyForForumThread, newReplyCountOfForumThread, starKeyForForumThread } from '../../core/world.js';
 
 export const FORUM_APP_ID = 'forum';
 export const FORUM_SKIN_URL = new URL('./skin.css', import.meta.url).href;
@@ -98,7 +98,11 @@ export function renderForumListHtml({ world, busy, boardId, page = 1, seen = {},
  * @param seenAt 进这个帖那一刻的 seen 快照(同消息线程,用快照而非实时水位,否则分界线当场消失)
  * @param replyBatch 「生成回复」这一次要点单几楼
  */
-export function renderForumThreadHtml({ thread, world, busy, forumNow, seenAt = 0, replyBatch = 3 }) {
+export function renderForumThreadHtml({ thread, world, busy, forumNow, seenAt = 0, starred = {}, replyBatch = 3 }) {
+    // Asterism 星标(task-007):整帖收藏,挂在楼主块作者行右端(观测者的标记,住民看不见)
+    const starKey = starKeyForForumThread(thread.threadId);
+    const starOn = !!starred[starKey];
+    const starBtn = `<button class="or-star ${starOn ? 'on' : ''}" data-action="toggle-star" data-star-key="${escapeHtml(starKey)}" title="${starOn ? '从星图移除' : '加入星图'}">${starOn ? ICON_STAR_FILL : ICON_STAR}</button>`;
     let repliesHtml = '';
     let sepDone = false;
     thread.replies.forEach((r, i) => {
@@ -135,7 +139,7 @@ export function renderForumThreadHtml({ thread, world, busy, forumNow, seenAt = 
         <div class="or-forum-scroll">
             <div class="or-forum-op">
                 <div class="or-forum-op-title">${escapeHtml(thread.title)}</div>
-                <div class="or-forum-op-author">${escapeHtml(handleWithId(world, thread.authorId))} · ${formatRelativeTime(thread.worldTime, forumNow)}</div>
+                <div class="or-forum-op-author">${escapeHtml(handleWithId(world, thread.authorId))} · ${formatRelativeTime(thread.worldTime, forumNow)}${starBtn}</div>
                 <div class="or-forum-op-body">${escapeHtml(thread.body)}${thread.zh && thread.zh !== thread.body ? `<div class="or-zh">${escapeHtml(thread.zh)}</div>` : ''}</div>
             </div>
             <div class="or-forum-replies">${repliesHtml}</div>

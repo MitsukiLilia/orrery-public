@@ -350,3 +350,35 @@
     transition: opacity .2s ease, transform .2s ease; z-index: 50; white-space: nowrap;
 }
 .or-toast.show { opacity: .95; transform: translateX(-50%) translateY(-6px); }
+
+/* ── Asterism 星图(task-007 P0):共用星标钮 + 状态栏暗门 + 星图页。金色=点亮色,
+   内容色主题无关(先例=联系人色板/相册 tone 跨主题固定)。 ── */
+.or-star {
+    border: none; background: none; padding: 2px 4px; margin: 0; cursor: pointer;
+    color: var(--or-cocoa-light); display: inline-flex; align-items: center; flex-shrink: 0;
+}
+.or-star svg { width: 15px; height: 15px; }
+.or-star.on { color: #D9A441; }
+.or-star:active { transform: scale(1.25); transition: transform .12s; }
+.or-sns-row-stats .or-star { margin-left: auto; }
+.or-statusbar-star {
+    border: none; background: none; padding: 2px 4px; margin-left: 8px; cursor: pointer;
+    color: var(--or-cocoa); opacity: .55; display: inline-flex; align-items: center;
+}
+.or-statusbar-star svg { width: 12px; height: 12px; }
+.or-statusbar-star:active { opacity: 1; }
+.or-aster-list { flex: 1; overflow-y: auto; padding: 12px 14px 20px; display: flex; flex-direction: column; gap: 10px; }
+.or-aster-card {
+    display: block; width: 100%; text-align: left; border: none; cursor: pointer;
+    background: var(--or-white); border-radius: 14px; padding: 12px 14px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+}
+.or-aster-card.gone { cursor: default; background: var(--or-cream); box-shadow: none; }
+.or-aster-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+.or-aster-badge {
+    font-size: 10px; font-weight: 700; letter-spacing: .05em; color: var(--or-cocoa-light);
+    background: var(--or-cream-2); padding: 2px 8px; border-radius: 999px;
+}
+.or-aster-title { font-size: 13.5px; font-weight: 600; color: var(--or-cocoa); line-height: 1.45; }
+.or-aster-body { font-size: 12px; color: var(--or-cocoa-light); line-height: 1.55; margin-top: 3px; word-break: break-word; }
+.or-aster-gone { font-size: 12px; color: var(--or-cocoa-light); font-style: italic; }

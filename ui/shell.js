@@ -21,11 +21,11 @@ import {
     ICON_BACK, ICON_CHEVRON_RIGHT, ICON_CHECK, ICON_MINUS, ICON_PLUS, ICON_CLOSE,
     ICON_APP_MESSENGER, ICON_APP_SETTINGS, ICON_APP_FORUM, ICON_APP_MEMO, ICON_APP_SNS, ICON_APP_GALLERY,
     ICON_APP_BROWSER,
-    ICON_HUD_STARS, ICON_HUD_RING, dotPatternDataUri, scallopWaveDataUri,
+    ICON_HUD_STARS, ICON_HUD_RING, ICON_STAR, ICON_STAR_FILL, dotPatternDataUri, scallopWaveDataUri,
 } from './icons.js';
 import { renderThreadListHtml, renderThreadHtml, MESSENGER_SKIN_URL } from '../apps/messenger/app.js';
 import { renderForumListHtml, renderForumThreadHtml, FORUM_SKIN_URL } from '../apps/forum/app.js';
-import { renderSnsTlHtml, renderSnsTweetHtml, renderSnsProfileHtml, SNS_SKIN_URL } from '../apps/sns/app.js';
+import { renderSnsTlHtml, renderSnsTweetHtml, renderSnsProfileHtml, renderSnsMyPageHtml, SNS_SKIN_URL } from '../apps/sns/app.js';
 import { renderBrowserHtml, BROWSER_SKIN_URL } from '../apps/browser/app.js';
 import { renderGalleryListHtml, renderGalleryPhotoHtml, GALLERY_SKIN_URL } from '../apps/gallery/app.js';
 import { renderMemoListHtml, renderMemoNoteHtml, MEMO_SKIN_URL } from '../apps/memo/app.js';
@@ -249,7 +249,7 @@ export function createShell(ctx, onExternalChange) {
                     snsAccounts: new Map(), tweets: new Map(), searches: new Map(), visits: new Map(),
                     photos: [], memos: new Map(),
                 },
-                tip: -1, watermarks: { messenger: -1, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1 }, seen: {},
+                tip: -1, watermarks: { messenger: -1, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1 }, seen: {}, starred: {},
             };
         }
         const [entries, wmMessenger, wmForum, wmSns, wmBrowser, wmGallery, wmMemo] = await Promise.all([
@@ -267,11 +267,11 @@ export function createShell(ctx, onExternalChange) {
             baselineDone.add(worldKey);
             await store.initSeenBaseline(worldKey, seenBaselinePairs(world));
         }
-        const seen = await store.getSeenMap(worldKey);
+        const [seen, starred] = await Promise.all([store.getSeenMap(worldKey), store.getStarred(worldKey)]);
         return {
             worldKey, world, tip,
             watermarks: { messenger: wmMessenger, forum: wmForum, sns: wmSns, browser: wmBrowser, gallery: wmGallery, memo: wmMemo },
-            seen,
+            seen, starred,
         };
     }
 
@@ -309,9 +309,9 @@ export function createShell(ctx, onExternalChange) {
     // 长按删一条、调一下条数,她正在读的位置就被弹回顶部(她 2026-08-14 报的第 2 点)。
     // 规则:同一块屏幕重渲染 → 原地保持;刚进屋 / 刚生成完 → 跳到新内容分界线。 ──
     const SCROLLERS = '.or-chat-scroll, .or-forum-scroll, .or-thread-list, .or-forum-list, .or-browser-list, .or-list, .or-grid, '
-        + '.or-gallery-list, .or-memo-list, .or-gallery-detail-scroll, .or-memo-detail-scroll, .or-sns-list, .or-sns-scroll';
+        + '.or-gallery-list, .or-memo-list, .or-gallery-detail-scroll, .or-memo-detail-scroll, .or-sns-list, .or-sns-scroll, .or-aster-list';
     function screenKey(top) {
-        return [top.type, top.threadId || '', top.boardId || '', top.tweetId || '', top.accountId || '', top.photoId || '', top.noteId || ''].join('|');
+        return [top.type, top.threadId || '', top.boardId || '', top.tweetId || '', top.accountId || '', top.photoId || '', top.noteId || '', top.tab || ''].join('|');
     }
     let lastScreenKey = null;
 
@@ -342,7 +342,7 @@ export function createShell(ctx, onExternalChange) {
     async function render() {
         if (!screenEl) return;
         applyTheme();
-        const { worldKey, world, tip, watermarks, seen } = await currentWorld();
+        const { worldKey, world, tip, watermarks, seen, starred } = await currentWorld();
         // 换聊天=换了另一部手机:上一部停在谁的对话里,与这部毫无关系,退回网格重新开始。
         // (导航状态本身是跨开合保留的,见 open();只有换世界才清。)
         if (worldKey !== lastWorldKey) {
@@ -409,14 +409,18 @@ export function createShell(ctx, onExternalChange) {
             }
             screenEl.innerHTML = renderForumThreadHtml({
                 thread, world, busy: busy.forum, forumNow: world.forumNow,
-                seenAt: top.seenAt, replyBatch: settings().forumReplyBatch,
+                seenAt: top.seenAt, starred, replyBatch: settings().forumReplyBatch,
             });
             markSeenAfter = [seenKey, latestTsOfForumThread(thread)];
         } else if (top.type === 'sns-tl') {
-            screenEl.innerHTML = renderSnsTlHtml({
-                world, busy: busy.sns, viewerRole: top.viewerRole || 'omote', identityOpen: !!top.identityOpen,
-                seen, justUpdated,
-            });
+            // task-007 底导两 tab:时间线=表账号能刷到的面;「我的」=主人主页(表/裏切换住这边)。
+            if ((top.tab || 'tl') === 'me') {
+                screenEl.innerHTML = renderSnsMyPageHtml({
+                    world, busy: busy.sns, myRole: top.myRole || 'omote', seen, starred, snsNow: world.snsNow,
+                });
+            } else {
+                screenEl.innerHTML = renderSnsTlHtml({ world, busy: busy.sns, seen, starred, justUpdated });
+            }
             // TL 是浏览面,进 TL 不推 seen 水位——同论坛列表页语义(点进详情才算看过)。
         } else if (top.type === 'sns-tweet') {
             const tweet = world.tweets.get(top.tweetId);
@@ -428,13 +432,13 @@ export function createShell(ctx, onExternalChange) {
             }
             screenEl.innerHTML = renderSnsTweetHtml({
                 tweet, world, busy: busy.sns, snsNow: world.snsNow,
-                seenAt: top.seenAt, replyBatch: settings().snsReplyBatch,
+                seenAt: top.seenAt, starred, replyBatch: settings().snsReplyBatch,
             });
             markSeenAfter = [seenKey, latestTsOfTweet(tweet)];
         } else if (top.type === 'sns-profile') {
             const account = world.snsAccounts.get(top.accountId);
             if (!account) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚清空(理论上账号不会被单删,防御性兜底)
-            screenEl.innerHTML = renderSnsProfileHtml({ account, world, snsNow: world.snsNow, seen });
+            screenEl.innerHTML = renderSnsProfileHtml({ account, world, snsNow: world.snsNow, seen, starred });
         } else if (top.type === 'browser') {
             // 整 app 一把 seen 快照(不是每条一个 key)——进屏定格一次,tab 切换/重渲染都不再挪动;
             // 下次真正离开(navBack)重新进来才会拿到新的水位当新的快照(同 thread/forum-thread/sns-tweet 的模式)。
@@ -465,6 +469,8 @@ export function createShell(ctx, onExternalChange) {
             const note = world.memos.get(top.noteId);
             if (!note) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚/反悔清空
             screenEl.innerHTML = renderMemoNoteHtml({ note });
+        } else if (top.type === 'asterism') {
+            screenEl.innerHTML = renderAsterismHtml({ world, starred });
         } else if (top.type === 'settings') {
             const s = settings();
             const owner = await store.getOwner(currentWorldKey());
@@ -507,7 +513,7 @@ export function createShell(ctx, onExternalChange) {
         if (appId === 'messenger') navPush({ type: 'messenger-list' });
         else if (appId === 'settings') navPush({ type: 'settings' });
         else if (appId === 'forum') navPush({ type: 'forum-list', boardId: null });
-        else if (appId === 'sns') navPush({ type: 'sns-tl', viewerRole: 'omote', identityOpen: false });
+        else if (appId === 'sns') navPush({ type: 'sns-tl', tab: 'tl', myRole: 'omote' });
         else if (appId === 'browser') navPush({ type: 'browser', tab: 'search' });
         else if (appId === 'gallery') navPush({ type: 'gallery' });
         else if (appId === 'memo') navPush({ type: 'memo' });
@@ -757,19 +763,76 @@ export function createShell(ctx, onExternalChange) {
         await render();
     }
 
-    function doSnsToggleIdentity() {
+    // task-007:底导「时间线/我的」切换;表/裏切换只活在「我的」页(裏垢入口从 TL 顶栏迁来)。
+    function doSnsSelectTab(tab) {
         const top = navStack[navStack.length - 1];
         if (top.type !== 'sns-tl') return;
-        top.identityOpen = !top.identityOpen;
+        top.tab = tab === 'me' ? 'me' : 'tl';
         render();
     }
 
     function doSnsSelectViewer(role) {
         const top = navStack[navStack.length - 1];
         if (top.type !== 'sns-tl') return;
-        top.viewerRole = role === 'ura' ? 'ura' : 'omote';
-        top.identityOpen = false;
+        top.myRole = role === 'ura' ? 'ura' : 'omote';
         render();
+    }
+
+    // ── Asterism 星图(task-007 P0):观测者的收藏,点亮/熄灭——纯用户侧数据,世界毫无感知。──
+    async function doToggleStar(key) {
+        const worldKey = currentWorldKey();
+        if (!worldKey || !key) return;
+        const on = await store.toggleStar(worldKey, key);
+        showToast(on ? '一颗星亮了' : '一颗星熄灭了');
+        render();
+    }
+
+    /**
+     * 星图页:不属于 char 的手机(主屏没有它的图标,她拍板:主屏多一个 char 不知道的 app 会破坏
+     * 沉浸感)——入口在状态栏(仪器面板)与长按任意星标。内容从 world 现查:被反悔删掉的内容
+     * 不撒谎,如实显示已消失,星可以就地熄灭。
+     */
+    function renderAsterismHtml({ world, starred }) {
+        const items = Object.entries(starred)
+            .map(([key, v]) => ({ key, at: v?.at || 0 }))
+            .sort((a, b) => b.at - a.at);
+        const cards = items.map(({ key }) => {
+            const star = `<button class="or-star on" data-action="toggle-star" data-star-key="${escapeHtml(key)}" title="从星图移除">${ICON_STAR_FILL}</button>`;
+            let badge, title = '', body = '', action = '', attrs = '', gone = false;
+            if (key.startsWith('tw:')) {
+                badge = 'Pulsar';
+                const t = world.tweets.get(key.slice(3));
+                if (t?.accountId) {
+                    const acc = world.snsAccounts.get(t.accountId);
+                    title = acc?.displayName || t.accountId;
+                    body = (t.body || '').slice(0, 100);
+                    action = 'open-sns-tweet'; attrs = `data-tweet-id="${escapeHtml(t.tweetId)}"`;
+                } else gone = true;
+            } else if (key.startsWith('ft:')) {
+                badge = '论坛';
+                const t = world.forumThreads.get(key.slice(3));
+                if (t?.title) {
+                    title = t.title;
+                    body = (t.body || '').slice(0, 100);
+                    action = 'open-forum-thread'; attrs = `data-thread-id="${escapeHtml(t.threadId)}"`;
+                } else gone = true;
+            } else return '';
+            if (gone) {
+                return `<div class="or-aster-card gone"><div class="or-aster-head"><span class="or-aster-badge">${badge}</span>${star}</div>
+                    <div class="or-aster-gone">这颗星对应的内容,已从观测记录中消失。</div></div>`;
+            }
+            return `<button class="or-aster-card" data-action="${action}" ${attrs}>
+                <div class="or-aster-head"><span class="or-aster-badge">${badge}</span>${star}</div>
+                <div class="or-aster-title">${escapeHtml(title)}</div>
+                ${body ? `<div class="or-aster-body">${escapeHtml(body)}</div>` : ''}
+            </button>`;
+        }).join('');
+        return `
+        <div class="or-header">
+            <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
+            <span class="or-header-title">星图</span>
+        </div>
+        <div class="or-aster-list">${cards || `<div class="or-empty">还没有点亮任何星星。<br>在推文或帖子右下角点星标,把喜欢的内容连成你的星座。</div>`}</div>`;
     }
 
     // ── M3:浏览器「Astrolabe」:独立水位的「刷新」(唯一入口,没有续写)+ tab 切换(纯本地渲染)
@@ -964,8 +1027,10 @@ export function createShell(ctx, onExternalChange) {
             case 'open-sns-profile': navPush({ type: 'sns-profile', accountId: el.dataset.accountId }); break;
             case 'sns-refresh': doGenerateMoreSns(); break;
             case 'sns-generate-more': doContinueTweetReplies(); break;
-            case 'sns-identity-toggle': doSnsToggleIdentity(); break;
+            case 'sns-tab': doSnsSelectTab(el.dataset.tab); break;
             case 'sns-select-viewer': doSnsSelectViewer(el.dataset.role); break;
+            case 'toggle-star': doToggleStar(el.dataset.starKey); break;
+            case 'open-asterism': navPush({ type: 'asterism' }); break;
             case 'browser-refresh': doGenerateMoreBrowser(); break;
             case 'browser-select-tab': doBrowserSelectTab(el.dataset.tab); break;
             case 'open-gallery-photo': navPush({ type: 'galleryPhoto', photoId: el.dataset.photoId }); break;
@@ -1000,6 +1065,16 @@ export function createShell(ctx, onExternalChange) {
     // (后两者跟线程行一样直接弹确认,不走"唤出按钮再点一次"那一步——反悔工法相同,UI 更省一步)。
     function onPointerDown(e) {
         clearTimeout(longPressTimer);
+        // 星标长按=星图副入口(task-007 她拍板两个都要);必须先于行分支——星标嵌在推文行里,
+        // 落到行分支会变成长按删推。
+        const starBtn = e.target.closest('.or-star');
+        if (starBtn) {
+            longPressTimer = setTimeout(() => {
+                suppressNextClick = true;
+                navPush({ type: 'asterism' });
+            }, 550);
+            return;
+        }
         const msgRow = e.target.closest('.or-msg-row');
         if (msgRow) {
             longPressTimer = setTimeout(() => msgRow.classList.add('show-revert'), 480);
@@ -1071,6 +1146,12 @@ export function createShell(ctx, onExternalChange) {
     }
     function onPointerClear() { clearTimeout(longPressTimer); }
     function onContextMenu(e) {
+        const starBtn = e.target.closest('.or-star');
+        if (starBtn) {
+            e.preventDefault();
+            navPush({ type: 'asterism' });
+            return;
+        }
         const threadRow = e.target.closest('.or-thread-row');
         if (threadRow) {
             e.preventDefault();
@@ -1148,6 +1229,7 @@ export function createShell(ctx, onExternalChange) {
                 <div class="or-statusbar">
                     <span class="or-statusbar-label">Orrery</span>
                     <span class="or-statusbar-icons">${ICON_HUD_STARS}${ICON_HUD_RING}</span>
+                    <button class="or-statusbar-star" data-action="open-asterism" title="星图">${ICON_STAR}</button>
                     <button class="or-close-btn" data-action="close-phone" title="收起手机">${ICON_CLOSE}</button>
                 </div>
                 <div class="or-screen"></div>

@@ -249,6 +249,11 @@ export function seenKeyForForumThread(threadId) { return `forum:${threadId}`; }
 export function seenKeyForTweet(tweetId) { return `sns:${tweetId}`; }
 // 浏览器不按线程/帖子/推分 key——整个 app 一把快照(任务书 §1「新内容标记」),单键固定不带参数。
 export function seenKeyForBrowser() { return 'browser:app'; }
+
+// ── Asterism 星图键(v0.13.0):观测者收藏的 key,与 seen 键同风格但各是各的表——
+// starred 表存在 meta 里,不进账本、不进 LLM 上下文(零输入铁律,星星只属于观测者)。 ──
+export function starKeyForTweet(tweetId) { return `tw:${tweetId}`; }
+export function starKeyForForumThread(threadId) { return `ft:${threadId}`; }
 // M4 相册/备忘录同浏览器的整 app 一把快照工法(任务书-M4 §2)。
 export function seenKeyForGallery() { return 'gallery:app'; }
 export function seenKeyForMemo() { return 'memo:app'; }
