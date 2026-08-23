@@ -34,6 +34,10 @@ export const ICON_APP_BROWSER = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12
 // 检索行前缀小图标(放大镜),尺寸家族同 ICON_REPLY_SM/ICON_RT_SM(24 viewBox,内联用时约 13〜14px)。
 export const ICON_SEARCH_SM = '<svg viewBox="0 0 24 24"><circle cx="10.3" cy="10.3" r="6" fill="none" stroke="currentColor" stroke-width="1.7"/><line x1="14.9" y1="14.9" x2="19.5" y2="19.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 
+// M4 相册 screenshot 角标(任务书-M4 §一):两层圆角矩形错叠,手绘写意「叠着的画面截层」——
+// 后层描边、前层实心,极小尺寸下(约 14px)靠实心块保证还能辨认出是两层叠着的东西。
+export const ICON_SCREENSHOT_BADGE = '<svg viewBox="0 0 24 24"><rect x="8.5" y="3.5" width="11" height="11" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="4.5" y="9.5" width="11" height="11" rx="2.2" fill="currentColor"/></svg>';
+
 // 状态栏装饰(纯装饰,不代表真实电量/信号)。
 // v0.7.2 HUD 化(特色 B 案,克制极简侧):信号格→三粒渐大的星芒,电池→太阳符号☉(圆环+中心点,
 // 天文学的太阳记号——Orrery 太阳系仪的中心)。这是观测仪的 HUD,不是手机自己的假件,故不写字。

@@ -2,7 +2,7 @@
 // M1 拍板:A/B/B_GROUP 原本写死的语言原则行,改成 {{LANG_RULE}} 占位,运行时按全局语言开关(zh/ja_zh)替换。
 // 2026-08-16 日系氛围强化落地(评审+圈选轨迹见 docs/2026-08-16-提示词日系强化.md);此外仍只做 {{占位符}} 替换。
 // 2026-08-21 语言体系改版(月月拍板):ja(默认)/en/ja_zh 三档,zh 档退役;网感文化圈随语言档切换,细节以世界观为准。
-import { foldWorld, uncoveredMessages, monogramFor, colorForContact, resolveSender } from './world.js';
+import { foldWorld, uncoveredMessages, monogramFor, colorForContact, resolveSender, GALLERY_TONES } from './world.js';
 
 export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」的手机。给你的材料:①故事正文的最新进展 ②这部手机的当前状态(联系人、已有聊天)。请推演:这段进展之后,这部手机上自然会出现哪些新动静。
 
@@ -114,6 +114,48 @@ export const PROMPT_J = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - visits 挂在某条检索下=从那条检索点进去的页面;newVisits=与检索无关的独立浏览
 - 转发式、艾特式的社交行为不存在于这里——浏览器是完全无声的独处空间`;
 
+// ── M4:相册 + 备忘录提示词(K/L),任务书-M4 §三逐字嵌入,一个字都不许改写。──
+
+export const PROMPT_K = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里的相册——相机胶卷与截图,属于故事世界本身。相册是无声的日记:拍下什么、什么时候拍、什么没有拍,都是心事的形状。给你的材料:①故事正文的最新进展 ②相册当前状态(已有的照片与截图)。请推演这段进展之后,相册里自然会新增的痕迹。
+
+# 原则
+1. 快门,不是复述。照片拍的是正文事件在主人眼里留下的「舍不得让它过去的一瞬」——或者与事件毫无关系的日常惯性。绝不把正文剧情摆拍成照片;事件本身往往不在画面里,画面里是它的余光:散场后的空座位、没喝完的咖啡、回家路上的天空。
+2. 描述是镜头语言。desc 只写画面里有什么(构图、光线、物件、边角的意外入镜),像给看不见照片的人念照片;绝不写心情、绝不解释为什么拍。感情藏在「拍了什么」和「什么时候拍」里——深夜时刻的一张没有任何人的天空,比任何文字都响。
+3. 性格优先。谁会拍什么:爱吃的人拍饭,实务型拍白板和收据,不擅表达的人只拍风景不自拍;不是每个人都常拍照,克制的人相册许久不动一次也真实。以【人物设定参考】为准。
+4. 截图也是心事。主人偶尔截下聊天画面、帖子、推文(kind:"screenshot"):想给谁看却没发出去的、怕它消失所以留底的、会反复回看的。截图的 desc 写明是什么画面(「〇〇とのトーク画面」式),画面内容要与故事世界一致,不得虚构明显不存在的对话或帖子。一批最多 1 张截图,多数批次没有。
+5. 视角与关系阶段纪律。只能拍主人在场亲眼所见的画面;正文尚未发生的事绝不出现;两人尚未相识,对方的身影就绝不会入镜——相识后,画面边角「不小心拍进去的那个人」,是这个 app 最高级的余波。
+6. {{LANG_RULE}}
+7. 规模与下限:正文有新进展时,本批 2〜5 张——下限 2 张是硬性契约,其中至少 1 张与新进展有关(正面或余光都算),其余是日常惯性打底;没有新进展的批次才允许 0〜2 张的安静。用户按下刷新,是想翻到新照片的。
+8. 🚨OOC 纪律与 tone 契约:一切照片必须符合【人物设定参考】与正文已确立的性格和关系阶段,不得自行发明重大设定,不许未卜先知。tone 必须从给定清单里选最贴合画面主色的那个,不许自造。
+
+# 输出
+只输出一个 JSON 对象:
+{"worldTime":"YYYY-MM-DD HH:MM","newPhotos":[{"label":"一两个词","desc":"画面描述","zh":"","tone":"清单键","kind":"photo 或 screenshot","delayMin":0}]}
+- tone 清单:sky(昼の空)/night(夜)/sunset(夕方の光)/green(緑・植物)/blossom(花・淡い色)/food(料理・暖色)/sea(水辺)/indoor(室内の灯り)/street(街・グレー)/white(白っぽい・明るい)/dark(暗がり)/screen(スクショ)
+- label=缩略图角落的一两个词(「空」「弁当」「スクショ」式);desc=完整的画面描述
+- delayMin=距上一张的分钟数;worldTime 从正文推断,只许向后走
+- 相册是完全无声的独处空间——没有点赞没有观众,只有主人自己知道这里存了什么`;
+
+export const PROMPT_L = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里的备忘录,属于故事世界本身。备忘录是写给自己的只言片语:买い物リスト与人生大事挤在同一个列表里,没有观众,所以最诚实——写了又删的、没写完的、永远不会发出去的,都停在这里。给你的材料:①故事正文的最新进展 ②备忘录当前状态(已有的备忘)。请推演这段进展之后,备忘录里自然会新增或改动的痕迹。
+
+# 原则
+1. 碎片,不是日记。备忘录里没有完整的叙事——是清单、关键词、断句、写到一半就停的句子。绝不把正文剧情写成日记体的回顾;主人不会向自己解释自己都知道的事。
+2. 琐碎打底,真心话稀有。大部分备忘是彻底的生活流水:买い物リスト、TODO、行程、缴费提醒。「未发送的真心话」是稀有品——想说没说出口的、只敢写在这里的一句;稀有才珍贵,一批最多 1 条,多数批次一条也没有。
+3. 改写是心事的反刍。已有的备忘可以被后续剧情改动(edits):清单划掉一项添一项,是生活在动;那条真心话被改短、被删得只剩一个词、或整条清空只留一行,是心事在动。改写比新写更响——用得克制。
+4. 性格优先。实务型的人列表工整,散漫的人备忘七零八落,不擅表达的人连备忘录里都惜字如金;不是每个人都会把真心话写下来。以【人物设定参考】为准。
+5. 视角与关系阶段纪律。只能写主人亲历、被告知或自己心里正在想的事;正文尚未发生的事绝不出现;两人尚未相识,对方的名字就绝不许出现在备忘里——相识后,混在琐事中间的一行与对方有关的小事(TA 提过的喜好、约好的日子),是这个 app 最高级的余波。
+6. {{LANG_RULE}}
+7. 规模与下限:正文有新进展时,本批 1〜3 条动静(新备忘或改写都算)——下限 1 条是硬性契约,哪怕只是清单上多了一行琐碎;没有新进展的批次才允许完全安静(返回空数组)。
+8. 🚨OOC 纪律:一切备忘必须符合【人物设定参考】与正文已确立的性格和关系阶段,不得自行发明重大设定,不许未卜先知。
+
+# 输出
+只输出一个 JSON 对象:
+{"worldTime":"YYYY-MM-DD HH:MM","newNotes":[{"text":"","zh":"","delayMin":0}],"edits":[{"noteId":"已有备忘的id","text":"改写后的完整内容","zh":"","delayMin":0}]}
+- edits 的 noteId 必须来自【备忘录当前状态】里列出的 id;text=整条改写后的完整内容,不是增量
+- 备忘的第一行会被当作标题显示,像真人那样随手起头
+- delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走
+- 备忘录是完全无声的独处空间——没有读者,主人也不会对自己演戏`;
+
 // ── 全局语言开关:{{LANG_RULE}} 运行时按档替换。──
 // 2026-08-21 改版(月月拍板):ja(默认)/en/ja_zh 三档,旧 zh 档退役——「中文书写+日系翻译腔」
 // 是指令与材料互相拉扯的档位(风格词全在往日文拉),混杂漂移是结构性的;全日语反而是最稳的档。
@@ -140,6 +182,17 @@ const LANG_RULE = {
         ja: '检索词用地道的日文检索语式书写——关键词并列式(「頭痛 治らない 原因」),不是完整句;页面标题用地道的日文网页标题腔(Q&A/まとめ/攻略 wiki/商品页那一挂)。不要输出 zh 字段。',
         en: '检索词用地道的英文搜索语式书写("how to apologize without making it weird" 式的口语搜索或关键词并列);页面标题用英语圈网页标题腔(Q&A/论坛帖/wiki/评测那一挂)。本提示词里的日系检索参照一律换算成英语圈对应物。不要输出 zh 字段。',
         ja_zh: '检索词用地道的日文检索语式书写——关键词并列式(「頭痛 治らない 原因」),不是完整句;页面标题用地道的日文网页标题腔(Q&A/まとめ/攻略 wiki/商品页那一挂),每条同时给出中文翻译字段 zh。',
+    },
+    // M4 相册/备忘录(任务书-M4 §三逐字):gallery/memo 两个新 scope。
+    gallery: {
+        ja: '照片的 label 与 desc 用日文书写:label 是一两个词(「空」「弁当」式);desc 是干净的镜头描述文,体言止め为主,像图注不像小说。不要输出 zh 字段。',
+        en: 'label 与 desc 用英文书写:label 是一两个词("sky"、"lunch" 式);desc 是干净的镜头描述文,像图注不像小说。本提示词里的日系参照一律换算成英语圈对应物。不要输出 zh 字段。',
+        ja_zh: '照片的 label 与 desc 用日文书写:label 是一两个词(「空」「弁当」式);desc 是干净的镜头描述文,体言止め为主,像图注不像小说;desc 同时给出中文翻译字段 zh。',
+    },
+    memo: {
+        ja: '备忘用地道的日文メモ体书写:片言隻句、体言止め、清单式换行;写给自己的备忘里不会出现敬语。不要输出 zh 字段。',
+        en: '备忘用地道的英文便签体书写:碎片短语、清单式换行、随性的小写,notes-to-self 的省略语气。本提示词里的日系参照一律换算成英语圈对应物。不要输出 zh 字段。',
+        ja_zh: '备忘用地道的日文メモ体书写:片言隻句、体言止め、清单式换行;写给自己的备忘里不会出现敬语,每条同时给出中文翻译字段 zh。',
     },
 };
 // 世界观兜底(全档通用):哪天用日语玩 HP、或用英语玩日系原作,氛围细节听世界观的,别硬套黑话。
@@ -851,6 +904,48 @@ function buildBrowserDigestText(world) {
         ...[...world.visits.values()].map(v => ({ worldTime: v.worldTime || 0, line: `[閲覧] ${v.title}(${v.site || ''})` })),
     ].sort((a, b) => b.worldTime - a.worldTime).slice(0, 15);
     for (const m of mixed) parts.push(m.line);
+    return parts.join('\n');
+}
+
+// ── M4:相册/备忘录材料拼装(任务书-M4 §三)。两者都没有名册,没有 resolveByHandle 的事,
+//    也没有单条续写用的"单张/单条全文"拼装函数(v1 都只有主刷新,没有详情页续写)。 ──
+
+function buildGalleryDigestText(world) {
+    if (!world.photos.length) return '(相册是空的,这是第一次生成)';
+    const parts = [];
+    if (world.galleryNow) {
+        parts.push(`[相册当前世界时刻] ${fmtWorldTime(world.galleryNow)}(新照片不得与已有的重复或高度相似)`);
+    }
+    // 最近 15 张,最新在前(同 recentTweets/recentThreads/浏览器 mixed 的排序习惯;world.photos 本身是
+    // foldWorld 按 worldTime 升序输出的,这里单独倒序一遍给模型看"最近发生的",不改 foldWorld 的契约)。
+    const recent = [...world.photos].sort((a, b) => (b.worldTime || 0) - (a.worldTime || 0)).slice(0, 15);
+    for (const p of recent) {
+        const tag = p.kind === 'screenshot' ? 'スクショ' : '写真';
+        parts.push(`[${tag}] ${p.label || ''} — ${String(p.desc || '').slice(0, 40)}`);
+    }
+    return parts.join('\n');
+}
+
+// 备忘的第一行是标题,其余是正文——digest 里 "首行 — 后文前80字" 就是同一个切法,与 apps/memo/app.js
+// 渲染列表行时用的切法一致,但两处各自独立实现(apps 与 core 之间零共享格式化函数,同 browser 的先例)。
+function splitMemoFirstLine(text) {
+    const s = String(text || '');
+    const idx = s.indexOf('\n');
+    return idx === -1 ? { title: s, rest: '' } : { title: s.slice(0, idx), rest: s.slice(idx + 1) };
+}
+
+function buildMemoDigestText(world) {
+    if (!world.memos.size) return '(备忘录是空的,这是第一次生成)';
+    const parts = [];
+    if (world.memoNow) {
+        parts.push(`[备忘录当前世界时刻] ${fmtWorldTime(world.memoNow)}(改写请引用下列 id;新备忘不得与已有的重复)`);
+    }
+    // 全部备忘各带 noteId(任务书-M4 §三:edits 要反查 id,一条都不能省)。
+    for (const m of world.memos.values()) {
+        const { title, rest } = splitMemoFirstLine(m.text);
+        const editedTag = m.editedTime ? `(编辑于 ${fmtWorldTime(m.editedTime)})` : '';
+        parts.push(`[${m.noteId}] ${title} — ${rest.slice(0, 80)}${editedTag}`);
+    }
     return parts.join('\n');
 }
 
@@ -1570,8 +1665,145 @@ async function runBrowserMainGeneration(ctx, store, { worldKey, floorWindow, pro
     return { ok: true, changed: true, added: addedCount };
 }
 
-// ── 对外入口:UI 只认这七个。messenger 两个内部自动接总结检查;forum/sns/browser 没有总结机制
-//    (§2 拍板不用改 PROMPT_C)。browser 只有一个入口——v1 没有详情页,自然也没有续写。──
+// ── M4:相册主生成:独立水位、独立触发(app 内「刷新」),消化 newPhotos。
+//    没有续写/续聊入口——v1 没有详情页续写,只有主刷新(任务书-M4 §一)。 ──
+
+async function runGalleryMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, excludeTags }) {
+    await ensureRegexEngine();
+    const watermark = await store.getWatermark(worldKey, 'gallery');
+    const tip = ctx.chat.length - 1;
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    if (batchFloor === null) return { ok: true, changed: false };
+
+    const world = foldWorld(await store.getEntriesForWorld(worldKey));
+    const charName = owner || ctx.name2 || '主角';
+    // 同 messenger/forum/sns/browser 的点名警示,换成相册语境的措辞(任务书-M4 §三 caution 措辞)。
+    const userSideName = (ctx.name1 || '').trim();
+    const caution = (userSideName && userSideName !== charName)
+        ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。不得出现以「${userSideName}」为主角的摆拍;两人尚未相识时,「${userSideName}」的身影绝不许入镜。\n\n`
+        : '';
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
+    const notes = await buildInjectedNotes(ctx);
+    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}【相册当前状态】\n${buildGalleryDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
+    logContextShape('相册生成', userContent, notes.keys);
+    const systemPrompt = PROMPT_K.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('gallery', language));
+
+    // 回滚纪元闸照 browser 补上(任务书-M4 §一):生成期间用户在酒馆里删楼/swipe,回滚代表更晚的意图,整批作废。
+    const epoch = store.getRollbackEpoch();
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
+    if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
+
+    let addedCount = 0;
+    // 新实体 id 不让 LLM 现造(M1 教训),照 makeQueryId/makeVisitId 的思路自造。
+    function makePhotoId() { return `ph_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
+
+    // 锚=max(worldTime 解析值, galleryNow)(同浏览器的锚点写法),新照片自锚点按 delayMin 排开。
+    const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? (world.galleryNow ?? Date.now()), world.galleryNow ?? 0);
+
+    const validPhotos = [];
+    for (const p of Array.isArray(parsed.newPhotos) ? parsed.newPhotos : []) {
+        if (p?.desc) validPhotos.push(p);
+        else console.warn('[Orrery] 新照片缺少 desc,已丢弃'); // 静默丢弃教训:留声,不连累其余条目
+    }
+    const times = layoutWorldTimes(validPhotos, anchor, world.galleryNow || 0);
+
+    for (let i = 0; i < validPhotos.length; i++) {
+        const p = validPhotos[i];
+        // tone/kind 白名单校验:非法值分别落 street/photo(任务书-M4 §二),绝不把模型字符串直接进 DOM。
+        const tone = GALLERY_TONES.includes(p.tone) ? p.tone : 'street';
+        const kind = p.kind === 'screenshot' ? 'screenshot' : 'photo';
+        const payload = { photoId: makePhotoId(), label: String(p.label || ''), desc: String(p.desc), tone, kind, worldTime: times[i] };
+        { const z = cleanZh(p.zh, p.desc, language); if (z) payload.zh = z; }
+        await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'gallery', type: 'photo', payload });
+        addedCount++;
+    }
+
+    await store.setWatermark(worldKey, 'gallery', batchFloor);
+    return { ok: true, changed: true, added: addedCount };
+}
+
+// ── M4:备忘录主生成:独立水位、独立触发(app 内「刷新」),消化 newNotes + edits。
+//    没有续写/续聊入口——v1 没有详情页续写,只有主刷新(任务书-M4 §一)。 ──
+
+async function runMemoMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, excludeTags }) {
+    await ensureRegexEngine();
+    const watermark = await store.getWatermark(worldKey, 'memo');
+    const tip = ctx.chat.length - 1;
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    if (batchFloor === null) return { ok: true, changed: false };
+
+    const world = foldWorld(await store.getEntriesForWorld(worldKey));
+    const charName = owner || ctx.name2 || '主角';
+    // 同上,换成备忘录语境的措辞(任务书-M4 §三 caution 措辞)。
+    const userSideName = (ctx.name1 || '').trim();
+    const caution = (userSideName && userSideName !== charName)
+        ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。两人尚未相识时,「${userSideName}」的名字绝不许出现在备忘里。\n\n`
+        : '';
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
+    const notes = await buildInjectedNotes(ctx);
+    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}【备忘录当前状态】\n${buildMemoDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
+    logContextShape('备忘录生成', userContent, notes.keys);
+    const systemPrompt = PROMPT_L.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('memo', language));
+
+    const epoch = store.getRollbackEpoch();
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
+    if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
+
+    let addedCount = 0;
+    function makeNoteId() { return `mm_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
+    function makeEditId() { return `me_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
+
+    // 锚=max(worldTime 解析值, memoNow),newNotes 与 edits 各自独立自锚点排开(同浏览器 newSearches/
+    // newVisits 的写法——两个数组各是各的时间线,不互相接续,谁的 delayMin 都从同一个锚点起算)。
+    const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? (world.memoNow ?? Date.now()), world.memoNow ?? 0);
+
+    const validNotes = [];
+    for (const n of Array.isArray(parsed.newNotes) ? parsed.newNotes : []) {
+        if (n?.text) validNotes.push(n);
+        else console.warn('[Orrery] 新备忘缺少 text,已丢弃');
+    }
+    const noteTimes = layoutWorldTimes(validNotes, anchor, world.memoNow || 0);
+    for (let i = 0; i < validNotes.length; i++) {
+        const n = validNotes[i];
+        const noteId = makeNoteId();
+        const payload = { noteId, text: String(n.text), worldTime: noteTimes[i] };
+        { const z = cleanZh(n.zh, n.text, language); if (z) payload.zh = z; }
+        await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'memo', type: 'memo_note', payload });
+        // 本批新建的备忘也要能被本批的 edits 引用到(同 messenger 主生成里 world.contacts.set 的写法:
+        // 内存快照跟着这一批的写入同步更新,不必等下次 fold)——虽然任务书 §三 的 digest 只列已有备忘,
+        // 但消化层多容忍一步不算违约,只会更宽恕,不会更严格。
+        world.memos.set(noteId, { noteId, text: payload.text, zh: payload.zh, createdTime: noteTimes[i], editedTime: undefined, latestTs: noteTimes[i], ts: 0 });
+        addedCount++;
+    }
+
+    const validEdits = [];
+    for (const e of Array.isArray(parsed.edits) ? parsed.edits : []) {
+        if (e?.noteId && e?.text) validEdits.push(e);
+        else console.warn('[Orrery] 改写缺少 noteId 或 text,已丢弃');
+    }
+    const editTimes = layoutWorldTimes(validEdits, anchor, world.memoNow || 0);
+    for (let i = 0; i < validEdits.length; i++) {
+        const e = validEdits[i];
+        const noteId = String(e.noteId);
+        // edits 的 noteId 查无此账整条丢弃(任务书-M4 §三/§四):名册就在 world.memos 里,反查零成本
+        // (同 resolveByHandle 的宽恕哲学,只是这里没有 handle 别名可反查,查无此账就是真的没有)。
+        if (!world.memos.has(noteId)) { console.warn('[Orrery] 改写指向不存在的备忘', noteId, ',已丢弃'); continue; }
+        const editId = makeEditId();
+        const payload = { editId, noteId, text: String(e.text), worldTime: editTimes[i] };
+        { const z = cleanZh(e.zh, e.text, language); if (z) payload.zh = z; }
+        await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'memo', type: 'memo_edit', payload });
+        addedCount++;
+    }
+
+    await store.setWatermark(worldKey, 'memo', batchFloor);
+    return { ok: true, changed: true, added: addedCount };
+}
+
+// ── 对外入口:UI 只认这九个。messenger 两个内部自动接总结检查;forum/sns/browser/gallery/memo
+//    没有总结机制(§2 拍板不用改 PROMPT_C)。browser/gallery/memo 各只有一个入口——v1 没有详情页
+//    续写,自然也没有续写。──
 
 export async function generateMore(ctx, store, opts) {
     const result = await runMainGeneration(ctx, store, opts);
@@ -1609,4 +1841,12 @@ export async function continueTweetReplies(ctx, store, opts) {
 
 export async function generateMoreBrowser(ctx, store, opts) {
     return await runBrowserMainGeneration(ctx, store, opts);
+}
+
+export async function generateMoreGallery(ctx, store, opts) {
+    return await runGalleryMainGeneration(ctx, store, opts);
+}
+
+export async function generateMoreMemo(ctx, store, opts) {
+    return await runMemoMainGeneration(ctx, store, opts);
 }

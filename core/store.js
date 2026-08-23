@@ -1,8 +1,9 @@
 // 世界账本:IndexedDB 持久化。全系统只认 RippleEntry(见 §3),这里不解释业务语义,只管存取。
 // 库名 orrery,两个 store:
 //   ledger — RippleEntry 本体,autoIncrement 主键;索引 worldKey(取某世界全部条目)、sourceFloor(极少单独用,配合内存过滤)
-//   meta   — 每个 worldKey 一条,{ worldKey, owner, watermarks: { messenger, forum, sns } },各 app 独立水位(M1 水位重构、
-//            M2 补 sns 档,见 getWatermark/setWatermark/clampWatermarks;旧版单一 lastProcessedFloor + pendingFloors 已废除,
+//   meta   — 每个 worldKey 一条,{ worldKey, owner, watermarks: { messenger, forum, sns, browser, gallery, memo } },
+//            各 app 独立水位(M1 水位重构、M2 补 sns 档、M3 补 browser 档、M4 补 gallery/memo 档,见
+//            getWatermark/setWatermark/clampWatermarks;旧版单一 lastProcessedFloor + pendingFloors 已废除,
 //            读到旧格式时兼容迁移)
 
 const DB_NAME = 'orrery';
@@ -272,6 +273,57 @@ export async function deleteBrowserFrom(worldKey, fromWorldTime) {
     });
 }
 
+/**
+ * M4 相册专用倒带:photo 一型,payload.worldTime >= fromWorldTime 的全删(任务书-M4 §2)。
+ * 工法同 deleteBrowserFrom——反悔语义是「世界回滚到这一刻」,不是单条剧情内删除,所以长按任一张
+ * 删掉的不只是那一张,是那一刻及之后的全部相册痕迹(与浏览器的两 tab 一起倒带同一个哲学)。
+ */
+export async function deleteGalleryFrom(worldKey, fromWorldTime) {
+    if (!worldKey) return;
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_LEDGER, 'readwrite');
+        const idx = tx.objectStore(STORE_LEDGER).index('worldKey');
+        const req = idx.openCursor(IDBKeyRange.only(worldKey));
+        req.onsuccess = () => {
+            const cursor = req.result;
+            if (!cursor) return;
+            const v = cursor.value;
+            const isPhoto = v.type === 'photo';
+            if (isPhoto && (!Number.isFinite(v.payload?.worldTime) || v.payload.worldTime >= fromWorldTime)) cursor.delete();
+            cursor.continue();
+        };
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+/**
+ * M4 备忘录专用倒带:memo_note + memo_edit 两型一起,payload.worldTime >= fromWorldTime 的全删
+ * (任务书-M4 §2)。长按倒带锚点=该条目的最近活动时间(创建或最后编辑,取较新者)——这样长按一条
+ * 被改坏的旧备忘,worldTime 落在锚点之前的原始 memo_note 留了下来,只有那次改写(和它之后的动静)
+ * 被抹掉,老底子自然浮现,fold 重放即还原旧文本,不需要另存历史版本。
+ */
+export async function deleteMemoFrom(worldKey, fromWorldTime) {
+    if (!worldKey) return;
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_LEDGER, 'readwrite');
+        const idx = tx.objectStore(STORE_LEDGER).index('worldKey');
+        const req = idx.openCursor(IDBKeyRange.only(worldKey));
+        req.onsuccess = () => {
+            const cursor = req.result;
+            if (!cursor) return;
+            const v = cursor.value;
+            const isMemo = v.type === 'memo_note' || v.type === 'memo_edit';
+            if (isMemo && (!Number.isFinite(v.payload?.worldTime) || v.payload.worldTime >= fromWorldTime)) cursor.delete();
+            cursor.continue();
+        };
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
 /** 抹掉这部手机:账本条目 + meta(含主人设定/水位)全删,世界回到未激活状态。 */
 export async function wipeWorld(worldKey) {
     if (!worldKey) return;
@@ -311,10 +363,10 @@ async function writeMeta(meta) {
 // 旧 pendingFloors 字段直接丢弃——M1 已废除该机制,pending 完全靠水位推导(见 generator.js)。
 function normalizeWatermarks(meta) {
     if (meta.watermarks && typeof meta.watermarks === 'object') {
-        return { messenger: -1, forum: -1, sns: -1, browser: -1, ...meta.watermarks };
+        return { messenger: -1, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1, ...meta.watermarks };
     }
     const messenger = Number.isFinite(meta.lastProcessedFloor) ? meta.lastProcessedFloor : -1;
-    return { messenger, forum: -1, sns: -1, browser: -1 };
+    return { messenger, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1 };
 }
 
 /**

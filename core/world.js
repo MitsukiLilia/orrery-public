@@ -44,6 +44,11 @@ export function monogramFor(name) {
     return (name || '?').trim().charAt(0) || '?';
 }
 
+// M4 相册 tone 调色板(固定 12 键,内容色、主题无关——先例=CONTACT_PALETTE 的联系人色在三主题通用)。
+// 导出给 generator.js(消化时白名单校验)与 apps/gallery/app.js(渲染时白名单再校验一遍,双保险,
+// 不把模型字符串直接拼进 data-tone 属性)共用,一处定义两处消费,不会漂。非法值统一落 'street'。
+export const GALLERY_TONES = ['sky', 'night', 'sunset', 'green', 'blossom', 'food', 'sea', 'indoor', 'street', 'white', 'dark', 'screen'];
+
 /**
  * 住民短 ID(匿名板文化,同一住民永远同 ID):residentId 哈希后取 4 位十六进制,UI 显示 `handle #xxxx`。
  * 只是展示用的短哈希,不是身份密钥——碰撞不影响功能,只影响观感,概率也低到可以不管。
@@ -66,6 +71,12 @@ export function shortIdFor(residentId) {
  * searches: queryId -> search_query payload(+id/sourceFloor/ts)。visits: visitId -> browse_visit payload
  *   (+id/sourceFloor/ts,可选 fromQueryId 指回某条检索)——M3 浏览器「Astrolabe」自己的账,两型平铺、不嵌套,
  *   UI 按 worldTime 各自排序;同样不碰 threads/forumThreads/tweets/worldNow/forumNow/snsNow。
+ * photos: 按 worldTime 升序排好的数组(+ts/sourceFloor),M4 相册自己的账,只有 add/级联倒带,没有改写。
+ * memos: noteId -> { noteId, text, zh?, createdTime, editedTime?, latestTs, ts },M4 备忘录自己的账——
+ *   memo_edit 按入账顺序回放覆盖 text/zh 并推高 editedTime/latestTs(取 createdTime 与 editedTime 较新者),
+ *   这就是「改写=独立条目、不另存历史」的全部机制:回滚删掉一条 edit,下次 fold 重放自然还原旧文本。
+ *   edit 指向不存在的 noteId(理论上不该发生,防御性处理同下面「一条畸形记录」的哲学)→ 跳过 + console.warn。
+ * 以上两者同样不碰 threads/forumThreads/tweets/searches/visits/worldNow/forumNow/snsNow/browserNow。
  */
 export function foldWorld(entries) {
     const contacts = new Map();
@@ -78,6 +89,8 @@ export function foldWorld(entries) {
     const tweets = new Map();
     const searches = new Map();
     const visits = new Map();
+    const photosById = new Map(); // 内部工作表,最终按 worldTime 排序输出为 photos 数组(见 return)
+    const memos = new Map();
 
     function ensureThread(threadId) {
         if (!threads.has(threadId)) {
@@ -137,6 +150,24 @@ export function foldWorld(entries) {
             searches.set(e.payload.queryId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'browse_visit') {
             visits.set(e.payload.visitId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'photo') {
+            photosById.set(e.payload.photoId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'memo_note') {
+            memos.set(e.payload.noteId, {
+                noteId: e.payload.noteId, text: e.payload.text, zh: e.payload.zh,
+                createdTime: e.payload.worldTime, editedTime: undefined,
+                latestTs: e.payload.worldTime, ts: e.ts,
+            });
+        } else if (e.type === 'memo_edit') {
+            // edit 指向不存在的 noteId:正常流程下不该发生(generator.js 消化时已校验过一遍,见下方
+            // runMemoMainGeneration 的长注),这里是防御性的第二道闸——一条畸形记录不能连累整个备忘录。
+            const m = memos.get(e.payload.noteId);
+            if (!m) { console.warn('[Orrery] memo_edit 指向不存在的备忘', e.payload.noteId, ',已跳过'); continue; }
+            m.text = e.payload.text;
+            m.zh = e.payload.zh;
+            m.editedTime = e.payload.worldTime;
+            m.latestTs = Math.max(m.latestTs, e.payload.worldTime || 0);
+            m.ts = Math.max(m.ts, e.ts);
         }
     }
 
@@ -182,11 +213,23 @@ export function foldWorld(entries) {
     for (const s of searches.values()) if (Number.isFinite(s.worldTime)) browserNow = Math.max(browserNow, s.worldTime);
     for (const v of visits.values()) if (Number.isFinite(v.worldTime)) browserNow = Math.max(browserNow, v.worldTime);
 
+    // M4 相册时钟:photos 按 worldTime 升序输出(任务书 §2 明写的契约),UI 需要倒序时自己再排一遍
+    // (同 browser 的习惯,app.js 不借 foldWorld 排好的方向,各自按自己的展示需求排)。
+    const photos = [...photosById.values()].sort((a, b) => (a.worldTime || 0) - (b.worldTime || 0));
+    let galleryNow = 0;
+    for (const p of photos) if (Number.isFinite(p.worldTime)) galleryNow = Math.max(galleryNow, p.worldTime);
+
+    // M4 备忘录时钟:memoNow 取每条备忘 latestTs(创建或最后编辑,取较新者)里的最大值。
+    let memoNow = 0;
+    for (const m of memos.values()) if (Number.isFinite(m.latestTs)) memoNow = Math.max(memoNow, m.latestTs);
+
     return {
         contacts, groups, threads, worldNow: worldNow || null,
         boards, residents, forumThreads, forumNow: forumNow || null,
         snsAccounts, tweets, snsNow: snsNow || null,
         searches, visits, browserNow: browserNow || null,
+        photos, galleryNow: galleryNow || null,
+        memos, memoNow: memoNow || null,
     };
 }
 
@@ -201,6 +244,9 @@ export function seenKeyForForumThread(threadId) { return `forum:${threadId}`; }
 export function seenKeyForTweet(tweetId) { return `sns:${tweetId}`; }
 // 浏览器不按线程/帖子/推分 key——整个 app 一把快照(任务书 §1「新内容标记」),单键固定不带参数。
 export function seenKeyForBrowser() { return 'browser:app'; }
+// M4 相册/备忘录同浏览器的整 app 一把快照工法(任务书-M4 §2)。
+export function seenKeyForGallery() { return 'gallery:app'; }
+export function seenKeyForMemo() { return 'memo:app'; }
 
 /** 线程里最新一条消息的入账 ts(空线程 0)——看过之后 seen 就记到这个值。 */
 export function latestTsOfThread(thread) {
@@ -252,6 +298,20 @@ export function latestTsOfBrowser(world) {
     return max;
 }
 
+/** 相册全部照片里最新的入账 ts(同 latestTsOfBrowser 的整 app 一把快照工法)。 */
+export function latestTsOfGallery(world) {
+    let max = 0;
+    for (const p of world.photos) if (p.ts > max) max = p.ts;
+    return max;
+}
+
+/** 备忘录全部条目里最新的入账 ts——每条备忘的 ts 已在 fold 时推到「创建或最后一次改写」的较新者。 */
+export function latestTsOfMemo(world) {
+    let max = 0;
+    for (const m of world.memos.values()) if (m.ts > max) max = m.ts;
+    return max;
+}
+
 /** 某个 app 里还有没有她没看过的东西——真手机的图标角标就是这个语义(有未读就亮)。 */
 export function hasUnseenInApp(app, world, seen) {
     if (app === 'messenger') {
@@ -274,6 +334,16 @@ export function hasUnseenInApp(app, world, seen) {
         const latest = latestTsOfBrowser(world);
         if (!latest) return false; // 浏览器还是空的,不该为它亮角标
         return (seen[seenKeyForBrowser()] || 0) < latest;
+    }
+    if (app === 'gallery') {
+        const latest = latestTsOfGallery(world);
+        if (!latest) return false; // 相册还是空的,不该为它亮角标
+        return (seen[seenKeyForGallery()] || 0) < latest;
+    }
+    if (app === 'memo') {
+        const latest = latestTsOfMemo(world);
+        if (!latest) return false; // 备忘录还是空的,不该为它亮角标
+        return (seen[seenKeyForMemo()] || 0) < latest;
     }
     for (const t of world.forumThreads.values()) {
         if (!t.title) continue; // 帖子壳(悬空回复)不是能点开的东西,不该为它亮角标
@@ -300,6 +370,10 @@ export function seenBaselinePairs(world) {
     }
     const browserTs = latestTsOfBrowser(world);
     if (browserTs) pairs.push([seenKeyForBrowser(), browserTs]);
+    const galleryTs = latestTsOfGallery(world);
+    if (galleryTs) pairs.push([seenKeyForGallery(), galleryTs]);
+    const memoTs = latestTsOfMemo(world);
+    if (memoTs) pairs.push([seenKeyForMemo(), memoTs]);
     return pairs;
 }
 

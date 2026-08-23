@@ -100,8 +100,10 @@
                 含「压缩成 5 行以内」→摘要(C)/含「登录中的 SNS」→SNS 主生成(H,首刷/二刷两版按账本是否已有账号自动切换)/
                 含「围观这条推文」→SNS 回复续写(I)/含「匿名论坛」→论坛主生成(F)/含「围观这个帖子」→论坛盖楼(G)/
                 含「浏览器「Astrolabe」」→浏览器主生成(J,没有续写入口,只有这一条)/
+                含「手机里的相册」→相册主生成(K,没有续写入口,只有这一条)/
+                含「手机里的备忘录」→备忘录主生成(L,首刷/二刷两版按账本是否已有备忘自动切换,二刷会对首刷第一条清单做一次改写)/
                 含「续写」→消息续聊(B/B_GROUP)/否则→消息主生成(A)。
-                SNS/论坛/消息/浏览器这套流程都从手机内点「刷新」「生成更多」/「生成回复」触发,不用额外按钮。<br>
+                SNS/论坛/消息/浏览器/相册/备忘录这套流程都从手机内点「刷新」「生成更多」/「生成回复」触发,不用额外按钮。<br>
                 语言开关(日本語/English/日中双语)直接在手机「设置」页切——fixture 会读同一份 extensionSettings,
                 切到日中双语后返回的消息/帖子/推文会带 zh 字段。
             </p>
@@ -340,6 +342,56 @@
         };
     }
 
+    // ── M4 相册「无声的日记」fixture(K,没有续写入口,只有一个主生成)──
+    // 字段名是 desc 不是 text/body/title,单独给一个,别复用其他 withZhXxx 撞错字段名。
+    function withZhDesc(desc) { return langIsJaZh() ? { desc, zh: `（中译）${desc}` } : { desc }; }
+    // 8 张照片跨 2 天(第 1〜5 张锚在较早的一天、第 6〜8 张锚在较新一天,靠 delayMin 累加天然跨天,
+    // 不用在 fixture 里手写 worldTime——同 layoutWorldTimes 的推演方式):tone 覆盖多种、含 1 张
+    // screenshot(kind:"screenshot")、1 张故意给非法 tone("nonexistent")练白名单落 street 这条路径。
+    function buildFixtureK() {
+        return {
+            worldTime: '2026-08-20 23:10',
+            newPhotos: [
+                { label: '空', ...withZhDesc('窓の外、雲がひとつもない夕方の空'), tone: 'sky', kind: 'photo', delayMin: 0 },
+                { label: '弁当', ...withZhDesc('コンビニの棚に並んだ弁当、まだ湯気が見える'), tone: 'food', kind: 'photo', delayMin: 30 },
+                { label: 'トーク画面', ...withZhDesc('既読がついたまま返信のないトーク画面のスクショ'), tone: 'screen', kind: 'screenshot', delayMin: 5 },
+                { label: '駅前', ...withZhDesc('人がまばらな駅前のロータリー、街灯がつき始めている'), tone: 'street', kind: 'photo', delayMin: 90 },
+                { label: '謎の色', ...withZhDesc('部屋の隅、暗がりに置かれたままの傘'), tone: 'nonexistent', kind: 'photo', delayMin: 20 },
+                { label: '海', ...withZhDesc('防波堤から見た夕方前の海、波が静か'), tone: 'sea', kind: 'photo', delayMin: 700 },
+                { label: '花', ...withZhDesc('道端に咲いていた名前の知らない花'), tone: 'blossom', kind: 'photo', delayMin: 15 },
+                { label: '夜', ...withZhDesc('誰もいない真夜中の空、星がひとつも見えない'), tone: 'night', kind: 'photo', delayMin: 200 },
+            ],
+        };
+    }
+
+    // ── M4 备忘录「未发送的真心话」fixture(L,没有续写入口,只有一个主生成)──
+    // 首刷 4 条新备忘(1 条多行清单练标题/预览切法、1 条单行短句、1 条含真心话稀有品、1 条日常琐碎)。
+    function buildFixtureLFirst() {
+        return {
+            worldTime: '2026-08-20 22:00',
+            newNotes: [
+                { ...withZh('牛乳\nパン\n卵'), delayMin: 0 },
+                { ...withZh('明日 9時 歯医者'), delayMin: 40 },
+                { ...withZh('言えなかった\nやっぱりまだ無理'), delayMin: 180 },
+                { ...withZh('電気代 振込'), delayMin: 60 },
+            ],
+            edits: [],
+        };
+    }
+    // 二刷(已有备忘时):对首刷第一条清单做一次改写(划掉牛奶换成鸡蛋,生活在动)+ 追加 1 条新备忘。
+    // existingNoteId 从 userContent 的【备忘录当前状态】digest 里现取一个真实 noteId。
+    function buildFixtureLRegrow(existingNoteId) {
+        return {
+            worldTime: '2026-08-20 23:30',
+            newNotes: [{ ...withZh('洗剤 そろそろ切れる'), delayMin: 10 }],
+            edits: existingNoteId ? [{ noteId: existingNoteId, ...withZh('パン\n卵\n洗剤'), delayMin: 0 }] : [],
+        };
+    }
+    function extractExistingMemoId(userContent) {
+        const m = /\[(mm_\S+)\]/.exec(userContent || '');
+        return m ? m[1] : null;
+    }
+
     function wrapFenced(obj) {
         return `好的，这是本次生成结果：\n\`\`\`json\n${JSON.stringify(obj)}\n\`\`\`\n以上，希望符合要求！`;
     }
@@ -372,6 +424,15 @@
         }
         if (systemPrompt.includes('浏览器「Astrolabe」')) {
             const body = buildFixtureJ();
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        if (systemPrompt.includes('手机里的相册')) {
+            const body = buildFixtureK();
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        if (systemPrompt.includes('手机里的备忘录')) {
+            const isFirstTime = (userContent || '').includes('备忘录是空的');
+            const body = isFirstTime ? buildFixtureLFirst() : buildFixtureLRegrow(extractExistingMemoId(userContent));
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
         if (systemPrompt.includes('围观这个帖子')) {
@@ -446,18 +507,20 @@
 
     async function renderState() {
         const worldKey = `${characters[ctx.characterId].avatar}::${ctx.getCurrentChatId()}`;
-        const [wmMessenger, wmForum, wmSns, wmBrowser] = await Promise.all([
+        const [wmMessenger, wmForum, wmSns, wmBrowser, wmGallery, wmMemo] = await Promise.all([
             store.getWatermark(worldKey, 'messenger'),
             store.getWatermark(worldKey, 'forum'),
             store.getWatermark(worldKey, 'sns'),
             store.getWatermark(worldKey, 'browser'),
+            store.getWatermark(worldKey, 'gallery'),
+            store.getWatermark(worldKey, 'memo'),
         ]);
         const tip = chat.length - 1;
         document.getElementById('state').textContent =
             `worldKey = ${worldKey}\nchat.length = ${chat.length} (tip = ${tip})\n` +
-            `watermarks = { messenger: ${wmMessenger}, forum: ${wmForum}, sns: ${wmSns}, browser: ${wmBrowser} }\n` +
-            `messenger 落后 = ${wmMessenger < tip} / forum 落后 = ${wmForum < tip} / sns 落后 = ${wmSns < tip} / browser 落后 = ${wmBrowser < tip}` +
-            `(四个 app 各自独立——一个刷新不该清另一个的红点)`;
+            `watermarks = { messenger: ${wmMessenger}, forum: ${wmForum}, sns: ${wmSns}, browser: ${wmBrowser}, gallery: ${wmGallery}, memo: ${wmMemo} }\n` +
+            `messenger 落后 = ${wmMessenger < tip} / forum 落后 = ${wmForum < tip} / sns 落后 = ${wmSns < tip} / browser 落后 = ${wmBrowser < tip} / gallery 落后 = ${wmGallery < tip} / memo 落后 = ${wmMemo < tip}` +
+            `(六个 app 各自独立——一个刷新不该清另一个的红点)`;
     }
 
     async function dumpLedger() {

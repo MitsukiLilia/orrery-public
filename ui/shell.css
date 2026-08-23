@@ -147,6 +147,7 @@
     gap: 24px 14px; padding: 28px 22px; align-content: start;
 }
 .or-app {
+    position: relative; /* 未读角标的定位参照(角标不能住在 or-app-icon 里,见 .or-app-badge 注) */
     display: flex; flex-direction: column; align-items: center; gap: 6px;
     background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
 }
@@ -175,8 +176,13 @@
     position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: cover; z-index: 2; display: block;
 }
+/* 未读角标:必须住在 or-app-icon 的外面——那个容器为了给生图图标裁圆角开着 overflow:hidden,
+   角标塞在里面会被圆角切成不规则的深色残片,读起来像图标上的脏点而不是通知(她 2026-08-22 报的
+   「右上角黑点」就是它)。挪出来贴在 .or-app 上,完整的小圆+奶油环才有角标的样子。
+   横向定位不用 right(格子是整列宽,图标 58px 居中):锚 50% 再往右偏出图标半宽附近。 */
 .or-app-badge {
-    position: absolute; top: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%;
+    position: absolute; top: -4px; left: calc(50% + 21px);
+    width: 11px; height: 11px; border-radius: 50%;
     background: var(--or-cocoa); border: 2px solid var(--or-cream); z-index: 3;
 }
 
