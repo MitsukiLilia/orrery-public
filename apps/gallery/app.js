@@ -3,16 +3,11 @@
 // v1 没有「生成更多/续写」——只有主刷新,详情屏只是看,没有任何操作按钮(任务书-M4 §一)。
 // 系统自带 app,不起化名(Pulsar/Astrolabe 是世界内品牌,相册没有品牌才拟真)——不带品牌条,标题就是「相册」。
 import { ICON_BACK, ICON_SCREENSHOT_BADGE } from '../../ui/icons.js';
+import { escapeHtml } from '../../core/escape.js';
 import { GALLERY_TONES } from '../../core/world.js';
 
 export const GALLERY_APP_ID = 'gallery';
 export const GALLERY_SKIN_URL = new URL('./skin.css', import.meta.url).href;
-
-function escapeHtml(s) {
-    const d = document.createElement('div');
-    d.textContent = String(s ?? '');
-    return d.innerHTML;
-}
 
 // tone 白名单再校验一遍(双保险,任务书-M4 §二/§四):即便 generator.js 消化时已经白名单过一次,
 // 渲染层落笔进 data-tone 属性前仍要自己再查一遍——绝不假设上游数据一定干净(IndexedDB 里可能躺着

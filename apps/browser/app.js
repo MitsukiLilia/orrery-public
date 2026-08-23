@@ -2,15 +2,10 @@
 // 用户只读:零输入框,唯二操作走 shell 的 data-action(刷新/切 tab)+ 长按/右键反悔(两 tab 一起倒带)。
 // v1 没有详情页——搜索记录/浏览历史都是终点,没有 open-xxx 的事,行本身不可点击,只能长按。
 import { ICON_BACK, ICON_APP_BROWSER, ICON_SEARCH_SM } from '../../ui/icons.js';
+import { escapeHtml } from '../../core/escape.js';
 
 export const BROWSER_APP_ID = 'browser';
 export const BROWSER_SKIN_URL = new URL('./skin.css', import.meta.url).href;
-
-function escapeHtml(s) {
-    const d = document.createElement('div');
-    d.textContent = String(s ?? '');
-    return d.innerHTML;
-}
 
 function isSameDay(ts1, ts2) {
     const a = new Date(ts1), b = new Date(ts2);

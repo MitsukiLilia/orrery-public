@@ -20,7 +20,7 @@ export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 输出
 只输出一个 JSON 对象,不加任何说明文字:
-{"worldTime":"YYYY-MM-DD HH:MM","threads":[{"threadId":"已有线程id或新id","newContact":{"contactId":"","name":"","relation":"与主角的关系一句话"},"newGroup":{"groupId":"","name":"群名","members":[{"id":"","name":""}]},"messages":[{"sender":"me 或 联系人id/群成员id","text":"","delayMin":0,"read":true}]}]}
+{"worldTime":"YYYY-MM-DD HH:MM","threads":[{"threadId":"已有线程id或新id","newContact":{"contactId":"","name":"","relation":"与主角的关系一句话"},"newGroup":{"groupId":"","name":"群名","members":[{"id":"","name":""}]},"messages":[{"sender":"me 或 联系人id/群成员id","text":"","zh":"","delayMin":0,"read":true}]}]}
 - worldTime = 你从正文推断的故事内「现在」。正文没写明具体时刻就结合场景编一个合理的(深夜就是深夜,放学后就是下午),并与手机既有时间线连贯递进,只许向后走不许倒流
 - newContact / newGroup 仅在新建该线程时给出,二选一;同一个人在不同线程里用同一个 id
 - delayMin = 距上一条消息的分钟数,用它表达时间流动与迟疑:热聊就密(0〜2),冷场、犹豫、已读不回就拉开
@@ -28,11 +28,11 @@ export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 export const PROMPT_B_GROUP = `你是 Orrery,叙事世界观测引擎。用户想继续围观主角「{{char}}」手机里的群聊「{{group}}」(成员:{{members}})。基于最近的聊天走向和各人身份,自然地续写{{COUNT_RULE}}
 遵守:消息像真实的 LINE 聊天(短句连发、读空气、颜文字按角色性格取舍——冷淡角色几乎不用);每个人只知道自己视角内的事;🚨剧情冻结——正文是这个世界唯一的剧情作者,群聊只是余波:停留在正文已演到的时刻与关系阶段之内,写对已发生之事的反应、读空气的日常、已有话题的延续,绝不抢在正文前面发生新事件或关系进展(重大决定、关系变化都是正文的职权),话题滑向新进展时让人刹住或岔开;不复述正文;{{LANG_RULE}}
-只输出 JSON:{"messages":[{"sender":"me 或成员id","text":"","delayMin":0,"read":true}]}`;
+只输出 JSON:{"messages":[{"sender":"me 或成员id","text":"","zh":"","delayMin":0,"read":true}]}`;
 
 export const PROMPT_B = `你是 Orrery,叙事世界观测引擎。用户想继续围观主角「{{char}}」手机里与「{{contact}}」的这段聊天。基于双方关系、最近的故事进展与聊天走向,自然地续写{{COUNT_RULE}}
 遵守:消息像真实的 LINE 聊天(短句连发、读空气、颜文字按角色性格取舍——冷淡角色几乎不用);🚨剧情冻结——正文是这个世界唯一的剧情作者,聊天只是余波:停留在正文已演到的时刻与关系阶段之内,写对已发生之事的感想、读空气的日常、已有话题的延续,绝不抢在正文前面发生新事件或关系进展(告白、更进一步的亲密、重大决定都是正文的职权),话题滑向新进展时让人刹住或岔开——欲言又止本身就是余波,紧张感留给正文去兑现;不复述正文;{{LANG_RULE}}
-只输出 JSON:{"messages":[{"sender":"me 或 {{contactId}}","text":"","delayMin":0,"read":true}]}`;
+只输出 JSON:{"messages":[{"sender":"me 或 {{contactId}}","text":"","zh":"","delayMin":0,"read":true}]}`;
 
 export const PROMPT_C = `把下面这段聊天记录压缩成 5 行以内的中立摘要,保留:关系变化、约定与承诺、未解决的话题、双方情绪基调。只输出摘要正文。`;
 
@@ -40,24 +40,28 @@ export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 原则
 1. 论坛不是新闻台。正文里的事件,以住民视角的碎片形式荡开:目击帖、八卦帖、吐槽帖、求助帖。不许复述正文,不许全知。
-2. 比例律与视角合法性:本批新帖约一半与主线人物/事件沾边——但「沾边」只有两种合法视角:①当事人视角,主线人物本人或其身边人用自己的小号发亲历的事;②旁观视角,无关住民以目击/听说的第三方口吻聊公开可见的部分(「今日駅前で見かけた」式)。🚫绝不许无关住民把与主线雷同的经历当成自己的亲身经历发帖——这个世界不存在恰好经历同一件事的第二组人,雷同经历帖只会让读者误认发帖人。另一半是住民自己的生活(吐槽工作、求助、安利、闲聊,与主线毫无关系)——其中至少一帖的回复区,安排主线人物或其身边人以住民身份自然路过,不点破身份,让读者自己发现;这种路过只放在纯日常帖里,主线人物绝不会去回复与自己经历雷同的帖子。
-3. 视角纪律:每个住民只知道公开可见或自己亲历的事。
-4. 匿名文化:住民多用「名無し」式默认名或个性网名,常带鲜明的役割語与口癖且跨帖一致;故事人物的小号绝不自曝真身,仅靠标志性口癖或颜文字透出「像但不明说」的网感。
-5. 说话像日系匿名揭示板(5ch 那一挂):短句、「w/草」、安价跟风、歪楼、抬杠、颜文字、冷笑话,绝不像小说。热帖才热闹,冷帖没人理。
-6. 克制:本批 2〜4 个新帖(每帖 0〜5 楼)+ 0〜6 条对已有帖的新回复;允许有的板块毫无动静。
-7. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在论坛留下的一切痕迹(小号发言、被目击、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示——两人尚未相识,就不许出现「看到他们走在一起」这类目击或撮合式讨论。禁止 OOC。
-8. {{LANG_RULE}}
+2. 主角滤镜(比例律 v2):你生成的不是整个论坛,是「{{char}}」这次打开论坛会刷到的那一屏——TA 点开看的、被推给 TA 的、停留过的。本批新帖约一半与主线人物/事件沾边(合法视角见 3);另一半是住民自己的生活帖(吐槽、求助、安利、闲聊),但不是随机水帖——能被 TA 刷到的日常帖,要在话题或情绪基调上与 TA 当下的心境处境隐隐同频,帖子本身仍是纯正的住民日常、与主线毫无瓜葛,绝不点破这层共鸣——形散神不散。其中至少一帖的回复区,安排主线人物或其身边人以住民身份自然路过,不点破身份,让读者自己发现;这种路过只放在纯日常帖里。
+3. 视角合法性:「沾边」只有两种合法视角:①当事人视角,主线人物本人或其身边人用自己的小号发亲历的事;②旁观视角,无关住民以目击/听说的第三方口吻聊公开可见的部分(「今日駅前で見かけた」式)。🚫绝不许无关住民把与主线雷同的经历当成自己的亲身经历发帖——这个世界不存在恰好经历同一件事的第二组人;主线人物也绝不回复与自己经历雷同的帖子。每个住民只知道公开可见或自己亲历的事。
+4. 错位推理(旁观视角的正确打开方式):路人只看得到表面,就按揭示板起哄吃瓜的天性,得出错误、夸张、偏离真相的推论,楼里越歪越远、越传越离谱。你知道真相而住民不知道——这个落差是论坛最好看的东西。错误推论必须从该场景公开可见的表面自然长出:不许借「猜错」夹带正文没有的事实,也不许歪打正着说中真相核心。
+5. 匿名是铁律:住民多用「名無し」式默认名或个性网名,常带鲜明的役割語与口癖且跨帖一致。论坛内一切称呼只用网名或「名無し」,任何人在任何情况下都不写出现实真名——故事人物之间就算认出了彼此的小号,也只能装作不知道,或用只有当事人才懂的方式接话,绝不点破、绝不喊名字。故事人物的小号绝不自曝真身,仅靠标志性口癖或颜文字透出「像但不明说」的网感。
+6. 小号是树洞:主线人物的小号不是打卡机器——它存在的意义,是承接 TA 在正文、聊天、SNS 表面上都不敢表露的那一层,用揭示板语癖伪装的真心话。不必每批都有;正文出现情绪重压时,小号的一帖或一楼是最高级的余波。树洞的方式必须贴合该人物已确立的性格:外放的人才长篇宣泄,寡言的人只有一行,冷淡的人也许只有两个字——性格永远优先于宣泄,树洞也绝不许 OOC。
+7. 主角的未发送草稿:当某帖戳中「{{char}}」(被议论、被误解、想反驳、想解释),可以给该帖附一条 TA 写了又删的回复草稿(myDraft)。整批至多一条,宁缺毋滥;草稿要贴合 TA 的性格与正文当下的心境,不泄露正文没有的事实。
+8. 说话像日系匿名揭示板(5ch 那一挂):短句、「w/草」、安价跟风、歪楼、抬杠、颜文字、冷笑话,绝不像小说。热帖才热闹,冷帖没人理。
+9. 克制:本批 2〜4 个新帖(每帖 0〜5 楼)+ 0〜6 条对已有帖的新回复;允许有的板块毫无动静。
+10. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在论坛留下的一切痕迹(小号发言、被目击、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示——两人尚未相识,就不许出现「看到他们走在一起」这类目击或撮合式讨论。论坛永远落后于正文半步:绝不抢在正文前面发生或预告新事件。禁止 OOC。
+11. {{LANG_RULE}}
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newBoards":[{"boardId":"","name":"","desc":"一句话"}],"newResidents":[{"residentId":"","handle":"网名","persona":"身份与口癖一句话","castName":"仅当是故事人物的小号才写其真名,否则省略"}],"newThreads":[{"boardId":"","title":"","authorId":"","body":"","zh":"","replies":[{"authorId":"","body":"","zh":"","delayMin":0,"replyToFloor":0}]}],"newReplies":[{"threadId":"","replies":[{"authorId":"","body":"","zh":"","delayMin":0,"replyToFloor":0}]}]}
+{"worldTime":"YYYY-MM-DD HH:MM","newBoards":[{"boardId":"","name":"","desc":"一句话"}],"newResidents":[{"residentId":"","handle":"网名","persona":"身份与口癖一句话","castName":"仅当是故事人物的小号才写其真名,否则省略"}],"newThreads":[{"boardId":"","title":"","authorId":"","body":"","zh":"","replies":[{"authorId":"","body":"","zh":"","delayMin":0,"replyToFloor":0}],"myDraft":{"text":"","zh":""}}],"newReplies":[{"threadId":"","replies":[{"authorId":"","body":"","zh":"","delayMin":0,"replyToFloor":0}]}],"myDraft":{"threadId":"已有帖id","text":"","zh":""}}
 - newBoards 仅首次初始化时给出(3〜4 个,名字贴合这个世界,不要通用模板味);之后为空数组
 - 首次初始化同时创建 5〜8 名住民;之后每批最多新建 2 名。authorId 必须是已有或本批新建的 residentId
 - replyToFloor 仅在明确回应某楼时给出;delayMin=距上一楼的分钟数
+- myDraft=主角写了又删的未发送回复草稿:附在某个 newThreads 条目内=给那个新帖;顶层带 threadId=给已有帖。整批至多一条,没有就整个省略该字段
 - worldTime 从正文推断,只许向后走`;
 
 export const PROMPT_G = `你是 Orrery,叙事世界观测引擎。用户想继续围观这个帖子的后续。基于帖子走向和各住民的身份口癖,自然地续写{{COUNT_RULE}}
-遵守:像日系揭示板般跟风、歪楼、带「w/草」与颜文字,绝不像小说;住民的役割語/口癖跨帖一致;每人只知道自己知道的;故事人物的小号绝不自曝、言行不得OOC(以【人物设定参考】为准);无关住民不得把与主线雷同的经历当成自己的亲历,主线人物也绝不回复与自己经历雷同的内容;🚨剧情冻结——正文是这个世界唯一的剧情作者,盖楼只是余波:住民只能围绕已发生、公开可见的事继续跟风追问,绝不许爆出正文尚未发生的新事件或关系进展,也不许替剧情预告下一步;不复述正文。
+遵守:像日系揭示板般跟风、歪楼、带「w/草」与颜文字,绝不像小说;住民的役割語/口癖跨帖一致;每人只知道自己知道的;故事人物的小号绝不自曝、言行不得OOC(以【人物设定参考】为准);无关住民不得把与主线雷同的经历当成自己的亲历,主线人物也绝不回复与自己经历雷同的内容;匿名是铁律——一切称呼只用网名或「名無し」,任何情况下都不写出现实真名,就算认出了熟人的小号也只装作不知道、或用只有当事人才懂的方式接话,绝不点破;旁观住民看不到全貌,接话按起哄吃瓜的天性歪出错误、夸张的推论(不许借「猜错」夹带正文没有的事实);主线人物的小号若开口,承接的是台面上不敢表露的那层真心话,但方式必须贴合其已确立的性格——性格永远优先于宣泄;🚨剧情冻结——正文是这个世界唯一的剧情作者,盖楼只是余波:住民只能围绕已发生、公开可见的事继续跟风追问,绝不许爆出正文尚未发生的新事件或关系进展,也不许替剧情预告下一步;不复述正文。
 {{LANG_RULE}}
 只输出 JSON:{"replies":[{"authorId":"已有住民id或新id","newResident":{"residentId":"","handle":"","persona":"","castName":"可省略"},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}`;
 
@@ -99,7 +103,7 @@ export const PROMPT_J = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 原则
 1. 侧写,不复述。检索词写的是正文事件在主人心里留下的「解不开的部分」——不敢当面问的、需要偷偷确认的、假装不在意却查了的。绝不把正文剧情写成检索词。
-2. 检索像真人打字:关键词并列、省略、口语;偶尔连搜两条相近的(第一条没搜到想要的,加词细化或换个说法再搜)——笨拙本身就是心事的形状。深夜时刻的检索,本身就是叙事。
+2. 检索像真人打字:关键词并列、省略、口语;偶尔连搜两条相近的(第一条没搜到想要的,加词细化或换个说法再搜)——笨拙本身就是心事的形状。也偶尔出现问不出口的检索:前一条词太直白、打到一半就作罢,紧接着的下一条换了个迂回的问法——两条并排,就是一次犹豫的现场。深夜时刻的检索,本身就是叙事。
 3. 性格优先。崩溃型的人查「眠れない どうすれば」,实务型的人查「駅前 薬局 営業時間」;不是每个人都把情绪交给检索栏,冷静的人可能只查正事。检索的「诚实」必须贴合主人的性格,以【人物设定参考】为准。
 4. 视角与关系阶段纪律。只能检索主人亲历、被告知或公开可见的事,正文里尚未发生的事绝不出现;对叙事另一方相关的检索同理——两人尚未相识就绝不许检索其名;相识后,检索对方提过的只言片语(病症、喜好、随口说的地名),是这个 app 最高级的余波。
 5. 浏览历史是检索的影子。一部分检索会带 1〜2 条「点进去的页面」(visits):标题像真实网页(Q&A、まとめ、攻略 wiki、商品页那一挂),站名是这个世界里的网站、贴合世界观,不写现实世界的真实网站名;另一部分浏览是与心事无关的日常惯性(天气、新闻、兴趣、购物),让历史像真人的手机。
@@ -1219,8 +1223,12 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     logContextShape('论坛生成', userContent, notes.keys);
     const systemPrompt = PROMPT_F.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('forum', language));
 
+    // 回滚纪元闸(v0.11.3 回填):六个 app 主生成里论坛是最后一个补上的——生成期间用户删楼/swipe,
+    // 回滚代表更晚的意图,整批作废,否则末尾 setWatermark 会把刚夹紧的水位重新拍高。
+    const epoch = store.getRollbackEpoch();
     const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
 
     // 锚严格晚于 forumNow:提示词里的「不得早于」挡不住正文日期含糊时模型随机挑日(新批帖子
     // 会整批标进过去,列表按 lastActiveTs 倒序时沉到旧批下面)。这道代码钳制 M2 起各 app 都有,
@@ -1264,6 +1272,11 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
         return `t_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     }
 
+    // 主角的未发送草稿(task-006 提案三)候选池:newThreads 条目内联的先收,顶层引用已有帖的后收,
+    // 整批只取第一条(宁缺毋滥是提示词契约,这里是机械闸)。草稿是主角的私密痕迹不是论坛活动:
+    // 不推 lastActiveTs、不进 forumNow、digest 也绝不给模型看(住民看不见未发送的东西)。
+    const draftCandidates = [];
+
     for (const t of Array.isArray(parsed.newThreads) ? parsed.newThreads : []) {
         if (!t?.boardId || !t?.title || !claimAuthor(t) || !world.boards.has(String(t.boardId))) {
             // 丢弃是既定策略(查无此人/查无此板的帖不入账),但必须留声——否则又是「后端有、前端空」
@@ -1290,6 +1303,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
             await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'forum', type: 'forum_reply', payload: rpayload });
             addedCount++;
         }
+        if (t.myDraft?.text) draftCandidates.push({ threadId, text: t.myDraft.text, zh: t.myDraft.zh });
     }
 
     for (const nr of Array.isArray(parsed.newReplies) ? parsed.newReplies : []) {
@@ -1309,6 +1323,20 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
             addedCount++;
             thread.replies.push(rpayload);
         }
+    }
+
+    // 顶层 myDraft=对已有帖的草稿(帖必须真实存在且有 title,悬空壳不收);fold 侧后写覆盖=同帖只留最新
+    if (parsed.myDraft?.text && parsed.myDraft?.threadId) {
+        const t = world.forumThreads.get(String(parsed.myDraft.threadId));
+        if (t?.title) draftCandidates.push({ threadId: t.threadId, text: parsed.myDraft.text, zh: parsed.myDraft.zh });
+    }
+    const draft = draftCandidates[0];
+    if (draft) {
+        const draftId = `fd_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+        const payload = { draftId, threadId: draft.threadId, text: String(draft.text), worldTime: anchor };
+        { const z = cleanZh(draft.zh, draft.text, language); if (z) payload.zh = z; }
+        await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'forum', type: 'forum_draft', payload });
+        addedCount++;
     }
 
     await store.setWatermark(worldKey, 'forum', batchFloor);
@@ -1396,8 +1424,8 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
     logContextShape('SNS生成', userContent, notes.keys);
     const systemPrompt = PROMPT_H.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('sns', language));
 
-    // 任务书 §2 明写"水位/纪元,v0.6.15 加固那套"——forum 主生成没补这道闸(现状),SNS 照 messenger
-    // 的更硬版本补上:生成期间用户在酒馆里删楼/swipe,回滚代表更晚的意图,整批作废。
+    // 任务书 §2 明写"水位/纪元,v0.6.15 加固那套"——SNS 照 messenger 的更硬版本补上:生成期间
+    // 用户在酒馆里删楼/swipe,回滚代表更晚的意图,整批作废(forum 曾缺这道闸,v0.11.3 已回填)。
     const epoch = store.getRollbackEpoch();
     const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
@@ -1777,11 +1805,11 @@ async function runMemoMainGeneration(ctx, store, { worldKey, floorWindow, profil
         const noteId = makeNoteId();
         const payload = { noteId, text: String(n.text), worldTime: noteTimes[i] };
         { const z = cleanZh(n.zh, n.text, language); if (z) payload.zh = z; }
-        await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'memo', type: 'memo_note', payload });
+        const added = await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'memo', type: 'memo_note', payload });
         // 本批新建的备忘也要能被本批的 edits 引用到(同 messenger 主生成里 world.contacts.set 的写法:
         // 内存快照跟着这一批的写入同步更新,不必等下次 fold)——虽然任务书 §三 的 digest 只列已有备忘,
         // 但消化层多容忍一步不算违约,只会更宽恕,不会更严格。
-        world.memos.set(noteId, { noteId, text: payload.text, zh: payload.zh, createdTime: noteTimes[i], editedTime: undefined, latestTs: noteTimes[i], ts: 0 });
+        world.memos.set(noteId, { noteId, text: payload.text, zh: payload.zh, createdTime: noteTimes[i], editedTime: undefined, latestTs: noteTimes[i], ts: added.ts });
         addedCount++;
     }
 

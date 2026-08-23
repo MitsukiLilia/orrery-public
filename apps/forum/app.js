@@ -2,16 +2,11 @@
 // 用户只读:零输入框,唯二操作走 shell 的 data-action(刷新/生成更多)+ 长按/右键反悔。
 // castName 只活在 core/世界数据层,这个文件从不读它——住民短 ID 用 world.shortIdFor,不暴露真名。
 import { ICON_BACK, ICON_MINUS, ICON_PLUS } from '../../ui/icons.js';
+import { escapeHtml } from '../../core/escape.js';
 import { shortIdFor, seenKeyForForumThread, newReplyCountOfForumThread } from '../../core/world.js';
 
 export const FORUM_APP_ID = 'forum';
 export const FORUM_SKIN_URL = new URL('./skin.css', import.meta.url).href;
-
-function escapeHtml(s) {
-    const d = document.createElement('div');
-    d.textContent = String(s ?? '');
-    return d.innerHTML;
-}
 
 function isSameDay(ts1, ts2) {
     const a = new Date(ts1), b = new Date(ts2);
@@ -123,6 +118,15 @@ export function renderForumThreadHtml({ thread, world, busy, forumNow, seenAt = 
     });
     if (!thread.replies.length) repliesHtml = `<div class="or-empty">还没有人回复。</div>`;
 
+    // 主角写了又删的回复草稿(task-006 提案三):渲染成一条未发送的输入痕迹,划删除线=「写了又删」。
+    // 它只存在于主角的屏幕上——住民看不见,digest 也不进 LLM 上下文,纯 UI 私密层。
+    const d = thread.myDraft;
+    const draftHtml = d?.text ? `<div class="or-forum-draft">
+        <div class="or-forum-draft-label">未发送的回复</div>
+        <div class="or-forum-draft-body">${escapeHtml(d.text)}</div>
+        ${d.zh && d.zh !== d.text ? `<div class="or-forum-draft-zh">${escapeHtml(d.zh)}</div>` : ''}
+    </div>` : '';
+
     return `
         <div class="or-header">
             <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
@@ -135,6 +139,7 @@ export function renderForumThreadHtml({ thread, world, busy, forumNow, seenAt = 
                 <div class="or-forum-op-body">${escapeHtml(thread.body)}${thread.zh && thread.zh !== thread.body ? `<div class="or-zh">${escapeHtml(thread.zh)}</div>` : ''}</div>
             </div>
             <div class="or-forum-replies">${repliesHtml}</div>
+            ${draftHtml}
         </div>
         <div class="or-chat-footer">
             <div class="or-batch">

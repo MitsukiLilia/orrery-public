@@ -16,6 +16,7 @@ import {
     generateMoreGallery, generateMoreMemo,
 } from '../core/generator.js';
 import { manualRevert } from '../core/rollback.js';
+import { escapeHtml } from '../core/escape.js';
 import {
     ICON_BACK, ICON_CHEVRON_RIGHT, ICON_CHECK, ICON_MINUS, ICON_PLUS, ICON_CLOSE,
     ICON_APP_MESSENGER, ICON_APP_SETTINGS, ICON_APP_FORUM, ICON_APP_MEMO, ICON_APP_SNS, ICON_APP_GALLERY,
@@ -55,13 +56,7 @@ const APPS = [
     { id: 'browser', label: '浏览器', bg: 'salt', icon: ICON_APP_BROWSER, enabled: true },
 ];
 
-// 注意必须自己转义引号:textContent→innerHTML 那套只转 & < >(序列化文本节点本就不需要转引号),
-// 而这个函数大量用在属性值里(data-thread-id="${...}" 等),那些 id 是模型自由生成的字符串。
-// 一个引号就能提前闭合属性、往标签里塞任意属性;Shadow DOM 只隔离样式和查询,不隔离脚本执行。
-const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-function escapeHtml(s) {
-    return String(s ?? '').replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
-}
+// escapeHtml 收编进 core/escape.js(带引号转义的安全版,六个 app 共用,注释见彼处)。
 
 // 手机主人=世界的锚点,一经设定不可更改(她 2026-08-11 拍板:唯一不可改的设置)。
 // 多人卡({{char}}=世界观名)时,余波视角必须锚在一个具体人物身上,这里就是锚。
@@ -314,7 +309,7 @@ export function createShell(ctx, onExternalChange) {
     // 长按删一条、调一下条数,她正在读的位置就被弹回顶部(她 2026-08-14 报的第 2 点)。
     // 规则:同一块屏幕重渲染 → 原地保持;刚进屋 / 刚生成完 → 跳到新内容分界线。 ──
     const SCROLLERS = '.or-chat-scroll, .or-forum-scroll, .or-thread-list, .or-forum-list, .or-browser-list, .or-list, .or-grid, '
-        + '.or-gallery-list, .or-memo-list, .or-gallery-detail-scroll, .or-memo-detail-scroll';
+        + '.or-gallery-list, .or-memo-list, .or-gallery-detail-scroll, .or-memo-detail-scroll, .or-sns-list, .or-sns-scroll';
     function screenKey(top) {
         return [top.type, top.threadId || '', top.boardId || '', top.tweetId || '', top.accountId || '', top.photoId || '', top.noteId || ''].join('|');
     }

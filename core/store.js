@@ -189,7 +189,7 @@ export async function deleteForumThreadCascade(worldKey, threadId) {
             const cursor = req.result;
             if (!cursor) return;
             const v = cursor.value;
-            const hit = (v.type === 'forum_thread' || v.type === 'forum_reply') && v.payload?.threadId === threadId;
+            const hit = (v.type === 'forum_thread' || v.type === 'forum_reply' || v.type === 'forum_draft') && v.payload?.threadId === threadId;
             if (hit) cursor.delete();
             cursor.continue();
         };

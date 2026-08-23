@@ -2,16 +2,11 @@
 // 用户只读:零输入框,唯二操作走 shell 的 data-action(刷新/生成回复)+ 长按/右键反悔。
 // castName 只活在 core/世界数据层,这个文件从不读它——账号条目与住民条目一视同仁,UI 只用 handle/displayName/locked。
 import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_LOCK, ICON_CAMERA, ICON_REPLY_SM, ICON_RT_SM, ICON_MOON } from '../../ui/icons.js';
+import { escapeHtml } from '../../core/escape.js';
 import { monogramFor, colorForContact, seenKeyForTweet, newReplyCountOfTweet } from '../../core/world.js';
 
 export const SNS_APP_ID = 'sns';
 export const SNS_SKIN_URL = new URL('./skin.css', import.meta.url).href;
-
-function escapeHtml(s) {
-    const d = document.createElement('div');
-    d.textContent = String(s ?? '');
-    return d.innerHTML;
-}
 
 function isSameDay(ts1, ts2) {
     const a = new Date(ts1), b = new Date(ts2);

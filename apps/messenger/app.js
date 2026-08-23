@@ -1,6 +1,7 @@
 // 聊天软件:纯渲染,不碰 ctx、不挂事件监听——事件委托统一在 ui/shell.js(避免每次重渲染都叠加监听器)。
 // 既読渲染只认 payload.read,不做"最后一条 AI 消息之前都算已读"那套推导(与 Perigee 的差异点)。
 import { ICON_BACK, ICON_UNDO, ICON_MINUS, ICON_PLUS } from '../../ui/icons.js';
+import { escapeHtml } from '../../core/escape.js';
 import {
     resolveSender, monogramFor, colorForContact,
     seenKeyForThread, unreadCountOfThread,
@@ -8,12 +9,6 @@ import {
 
 export const MESSENGER_APP_ID = 'messenger';
 export const MESSENGER_SKIN_URL = new URL('./skin.css', import.meta.url).href;
-
-function escapeHtml(s) {
-    const d = document.createElement('div');
-    d.textContent = String(s ?? '');
-    return d.innerHTML;
-}
 
 function isSameDay(ts1, ts2) {
     const a = new Date(ts1), b = new Date(ts2);

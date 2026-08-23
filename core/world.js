@@ -138,6 +138,11 @@ export function foldWorld(entries) {
         } else if (e.type === 'forum_reply') {
             const t = ensureForumThread(e.payload.threadId);
             t.replies.push({ ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'forum_draft') {
+            // 主角写了又删的回复草稿(task-006):挂在帖上,后写覆盖=同帖只留最新;
+            // 不参与 lastActiveTs/forumNow(它不是论坛活动,是主角屏幕上的私密痕迹)
+            const t = ensureForumThread(e.payload.threadId);
+            t.myDraft = { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts };
         } else if (e.type === 'sns_account') {
             snsAccounts.set(e.payload.accountId, { ...e.payload, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'tweet') {
@@ -391,8 +396,10 @@ export function resolveSender(world, thread, senderId) {
 
 /** 某线程内,最后一条 summary 覆盖到的 ts——之前的消息只在 UI 显示,不再喂给 LLM。 */
 export function lastCoveredTs(thread) {
-    if (!thread.summaries.length) return -Infinity;
-    return Math.max(...thread.summaries.map(s => s.coversUntilTs));
+    // filter(Number.isFinite) 与本文件其余聚合同款:一条畸形 summary 的 NaN 会让 uncoveredMessages
+    // 恒空,总结与续聊上下文静默失效——第二道闸哲学同 memo_edit。
+    const times = thread.summaries.map(s => s.coversUntilTs).filter(Number.isFinite);
+    return times.length ? Math.max(...times) : -Infinity;
 }
 
 /** 某线程内尚未被任何 summary 覆盖的消息(生成/总结都用这份,UI 渲染用 thread.messages 全量)。 */

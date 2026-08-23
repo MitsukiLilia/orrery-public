@@ -84,3 +84,20 @@
     font-size: 13.5px; color: var(--or-cocoa); line-height: 1.6;
     margin-top: 4px; white-space: pre-wrap; word-break: break-word;
 }
+
+/* 主角的未发送草稿(task-006):输入框痕迹感——虚线框+删除线;住民视角不存在的私密层 */
+.or-forum-draft {
+    margin: 14px 16px 8px; padding: 10px 12px;
+    border: 1.5px dashed var(--or-cocoa-light); border-radius: 10px;
+    background: var(--or-cream);
+}
+.or-forum-draft-label { font-size: 10.5px; color: var(--or-cocoa-light); margin-bottom: 4px; letter-spacing: .04em; }
+.or-forum-draft-body {
+    font-size: 13.5px; color: var(--or-cocoa); line-height: 1.55;
+    text-decoration: line-through; text-decoration-color: var(--or-cocoa-light);
+    white-space: pre-wrap; word-break: break-word;
+}
+.or-forum-draft-zh {
+    font-size: 12px; color: var(--or-cocoa-light); margin-top: 4px; line-height: 1.5;
+    text-decoration: line-through; text-decoration-color: var(--or-cocoa-light);
+}

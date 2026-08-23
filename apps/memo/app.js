@@ -3,15 +3,10 @@
 // v1 没有「生成更多/续写」——只有主刷新,详情屏只是看,没有任何操作按钮(任务书-M4 §一)。
 // 系统自带 app,不起化名——不带品牌条,标题就是「备忘录」。
 import { ICON_BACK } from '../../ui/icons.js';
+import { escapeHtml } from '../../core/escape.js';
 
 export const MEMO_APP_ID = 'memo';
 export const MEMO_SKIN_URL = new URL('./skin.css', import.meta.url).href;
-
-function escapeHtml(s) {
-    const d = document.createElement('div');
-    d.textContent = String(s ?? '');
-    return d.innerHTML;
-}
 
 function isSameDay(ts1, ts2) {
     const a = new Date(ts1), b = new Date(ts2);
