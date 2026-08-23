@@ -27,11 +27,11 @@ export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - read:sender 为 me 时表示对方是否已读;sender 为他人时表示主角是否已读。用它演出已读不回。`;
 
 export const PROMPT_B_GROUP = `你是 Orrery,叙事世界观测引擎。用户想继续围观主角「{{char}}」手机里的群聊「{{group}}」(成员:{{members}})。基于最近的聊天走向和各人身份,自然地续写{{COUNT_RULE}}
-遵守:消息像真实的 LINE 聊天(短句连发、读空气、颜文字按角色性格取舍——冷淡角色几乎不用);每个人只知道自己视角内的事;不复述正文;{{LANG_RULE}}
+遵守:消息像真实的 LINE 聊天(短句连发、读空气、颜文字按角色性格取舍——冷淡角色几乎不用);每个人只知道自己视角内的事;🚨剧情冻结——正文是这个世界唯一的剧情作者,群聊只是余波:停留在正文已演到的时刻与关系阶段之内,写对已发生之事的反应、读空气的日常、已有话题的延续,绝不抢在正文前面发生新事件或关系进展(重大决定、关系变化都是正文的职权),话题滑向新进展时让人刹住或岔开;不复述正文;{{LANG_RULE}}
 只输出 JSON:{"messages":[{"sender":"me 或成员id","text":"","delayMin":0,"read":true}]}`;
 
 export const PROMPT_B = `你是 Orrery,叙事世界观测引擎。用户想继续围观主角「{{char}}」手机里与「{{contact}}」的这段聊天。基于双方关系、最近的故事进展与聊天走向,自然地续写{{COUNT_RULE}}
-遵守:消息像真实的 LINE 聊天(短句连发、读空气、颜文字按角色性格取舍——冷淡角色几乎不用);不复述正文;{{LANG_RULE}}
+遵守:消息像真实的 LINE 聊天(短句连发、读空气、颜文字按角色性格取舍——冷淡角色几乎不用);🚨剧情冻结——正文是这个世界唯一的剧情作者,聊天只是余波:停留在正文已演到的时刻与关系阶段之内,写对已发生之事的感想、读空气的日常、已有话题的延续,绝不抢在正文前面发生新事件或关系进展(告白、更进一步的亲密、重大决定都是正文的职权),话题滑向新进展时让人刹住或岔开——欲言又止本身就是余波,紧张感留给正文去兑现;不复述正文;{{LANG_RULE}}
 只输出 JSON:{"messages":[{"sender":"me 或 {{contactId}}","text":"","delayMin":0,"read":true}]}`;
 
 export const PROMPT_C = `把下面这段聊天记录压缩成 5 行以内的中立摘要,保留:关系变化、约定与承诺、未解决的话题、双方情绪基调。只输出摘要正文。`;
@@ -57,7 +57,7 @@ export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - worldTime 从正文推断,只许向后走`;
 
 export const PROMPT_G = `你是 Orrery,叙事世界观测引擎。用户想继续围观这个帖子的后续。基于帖子走向和各住民的身份口癖,自然地续写{{COUNT_RULE}}
-遵守:像日系揭示板般跟风、歪楼、带「w/草」与颜文字,绝不像小说;住民的役割語/口癖跨帖一致;每人只知道自己知道的;故事人物的小号绝不自曝、言行不得OOC(以【人物设定参考】为准);无关住民不得把与主线雷同的经历当成自己的亲历,主线人物也绝不回复与自己经历雷同的内容;不复述正文。
+遵守:像日系揭示板般跟风、歪楼、带「w/草」与颜文字,绝不像小说;住民的役割語/口癖跨帖一致;每人只知道自己知道的;故事人物的小号绝不自曝、言行不得OOC(以【人物设定参考】为准);无关住民不得把与主线雷同的经历当成自己的亲历,主线人物也绝不回复与自己经历雷同的内容;🚨剧情冻结——正文是这个世界唯一的剧情作者,盖楼只是余波:住民只能围绕已发生、公开可见的事继续跟风追问,绝不许爆出正文尚未发生的新事件或关系进展,也不许替剧情预告下一步;不复述正文。
 {{LANG_RULE}}
 只输出 JSON:{"replies":[{"authorId":"已有住民id或新id","newResident":{"residentId":"","handle":"","persona":"","castName":"可省略"},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}`;
 
@@ -89,7 +89,7 @@ export const PROMPT_H = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走`;
 
 export const PROMPT_I = `你是 Orrery,叙事世界观测引擎。用户想继续围观这条推文下的后续。基于推文内容和各账号的人格口癖,自然地续写{{COUNT_RULE}}
-遵守:像真实的日本推特回复串(短文、体言止め、跟风、歪楼),绝不像小说;严格保持社交距离感——熟人随意接梗,陌生人搭话(尤其热推下)常带「FF外から失礼します」式客套,偶尔有不读空气的 KY,但对主线人物的失礼极少且轻微、且很快有其他账号自然怼回或打圆场;账号口癖与人格跨推一致;每人只知道公开可见的事;故事人物的账号绝不自曝、言行不得OOC(以【人物设定参考】为准);表垢与裏垢的语气落差要守住;无关住民不得把与主线雷同的经历当成自己的亲历;⭐主人本人的账号绝不出现在陌生账号的回复区(主人只回已相识者的推,身边人路过陌生推则不受此限);不复述正文。
+遵守:像真实的日本推特回复串(短文、体言止め、跟风、歪楼),绝不像小说;严格保持社交距离感——熟人随意接梗,陌生人搭话(尤其热推下)常带「FF外から失礼します」式客套,偶尔有不读空气的 KY,但对主线人物的失礼极少且轻微、且很快有其他账号自然怼回或打圆场;账号口癖与人格跨推一致;每人只知道公开可见的事;故事人物的账号绝不自曝、言行不得OOC(以【人物设定参考】为准);表垢与裏垢的语气落差要守住;无关住民不得把与主线雷同的经历当成自己的亲历;⭐主人本人的账号绝不出现在陌生账号的回复区(主人只回已相识者的推,身边人路过陌生推则不受此限);🚨剧情冻结——正文是这个世界唯一的剧情作者,回复串只是余波:只围绕已发生、公开可见的事接梗,绝不许爆出正文尚未发生的新事件或关系进展;不复述正文。
 {{LANG_RULE}}
 只输出 JSON:{"replies":[{"accountId":"已有账号id或新id","newAccount":{"accountId":"","handle":"","displayName":"","bio":"","castName":"可省略"},"body":"","zh":"","delayMin":0}]}`;
 
@@ -1013,7 +1013,10 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
 
     const touchedThreads = new Set();
     let addedCount = 0;
-    const anchor = parseWorldTime(parsed.worldTime) ?? world.worldNow ?? Date.now();
+    // 锚严格晚于 worldNow(同论坛的钳制):线程内有 batchTail/layoutWorldTimes 保单调,但锚若
+    // 倒退,只动到旧线程的批次会把新消息标进过去,线程列表(按最新消息排)随之倒挂。
+    const notBefore = world.worldNow ? world.worldNow + 60000 : null;
+    const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? notBefore ?? Date.now(), notBefore ?? 0);
     // 批内线程尾时刻:world.threads 是批次开始前的静态快照,循环里从不更新。同一次响应里
     // 两个块落到同一条线程时(模型重复同一 threadId,或经身份归一后被合并),第二块若仍读旧快照,
     // 排出来的世界时刻会早于第一块刚写进去的消息,同线程内出现时间倒挂。
@@ -1219,7 +1222,11 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
 
-    const anchor = parseWorldTime(parsed.worldTime) ?? world.forumNow ?? Date.now();
+    // 锚严格晚于 forumNow:提示词里的「不得早于」挡不住正文日期含糊时模型随机挑日(新批帖子
+    // 会整批标进过去,列表按 lastActiveTs 倒序时沉到旧批下面)。这道代码钳制 M2 起各 app 都有,
+    // 论坛是 M1 建的一直没回填;+1 分钟是防钳平后与旧最新帖同刻,稳定排序仍让新帖垫底。
+    const notBefore = world.forumNow ? world.forumNow + 60000 : null;
+    const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? notBefore ?? Date.now(), notBefore ?? 0);
     let addedCount = 0;
 
     for (const b of Array.isArray(parsed.newBoards) ? parsed.newBoards : []) {
