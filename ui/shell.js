@@ -105,6 +105,7 @@ function renderSettingsHtml(s, profileLabel, owner) {
                     <button class="${s.theme === 'seasalt' ? 'on' : ''}" data-action="set-theme" data-theme="seasalt">海盐巧克力</button>
                     <button class="${s.theme === 'mono' ? 'on' : ''}" data-action="set-theme" data-theme="mono">墨白</button>
                     <button class="${s.theme === 'lunar' ? 'on' : ''}" data-action="set-theme" data-theme="lunar">月夜</button>
+                    <button class="${s.theme === 'magic' ? 'on' : ''}" data-action="set-theme" data-theme="magic">魔導書</button>
                 </div>
             </div>
             <div class="or-row">
@@ -297,8 +298,8 @@ export function createShell(ctx, onExternalChange) {
         if (!root) return;
         const theme = settings().theme || 'seasalt';
         root.dataset.theme = theme;
-        if (theme === 'mono' || theme === 'lunar') {
-            // 墨白/月夜:极简底,不要波点和浪花(月夜的氛围交给图标)
+        if (theme === 'mono' || theme === 'lunar' || theme === 'magic') {
+            // 墨白/月夜/魔導書:极简底,不要波点和浪花(月夜的氛围交给图标,羊皮纸自己就是质感)
             root.style.setProperty('--or-dots', 'none');
             root.style.setProperty('--or-wave', 'none');
             root.style.setProperty('--or-chat-dots', 'none');

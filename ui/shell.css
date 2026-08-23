@@ -27,6 +27,17 @@
     --or-photo-ph: #E4E7EC;
 }
 
+/* 魔導書主题(第四主题·2026-08-23 她圈选方向1「羊皮纸烫金」):羊皮纸底+鎏金+深褐墨,
+   给 HP 那类西幻 IP 用。色板采样自方向探针再为整屏 UI 提亮;salt-deep=古金(担当未读点/
+   开关/选中态——蜡封红会和危险操作的红撞语义,故用金)。波点浪花置 none(羊皮纸自己就是质感)。 */
+.or-root[data-theme="magic"] {
+    --or-cream: #F3EAD9; --or-cream-2: #E7D9BE; --or-white: #FBF6EA;
+    --or-salt: #DCC298; --or-salt-deep: #A6813C;
+    --or-cocoa: #5C452C; --or-cocoa-light: #8F7A5E;
+    --or-shadow: rgba(92, 69, 44, .12);
+    --or-photo-ph: #E2D2B0;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 
 .or-root {
@@ -285,7 +296,7 @@
 .or-setup-warn { font-size: 11px; color: var(--or-cocoa-light); opacity: .85; line-height: 1.6; max-width: 240px; }
 
 /* ── 主题分段选择 / 危险操作 ── */
-.or-theme-seg { display: flex; gap: 6px; }
+.or-theme-seg { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .or-theme-seg button {
     border: 1px solid var(--or-cream-2); background: none; color: var(--or-cocoa-light);
     font-size: 12px; padding: 6px 12px; border-radius: 999px; cursor: pointer; font-family: inherit;
