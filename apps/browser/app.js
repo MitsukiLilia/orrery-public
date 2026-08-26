@@ -139,8 +139,11 @@ export function renderWebPageHtml({ visit, snapshot, busy, starred = {} }) {
     const starBtn = snapshot ? `<button class="or-star ${on ? 'on' : ''}" data-action="toggle-star" data-star-key="${escapeHtml(starKey)}" title="${on ? '从星图移除' : '加入星图'}">${on ? ICON_STAR_FILL : ICON_STAR}</button>` : '';
     let body;
     if (snapshot) {
+        // 兜底只加两条,不掺会压扁排版的全局规则:html{overflow-x:auto} 让提示词层刻意保留桌面版式的
+        // 社内系统能整页横向滚动而不是被挤压;img/video max-width 防止图片撑破窄屏容器。桌面版式本身
+        // 靠模型给最外层容器写 min-width 来横向滚动——这是提示词层的约定,这里不重复兜底也不越权覆盖。
         const clean = sanitizeSnapshotHtml(snapshot.html);
-        const srcdoc = `<style>a{cursor:not-allowed !important}body{margin:0;padding:14px;box-sizing:border-box;overflow-wrap:break-word}</style>${clean}`;
+        const srcdoc = `<style>a{cursor:not-allowed !important}body{margin:0;padding:14px;box-sizing:border-box;overflow-wrap:break-word}html{overflow-x:auto}img,video{max-width:100%;height:auto}</style>${clean}`;
         body = `<div class="or-webpage-body">
             <iframe class="or-webpage-frame" sandbox="" srcdoc="${escapeHtml(srcdoc)}"></iframe>
             ${snapshot.zh ? `<div class="or-webpage-zh">${escapeHtml(snapshot.zh)}</div>` : ''}
