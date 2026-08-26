@@ -80,6 +80,9 @@ export function shortIdFor(residentId) {
  * community: 所属对象或 null(app='world' type='community',一世界一条,后写覆盖=只留最新,同 snsSuggest)。
  * notices: noticeId -> { noticeId, title, body, zh?, signedBy, worldTime },M5 论坛公告——worldTime 参与
  *   forumNow 推进(它是论坛活动),置顶(前 3 条)与折叠规则在渲染层算,fold 只原样收着不作取舍。
+ * follows: { omote: Set<accountId>, ura: Set<accountId> }——M6 关注表,按账本顺序回放 sns_follow
+ *   (follow=add,unfollow=delete;Set 语义天然让"unfollow 一个不在表里的 id"是 no-op)。fold 收尾时
+ *   过滤掉 accountId 已不在 snsAccounts 里的悬空关注(账号被回滚/删除的防御性兜底,同 memo_edit 的第二道闸)。
  */
 export function foldWorld(entries) {
     const contacts = new Map();
@@ -98,6 +101,7 @@ export function foldWorld(entries) {
     let snsSuggest = null;        // v0.14 搜索联想:整批一条,后写覆盖=只留最新一批
     let community = null;         // M5 所属:一世界一条,后写覆盖=只留最新(同 snsSuggest 的语义)
     const notices = new Map();    // M5 公告:noticeId -> notice,置顶规则在渲染层算,fold 只管原样收着
+    const follows = { omote: new Set(), ura: new Set() }; // M6 关注表:by 分两套,follow/unfollow 按账本顺序回放
 
     function ensureThread(threadId) {
         if (!threads.has(threadId)) {
@@ -158,6 +162,15 @@ export function foldWorld(entries) {
         } else if (e.type === 'tweet_reply') {
             const t = ensureTweet(e.payload.tweetId);
             t.replies.push({ ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'sns_follow') {
+            // M6 关注表:by 只认 omote/ura(其余归 omote 兜底,同其余字段的宽容解析习惯);
+            // follow=Set.add,unfollow=Set.delete——delete 对不存在的 key 天然 no-op,契约自动满足。
+            const by = e.payload.by === 'ura' ? 'ura' : 'omote';
+            const accountId = e.payload.accountId;
+            if (accountId) {
+                if (e.payload.action === 'unfollow') follows[by].delete(accountId);
+                else follows[by].add(accountId);
+            }
         } else if (e.type === 'search_query') {
             searches.set(e.payload.queryId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'browse_visit') {
@@ -245,6 +258,15 @@ export function foldWorld(entries) {
     let memoNow = 0;
     for (const m of memos.values()) if (Number.isFinite(m.latestTs)) memoNow = Math.max(memoNow, m.latestTs);
 
+    // M6 关注表收尾:渲染前过滤一次悬空引用(account 已不在 snsAccounts 里的 accountId)——
+    // 现有删除机制都是账号与关注同 sourceFloor 一起被 deleteEntriesFromFloor 清走,理论上不会出现,
+    // 但防御性闸门成本极低(同 memo_edit 指向不存在 noteId 的先例),留着不吃亏。
+    for (const role of ['omote', 'ura']) {
+        for (const id of [...follows[role]]) {
+            if (!snsAccounts.has(id)) follows[role].delete(id);
+        }
+    }
+
     return {
         contacts, groups, threads, worldNow: worldNow || null,
         boards, residents, forumThreads, forumNow: forumNow || null,
@@ -253,6 +275,7 @@ export function foldWorld(entries) {
         photos, galleryNow: galleryNow || null,
         memos, memoNow: memoNow || null,
         community, notices, // M5:所属(对象或 null)+ 公告表
+        follows, // M6:{ omote: Set, ura: Set } 关注表
     };
 }
 

@@ -25,7 +25,7 @@ import {
 } from './icons.js';
 import { renderThreadListHtml, renderThreadHtml, MESSENGER_SKIN_URL } from '../apps/messenger/app.js';
 import { renderForumListHtml, renderForumThreadHtml, FORUM_SKIN_URL } from '../apps/forum/app.js';
-import { renderSnsTlHtml, renderSnsTweetHtml, renderSnsProfileHtml, renderSnsMyPageHtml, renderSnsSearchHtml, renderSnsSearchResultHtml, SNS_SKIN_URL } from '../apps/sns/app.js';
+import { renderSnsTlHtml, renderSnsTweetHtml, renderSnsProfileHtml, renderSnsMyPageHtml, renderSnsSearchHtml, renderSnsSearchResultHtml, renderSnsFollowListHtml, SNS_SKIN_URL } from '../apps/sns/app.js';
 import { renderBrowserHtml, renderWebPageHtml, BROWSER_SKIN_URL } from '../apps/browser/app.js';
 import { renderGalleryListHtml, renderGalleryPhotoHtml, GALLERY_SKIN_URL } from '../apps/gallery/app.js';
 import { renderMemoListHtml, renderMemoNoteHtml, MEMO_SKIN_URL } from '../apps/memo/app.js';
@@ -423,7 +423,16 @@ export function createShell(ctx, onExternalChange) {
                     world, busy: busy.sns, myRole: top.myRole || 'omote', seen, starred, snsNow: world.snsNow,
                 });
             } else {
-                screenEl.innerHTML = renderSnsTlHtml({ world, busy: busy.sns, seen, starred, justUpdated });
+                // 任务书-M6 §1.2:tlMode 默认值——该视角关注表非空→following,空→recommend
+                // (旧世界/首次打开时关注表是空的,不该一进来就撞见「フォロー中」的空白页)。
+                if (top.tlMode === undefined) {
+                    const role = top.myRole || 'omote';
+                    top.tlMode = (world.follows?.[role]?.size > 0) ? 'following' : 'recommend';
+                }
+                screenEl.innerHTML = renderSnsTlHtml({
+                    world, busy: busy.sns, seen, starred, justUpdated,
+                    myRole: top.myRole || 'omote', tlMode: top.tlMode,
+                });
             }
             // TL 是浏览面,进 TL 不推 seen 水位——同论坛列表页语义(点进详情才算看过)。
         } else if (top.type === 'sns-tweet') {
@@ -442,7 +451,10 @@ export function createShell(ctx, onExternalChange) {
         } else if (top.type === 'sns-profile') {
             const account = world.snsAccounts.get(top.accountId);
             if (!account) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚清空(理论上账号不会被单删,防御性兜底)
-            screenEl.innerHTML = renderSnsProfileHtml({ account, world, snsNow: world.snsNow, seen, starred });
+            screenEl.innerHTML = renderSnsProfileHtml({ account, world, snsNow: world.snsNow, seen, starred, myRole: currentSnsMyRole() });
+        } else if (top.type === 'sns-follow-list') {
+            // 任务书-M6 §4:纯本地渲染,role 是入口按钮固定传入的(裏垢视角点进来的就是裏垢的关注表)。
+            screenEl.innerHTML = renderSnsFollowListHtml({ world, role: top.role === 'ura' ? 'ura' : 'omote' });
         } else if (top.type === 'browser') {
             // 整 app 一把 seen 快照(不是每条一个 key)——进屏定格一次,tab 切换/重渲染都不再挪动;
             // 下次真正离开(navBack)重新进来才会拿到新的水位当新的快照(同 thread/forum-thread/sns-tweet 的模式)。
@@ -826,7 +838,28 @@ export function createShell(ctx, onExternalChange) {
         const top = navStack[navStack.length - 1];
         if (top.type !== 'sns-tl') return;
         top.myRole = role === 'ura' ? 'ura' : 'omote';
+        top.tlMode = undefined; // 任务书-M6 §4:视角变了,TL 的 フォロー中/おすすめ 重新按默认值取
         render();
+    }
+
+    // 任务书-M6 §4:TL header 下フォロー中/おすすめ 双 tab 切换,状态存在同一张 sns-tl 帧上。
+    // screenKey 不认 tlMode(同一张 sns-tl 帧、tab 还是 'tl'),不强制回顶的话会把上一个 tab 的滚动位置
+    // 带过来——同 doForumPage 翻页那道 pendingScroll 的思路,新切的 tab 该从头看起。
+    function doSnsSelectTlMode(mode) {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'sns-tl') return;
+        top.tlMode = mode === 'recommend' ? 'recommend' : 'following';
+        pendingScroll = { fallback: 'top', key: screenKey(top) };
+        render();
+    }
+
+    // 当前 SNS 观测者视角(表/裏):读最近一张 sns-tl 帧上的 myRole——账号主页/星图跳转进来的推文详情
+    // 都可能叠在 sns-tl 之上,视角状态只住在那一张帧,别处现查就得回头找它(找不到时兜底 omote)。
+    function currentSnsMyRole() {
+        for (let i = navStack.length - 1; i >= 0; i--) {
+            if (navStack[i].type === 'sns-tl') return navStack[i].myRole || 'omote';
+        }
+        return 'omote';
     }
 
     // ── v0.14 生成双面(task-007 她拍板):搜索结果与网页快照都是「点开才生成一次,入账永久缓存」。──
@@ -1122,6 +1155,8 @@ export function createShell(ctx, onExternalChange) {
             case 'sns-generate-more': doContinueTweetReplies(); break;
             case 'sns-tab': doSnsSelectTab(el.dataset.tab); break;
             case 'sns-select-viewer': doSnsSelectViewer(el.dataset.role); break;
+            case 'sns-tl-mode': doSnsSelectTlMode(el.dataset.mode); break;
+            case 'open-sns-follow-list': navPush({ type: 'sns-follow-list', role: el.dataset.role === 'ura' ? 'ura' : 'omote' }); break;
             case 'toggle-star': doToggleStar(el.dataset.starKey); break;
             case 'sns-search-open': navPush({ type: 'sns-search' }); break;
             case 'sns-search-word': doOpenSnsSearch(el.dataset.word); break;

@@ -20,6 +20,8 @@ export const ICON_MOON = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.
 // M2 SNS 件:锁形(locked 账号名字旁,任务书 §1/§3)/相机(配图占位框中央,任务书 §3)
 export const ICON_LOCK = '<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 export const ICON_CAMERA = '<svg viewBox="0 0 24 24"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1-1.6h7l1 1.6h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5v-9Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12.7" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+// M6 公式账号徽标(任务书-M6 §4):盾形纯色实心,不用现实平台的蓝色对勾——推文行/主页 displayName 旁小徽标。
+export const ICON_OFFICIAL_BADGE = '<svg viewBox="0 0 24 24"><path d="M12 2.8 19 5.6v5.1c0 5.2-3 8.9-7 10.5-4-1.6-7-5.3-7-10.5V5.6Z" fill="currentColor"/></svg>';
 
 // 应用网格图标(24x24 viewBox,单色,由容器决定底色)
 export const ICON_APP_MESSENGER = '<svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8A2.5 2.5 0 0 1 17.5 16H10l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 13.5v-8Z" fill="currentColor"/><circle cx="9" cy="9.5" r="1.15" fill="#fff"/><circle cx="12" cy="9.5" r="1.15" fill="#fff"/><circle cx="15" cy="9.5" r="1.15" fill="#fff"/></svg>';

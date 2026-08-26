@@ -166,3 +166,35 @@
     font-size: 13.5px; color: var(--or-cocoa); border-bottom: 1px solid var(--or-cream-2);
 }
 .or-sns-suggest-row svg { width: 14px; height: 14px; color: var(--or-cocoa-light); flex-shrink: 0; }
+
+/* ── M6 关注分层:TL 双 tab / 公式徽标 / 「我的」フォロー计数 / 关注列表页 / 已关注标签 ── */
+.or-sns-tlmode {
+    flex-shrink: 0; display: flex; border-bottom: 1px solid var(--or-cream-2); background: var(--or-white);
+}
+.or-sns-tlmode button {
+    flex: 1; border: none; background: none; padding: 10px 0; cursor: pointer;
+    font-size: 12.5px; color: var(--or-cocoa-light); border-bottom: 2px solid transparent;
+}
+.or-sns-tlmode button.on { color: var(--or-cocoa); font-weight: 700; border-bottom-color: var(--or-salt-deep); }
+
+.or-sns-official { display: inline-flex; color: var(--or-salt-deep); }
+.or-sns-official svg { width: 11px; height: 11px; }
+
+.or-sns-follow-count {
+    border: none; background: var(--or-cream); color: var(--or-cocoa-light); cursor: pointer;
+    font-size: 11.5px; padding: 4px 12px; border-radius: 999px; margin-top: 6px;
+}
+.or-sns-followed-tag {
+    display: inline-block; font-size: 10.5px; color: var(--or-cocoa-light);
+    background: var(--or-cream); padding: 2px 9px; border-radius: 999px; margin-top: 4px;
+}
+
+.or-sns-follow-row {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    border: none; background: none; cursor: pointer; padding: 12px 16px;
+    border-bottom: 1px solid var(--or-cream-2);
+}
+.or-sns-follow-row:active { background: rgba(110, 90, 80, .05); }
+.or-sns-follow-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.or-sns-follow-row-name { font-size: 13.5px; font-weight: 600; color: var(--or-cocoa); display: inline-flex; align-items: center; gap: 4px; }
+.or-sns-follow-row-handle { font-size: 12px; color: var(--or-cocoa-light); }

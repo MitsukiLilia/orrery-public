@@ -70,29 +70,31 @@ export const PROMPT_G = `你是 Orrery,叙事世界观测引擎。用户想继�
 
 // ── M2:SNS「Pulsar」提示词(H/I),任务书 §4 逐字嵌入,一个字都不许改写。 ──
 
-export const PROMPT_H = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里登录中的 SNS「Pulsar」——推特型的短文社交平台,属于故事世界本身,住民全部真实生活在这个世界里,没有人知道自己身处故事。给你的材料:①故事正文的最新进展 ②SNS 当前状态(账号、已有推文)。请推演 SNS 上自然会出现的新动静。
+export const PROMPT_H = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里登录中的 SNS「Pulsar」——推特型的短文社交平台,属于故事世界本身,住民全部真实生活在这个世界里,没有人知道自己身处故事。给你的材料:①故事正文的最新进展 ②SNS 当前状态(账号、关注、已有推文)。请推演 SNS 上自然会出现的新动静。
 
 # 原则
 1. 余波,不是复述。正文里的事件不许转述;写它在 SNS 上荡开的水纹——当事人若无其事的日常推、意味深长的空リプ、突然的沉默、以及与事件无关的日常继续流动。
 2. 社交面具与情绪裂缝(本 app 的灵魂)。表垢是对外的人格面(よそ行き):礼貌语或温和口语、体面、岁月静好,可带表情或 tag;裏垢是情绪的裂缝(壁打ち,面壁倾诉):语无伦次、全角半角混杂、甚至因情绪极化而失去词汇量(限界化,如「無理」「しんどい」),极少用表情。同一事件在表与裏的落差,是这里最高级的余波——大号一句「今日は暑かった」,锁着的小号五分钟前连发三条崩溃。但崩溃的方式也必须贴合角色性格——限界化是许可不是义务,性格永远优先于氛围。
 3. 裏垢按性格涌现,不保底。不是每个人都开小号:冷淡寡言、不擅表达的人可能一辈子只有一个账号,沉默也是人格。只有性格合适的人、且剧情推到某个情绪节点时,才会诞生裏垢——开号本身就是一次事件。主人的裏垢一旦诞生,默认带锁(鍵垢);而裏垢一旦存在就不许整批缺席:正文出现重大情绪/关系进展时,本批它必须有动静——发推、改 bio、displayName 加状态后缀都算,「隔了很久才发」可以,毫无痕迹不行。
-4. 比例律与视角合法性。本批推文约一半与主线人物/事件沾边——「沾边」只有两种合法视角:当事人(主线人物本人或身边人的账号,发与亲历相关的推)与旁观者(无关住民以目击/听说口吻聊公开可见的部分)。🚫绝不许无关住民把与主线雷同的经历当成自己的亲身经历发推——这个世界不存在恰好经历同一件事的第二组人。另一半是住民账号毫无营养的生活流水(おはよう/おやすみ打卡、抱怨通勤、天气、饭拍、安利、推活)——其中至少一条的回复区,安排主人**身边人**的账号(亲友、同事、下属那一挂)自然路过,不点破身份,让读者自己发现;这种路过只放在纯日常推下,绝不回复与主线经历雷同的内容。⭐主人本人的账号不做这种路过:现实的推特上没有人拿自己的账号到处去陌生人的回复区留言,主人的回复只会出现在已相识者的推文下;对陌生账号的内容,主人至多无言 RT 或保持沉默——主人的每一次开口都是剧情,不是活跃度。
-5. 视角纪律。每个账号只知道公开可见或自己亲历的事,不许未卜先知。
-6. 说话像真实的日本推特:短文、体言止め、省略主语;连投、跟风梗;ハッシュタグ偶尔用不滥用。不点名、不艾特的空リプ最有味——对某事/某人发表感想,只给懂的人看,绝不提及具体特征。绝不像小说。颜文字与表情按账号人格取舍——冷淡账号几乎不用。
-7. 回复区的社交距离与恶意浓度。熟人随意接梗;陌生人搭话(尤其热推下)常带「FF外から失礼します」式客套;偶尔有不读空气的 KY 或抬杠,但恶意浓度保持低——对主线人物的失礼极少且轻微,一旦出现,很快有其他账号自然怼回或打圆场。
-8. RT 与数字。RT 是无言转发(不写引用评论),用 retweetOf 标记,转发本身就是态度。いいね/RT 是几〜几十的小数字,同人世界不通胀;三位数以上的爆推=剧情级事件才配有。
-9. 配图占位。推文可偶尔带图:在 body 里用「[写真:一句话描述画面]」占位,本批最多 1〜2 条带图,以饭拍、风景、日常小物为主;裏垢几乎不发图。
-10. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在 SNS 留下的一切痕迹(账号、发言、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示;两人尚未相识,就不许出现互动或撮合式讨论。故事人物的小号绝不自曝真身。禁止 OOC。
-11. {{LANG_RULE}}
-12. 规模与下限:正文有新进展时,本批固定产出 5〜8 条新推——下限 5 条是硬性契约,其中至少 2 条从不同视角回应新进展(当事人的若无其事、身边人的反应、旁观者的只言片语都算),其余为日常流水;正文没有新进展的批次才允许 3 条以下的安静。沉默只能是账号级的(某个账号这批不发声),不能是时间线级的——用户按下刷新,是要看到世界在动的。另有 0〜6 条对已有推的新回复。首次初始化时创建主人的表垢 + 5〜8 个住民账号;之后每批最多新建 2 个账号。
-13. 検索の影(suggestedSearches):随每批给出 2〜4 条主人此刻会在 Pulsar 搜索栏输入的词——在意的人的话题、放不下的事、与情绪相关的 tag。与检索栏同一哲学:问不出口的,都会先出现在搜索栏。必须贴合主人性格与当下心境,是检索语式的短词组(语言随语言规则);没有可信的词就给空数组,不硬凑。
+4. 关注是人格的镜子(フォロー)。主人的表垢只关注 TA 认识的人与所属的公式账号:亲戚、朋友、同僚、上司下属、原著配角——首次初始化必须为主人建起这一圈(亲戚与朋友那一挂至少各有一个账号),并让表垢关注他们;所属若有公式账号(自治体・学校・組織那种官僚文风的お知らせ账号,official:true)也一并建立并关注,没有公式账号的所属不硬造。主人的裏垢(若存在)关注的是与心境同频的路人:病み垢的相互、恋愛相談・占い・名言 bot、深夜の独り言那一挂——按性格与剧情涌现,心境变了就取关、换关注;只有正文出现明确翻篇的时刻,才允许一次「リセット」式的清空(罕见,宁缺毋滥)。关注与取关都是余波,用 followChanges 表达;关注表为空视为首次,补齐主人已认识账号的关注。
+5. 比例律与视角合法性。本批推文约一半与主线人物/事件沾边——「沾边」只有两种合法视角:当事人(主线人物本人或身边人的账号,发与亲历相关的推)与旁观者(无关住民以目击/听说口吻聊公开可见的部分)。🚫绝不许无关住民把与主线雷同的经历当成自己的亲身经历发推——这个世界不存在恰好经历同一件事的第二组人。另一半是住民账号毫无营养的生活流水(おはよう/おやすみ打卡、抱怨通勤、天气、饭拍、安利、推活)——其中至少一条的回复区,安排主人**身边人**的账号(亲友、同事、下属那一挂)自然路过,不点破身份,让读者自己发现;这种路过只放在纯日常推下,绝不回复与主线经历雷同的内容。⭐主人本人的账号不做这种路过:现实的推特上没有人拿自己的账号到处去陌生人的回复区留言,主人的回复只会出现在已相识者的推文下;对陌生账号的内容,主人至多无言 RT 或保持沉默——主人的每一次开口都是剧情,不是活跃度。
+6. 视角纪律。每个账号只知道公开可见或自己亲历的事,不许未卜先知。
+7. 说话像真实的日本推特:短文、体言止め、省略主语;连投、跟风梗;ハッシュタグ偶尔用不滥用。不点名、不艾特的空リプ最有味——对某事/某人发表感想,只给懂的人看,绝不提及具体特征。绝不像小说。颜文字与表情按账号人格取舍——冷淡账号几乎不用。
+8. 回复区的社交距离与恶意浓度。熟人随意接梗;陌生人搭话(尤其热推下)常带「FF外から失礼します」式客套;偶尔有不读空气的 KY 或抬杠,但恶意浓度保持低——对主线人物的失礼极少且轻微,一旦出现,很快有其他账号自然怼回或打圆场。
+9. RT 与数字。RT 是无言转发(不写引用评论),用 retweetOf 标记,转发本身就是态度。いいね/RT 是几〜几十的小数字,同人世界不通胀;三位数以上的爆推=剧情级事件才配有。
+10. 配图占位。推文可偶尔带图:在 body 里用「[写真:一句话描述画面]」占位,本批最多 1〜2 条带图,以饭拍、风景、日常小物为主;裏垢几乎不发图。
+11. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在 SNS 留下的一切痕迹(账号、发言、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示;两人尚未相识,就不许出现互动或撮合式讨论。故事人物的小号绝不自曝真身。禁止 OOC。
+12. {{LANG_RULE}}
+13. 规模与下限:正文有新进展时,本批固定产出 5〜8 条新推——下限 5 条是硬性契约,其中至少 2 条从不同视角回应新进展(当事人的若无其事、身边人的反应、旁观者的只言片语都算),其余为日常流水;正文没有新进展的批次才允许 3 条以下的安静。沉默只能是账号级的(某个账号这批不发声),不能是时间线级的——用户按下刷新,是要看到世界在动的。另有 0〜6 条对已有推的新回复。首次初始化时创建主人的表垢 + TA 认识的人的账号(亲戚、朋友、同僚那一挂 3〜5 个,表垢关注他们)+ 3〜5 个无关住民账号;之后每批最多新建 2 个账号。
+14. 検索の影(suggestedSearches):随每批给出 2〜4 条主人此刻会在 Pulsar 搜索栏输入的词——在意的人的话题、放不下的事、与情绪相关的 tag。与检索栏同一哲学:问不出口的,都会先出现在搜索栏。必须贴合主人性格与当下心境,是检索语式的短词组(语言随语言规则);没有可信的词就给空数组,不硬凑。
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newAccounts":[{"accountId":"","handle":"英数字ID(不带@)","displayName":"显示名","bio":"一句话简介","locked":false,"ownerRole":"仅主人的账号才写:omote 或 ura","castName":"仅当是故事人物的账号才写其真名,否则省略"}],"newTweets":[{"accountId":"","body":"","zh":"","delayMin":0,"likes":0,"retweets":0,"retweetOf":"仅转发时写已有推文id","replies":[{"accountId":"","body":"","zh":"","delayMin":0}]}],"newReplies":[{"tweetId":"","replies":[{"accountId":"","body":"","zh":"","delayMin":0}]}],"suggestedSearches":["",""]}
-- newAccounts 里 ownerRole 与 castName 互斥;accountId 必须是已有或本批新建的
+{"worldTime":"YYYY-MM-DD HH:MM","newAccounts":[{"accountId":"","handle":"英数字ID(不带@)","displayName":"显示名","bio":"一句话简介","locked":false,"ownerRole":"仅主人的账号才写:omote 或 ura","castName":"仅当是故事人物的账号才写其真名,否则省略","official":false}],"newTweets":[{"accountId":"","body":"","zh":"","delayMin":0,"likes":0,"retweets":0,"retweetOf":"仅转发时写已有推文id","replies":[{"accountId":"","body":"","zh":"","delayMin":0}]}],"newReplies":[{"tweetId":"","replies":[{"accountId":"","body":"","zh":"","delayMin":0}]}],"followChanges":[{"by":"omote 或 ura","accountId":"已有或本批新建的账号id","action":"follow 或 unfollow"}],"suggestedSearches":["",""]}
+- newAccounts 里 ownerRole、castName、official 三者互斥;accountId 必须是已有或本批新建的
 - 首次初始化必建主人的表垢(ownerRole:"omote");裏垢(ownerRole:"ura")只在原则 3 的条件满足时才诞生
 - bio 与 displayName 都是余波舞台:情绪剧变或进入某事件时,可改 bio、或在 displayName 加状态后缀(低浮上、〇〇ロス式)作隐秘表达——用 newAccounts 重发同 accountId 覆盖即可
+- followChanges 的 by=ura 只在裏垢存在时有效;没有变动就给空数组
 - 转发推(带 retweetOf)的 body 留空
 - delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走`;
 
@@ -922,18 +924,36 @@ function buildForumThreadDigestText(world, thread) {
 
 // ── M2:SNS 材料拼装(主生成用【SNS 当前状态】+ 续写用单推全文;castName 只在这里流动,UI 绝不读它)。──
 
-// 任务书 §2:账号名册每行 `accountId | @handle | displayName | bio | ownerRole/castName 标注 | locked`
-function accountRosterLine(a) {
-    const tag = a.ownerRole ? `ownerRole=${a.ownerRole}` : (a.castName ? `castName=${a.castName}` : '');
-    return `${a.accountId} | @${a.handle} | ${a.displayName} | ${a.bio || ''} | ${tag} | ${a.locked ? 'locked' : ''}`;
+// 任务书 §2:账号名册每行 `accountId | @handle | displayName | bio | ownerRole/castName/official 标注 | locked | 关注标记`
+// M6 §3:tag 三选一改成 ownerRole > castName > official 优先级(与 runSnsMainGeneration 的互斥归一同一顺序);
+// 关注标记(表フォロー/裏フォロー)由 world.follows 现查现算,不落进账本——世界状态一变这行自然跟着变。
+function accountRosterLine(a, world) {
+    const tag = a.ownerRole ? `ownerRole=${a.ownerRole}` : (a.castName ? `castName=${a.castName}` : (a.official ? 'official' : ''));
+    const followTags = [];
+    if (world?.follows?.omote?.has(a.accountId)) followTags.push('表フォロー');
+    if (world?.follows?.ura?.has(a.accountId)) followTags.push('裏フォロー');
+    return `${a.accountId} | @${a.handle} | ${a.displayName} | ${a.bio || ''} | ${tag} | ${a.locked ? 'locked' : ''} | ${followTags.join('/')}`;
+}
+
+// M6 §3:名册之后加一行关注表——表垢/裏垢分别列出关注的 @handle,空则写「(空,视为首次)」
+// (表垢为空对应 PROMPT_H 原则 4 的首次初始化;裏垢为空多数时候只是裏垢还不存在,同一措辞够用,
+// 提示词自己会按原则 3/4 判断裏垢该不该诞生,这里只如实报告"当前是空的")。
+function buildSnsFollowLine(world) {
+    const handleFor = (id) => `@${world.snsAccounts.get(id)?.handle || id}`;
+    const omoteText = world.follows?.omote?.size ? [...world.follows.omote].map(handleFor).join(',') : '(空,视为首次)';
+    const uraText = world.follows?.ura?.size ? [...world.follows.ura].map(handleFor).join(',') : '(空,视为首次)';
+    return `[关注表] 表垢:${omoteText} / 裏垢:${uraText}`;
 }
 
 function buildSnsDigestText(world) {
     if (!world.snsAccounts.size) return '(SNS 是空的,首次生成:请先创建主人的表垢并初始化 5〜8 个住民账号)';
     const parts = [];
+    // M6 §3:所属背景行,写法与 buildForumDigestText 顶部那行同源(communityKindLabel 两处共用)。
+    if (world.community) parts.push(`[主人的所属] ${world.community.name}(${communityKindLabel(world.community.kind)}):${world.community.desc || ''}`);
     if (world.snsNow) parts.push(`[SNS 当前世界时刻] ${fmtWorldTime(world.snsNow)}(新的 worldTime 不得早于它)`);
     parts.push('[账号名册]');
-    for (const a of world.snsAccounts.values()) parts.push(accountRosterLine(a));
+    for (const a of world.snsAccounts.values()) parts.push(accountRosterLine(a, world));
+    parts.push(buildSnsFollowLine(world));
     // 任务书 §2:最近 8 条推(按 lastActiveTs 倒序):`tweetId | @handle | body 前 80 字 | 回复数 | likes/RT`;各推附最后 2 条回复
     const recentTweets = [...world.tweets.values()]
         .filter(t => t.accountId)
@@ -960,7 +980,7 @@ function buildSnsTweetDigestText(world, tweet) {
         parts.push(`@${rHandle}: ${r.body}`);
     });
     parts.push('\n[账号名册]');
-    for (const a of world.snsAccounts.values()) parts.push(accountRosterLine(a));
+    for (const a of world.snsAccounts.values()) parts.push(accountRosterLine(a, world));
     return parts.join('\n');
 }
 
@@ -1542,6 +1562,10 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
 
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
     const charName = owner || ctx.name2 || '主角';
+    // M6:所属コミュニティ接入 SNS(任务书-M6 §3)——只用来撑起「表垢关注所属公式账号」这条
+    // 关注纪律与 digest 的一行背景;不像论坛那样阻塞,推断失败/尚未推断出时 SNS 照常生成。
+    const community = await ensureCommunity(ctx, store, { worldKey, profileId, customApi, owner: charName, language, excludeTags, world });
+    if (community) world.community = community; // 首次生成时是刚写入的新条目,folded world 还没见过它,手动同步一次
     // 同 messenger/forum 的点名警示,换成 SNS 语境的措辞(注册账号发言而非通讯录/住民小号)。
     const userSideName = (ctx.name1 || '').trim();
     const caution = (userSideName && userSideName !== charName)
@@ -1568,7 +1592,10 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
         if (!a?.accountId || !a?.handle) continue;
         let ownerRole = (a.ownerRole === 'omote' || a.ownerRole === 'ura') ? a.ownerRole : undefined;
         let castName = a.castName ? String(a.castName) : undefined;
-        if (ownerRole && castName) castName = undefined; // 两者都有则丢 castName(任务书 §1)
+        let official = !!a.official;
+        // 三者互斥归一(任务书-M6 §1.1/§3):ownerRole > castName > official,优先级最高者留下
+        if (ownerRole) { castName = undefined; official = false; }
+        else if (castName) official = false;
 
         // ⭐user 硬防线:displayName 或 castName 匹配 ctx.name1 的新账号整条拒收(allowUserContact 开着才放行)
         if (!allowUserContact && ((a.displayName && isUserSide(a.displayName, ctx)) || (castName && isUserSide(castName, ctx)))) {
@@ -1587,7 +1614,8 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
             bio: a.bio || '', locked: !!a.locked,
         };
         if (ownerRole) payload.ownerRole = ownerRole;
-        if (castName) payload.castName = castName;
+        else if (castName) payload.castName = castName;
+        else if (official) payload.official = true;
         const added = await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'sns', type: 'sns_account', payload });
         world.snsAccounts.set(accountId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
     }
@@ -1672,6 +1700,27 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
             addedCount++;
             tweet.replies.push(rpayload);
         }
+    }
+
+    // ── followChanges(任务书-M6 §1.2/§3):关注/取关都是余波条目,worldTime 统一落在本批 anchor
+    //    (不是聊出来的,没有 delayMin 概念)。归一顺序:by 非 omote/ura 丢弃 → by=ura 但裏垢不存在丢弃 →
+    //    accountId 走 claimAccount 认领(查无此账号丢弃)→ 不许关注自己 → 已关注的 follow/未关注的
+    //    unfollow 是 no-op,不入账(账本不该被写满无意义的空操作)。 ──
+    for (const fc of Array.isArray(parsed.followChanges) ? parsed.followChanges : []) {
+        const by = (fc?.by === 'omote' || fc?.by === 'ura') ? fc.by : null;
+        if (!by) continue;
+        const byAccount = [...world.snsAccounts.values()].find(acc => acc.ownerRole === by);
+        if (by === 'ura' && !byAccount) continue; // 裏垢不存在,by=ura 整条丢弃
+        if (!claimAccount(fc)) continue; // 查无此账号(非已有、非本批新建)
+        const accountId = String(fc.accountId);
+        if (byAccount && byAccount.accountId === accountId) continue; // 主人自己的账号不能关注自己
+        const action = fc.action === 'unfollow' ? 'unfollow' : 'follow';
+        const already = world.follows[by].has(accountId);
+        if ((action === 'follow' && already) || (action === 'unfollow' && !already)) continue; // no-op,不入账
+        const payload = { by, accountId, action, worldTime: anchor };
+        await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'sns', type: 'sns_follow', payload });
+        addedCount++;
+        if (action === 'unfollow') world.follows[by].delete(accountId); else world.follows[by].add(accountId);
     }
 
     // task-007「猜你想搜索」:联想词搭主生成的便车(零额外调用),整批一条入账,fold 后写覆盖=只留最新——

@@ -1,7 +1,7 @@
 // SNS「Pulsar」:纯渲染,不碰 ctx、不挂事件监听——事件委托统一在 ui/shell.js(同 apps/forum/messenger 的模式)。
 // 用户只读:零输入框,唯二操作走 shell 的 data-action(刷新/生成回复)+ 长按/右键反悔。
 // castName 只活在 core/世界数据层,这个文件从不读它——账号条目与住民条目一视同仁,UI 只用 handle/displayName/locked。
-import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_LOCK, ICON_CAMERA, ICON_REPLY_SM, ICON_RT_SM, ICON_MOON, ICON_STAR, ICON_STAR_FILL, ICON_SEARCH_SM } from '../../ui/icons.js';
+import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_LOCK, ICON_CAMERA, ICON_REPLY_SM, ICON_RT_SM, ICON_MOON, ICON_STAR, ICON_STAR_FILL, ICON_SEARCH_SM, ICON_OFFICIAL_BADGE } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
 import { monogramFor, colorForContact, seenKeyForTweet, newReplyCountOfTweet, starKeyForTweet } from '../../core/world.js';
 
@@ -71,6 +71,11 @@ function lockIconHtml(account) {
     return account?.locked ? '<span class="or-sns-lock">' + ICON_LOCK + '</span>' : '';
 }
 
+// M6 公式账号徽标(任务书-M6 §4):bio 下方不加任何文字,只在 displayName 旁挂一枚小徽标。
+function officialBadgeHtml(account) {
+    return account?.official ? '<span class="or-sns-official" title="公式アカウント">' + ICON_OFFICIAL_BADGE + '</span>' : '';
+}
+
 function avatarHtml(account, size) {
     const cls = size === 'lg' ? 'or-sns-avatar lg' : 'or-sns-avatar';
     return `<div class="${cls}" style="background-color:${colorForContact(account?.accountId || '?')}">${escapeHtml(monogramFor(account?.displayName || '?'))}</div>`;
@@ -104,7 +109,7 @@ function renderTweetRowHtml(tweet, world, { snsNow, seen = {}, starred = {}, jus
             ${showAuthor ? `<button class="or-sns-row-avatarname" data-action="open-sns-profile" data-account-id="${escapeHtml(tweet.accountId)}">
                 ${avatarHtml(account)}
                 <span class="or-sns-row-name">${escapeHtml(account?.displayName || tweet.accountId)}</span>
-                ${lockIconHtml(account)}
+                ${lockIconHtml(account)}${officialBadgeHtml(account)}
                 <span class="or-sns-row-handle">@${escapeHtml(account?.handle || tweet.accountId)}</span>
             </button>` : ''}
             <span class="or-sns-row-time">${formatRelativeTime(tweet.worldTime, snsNow)}</span>
@@ -127,22 +132,54 @@ function tabbarHtml(tab) {
 }
 
 /**
- * TL(首屏):header + 推文流(表账号能刷到的面=所有非 ura 账号的推)+ 底导。
+ * M6 关注分层(任务书-M6 §4):TL header 下的双 tab——フォロー中(封闭小世界的内部黑话与鸡毛蒜皮)
+ * / おすすめ(外面的花花世界)。横向撑满,视觉语言沿用 or-sns-role-seg 的配色但改胶囊为通栏。
+ */
+function tlModeTabsHtml(tlMode) {
+    return `<div class="or-sns-tlmode">
+        <button class="${tlMode !== 'recommend' ? 'on' : ''}" data-action="sns-tl-mode" data-mode="following">フォロー中</button>
+        <button class="${tlMode === 'recommend' ? 'on' : ''}" data-action="sns-tl-mode" data-mode="recommend">おすすめ</button>
+    </div>`;
+}
+
+/**
+ * TL(首屏):header + フォロー中/おすすめ 双 tab + 推文流 + 底导(任务书-M6 §1.2/§4)。
  * @param seen 「我看过了」水位表:没记录=NEW,有记录比回复数(同论坛列表页语义)
  * @param starred Asterism 星图表:点亮状态渲染实心星
  * @param justUpdated 刚这一次刷新里新增/被盖楼的 tweetId 集合——只用来播一次入场动效
+ * @param myRole 当前视角(表/裏,与「我的」页共用同一 nav 帧字段)——决定「フォロー中」算谁的关注表
+ * @param tlMode 'following'|'recommend',默认值由 shell 按「该视角关注表是否为空」算好再传进来
  */
-export function renderSnsTlHtml({ world, busy, seen = {}, starred = {}, justUpdated = null }) {
+export function renderSnsTlHtml({ world, busy, seen = {}, starred = {}, justUpdated = null, myRole = 'omote', tlMode = 'following' }) {
     const ura = [...world.snsAccounts.values()].find(a => a.ownerRole === 'ura');
-    const tweets = [...world.tweets.values()]
-        .filter(t => t.accountId)
-        .filter(t => t.accountId !== ura?.accountId)
-        .filter(t => !t.fromSearch) // 搜索翻出来的旧推不灌时间线(发帖者主页不过滤,旧推在主页天经地义)
-        .sort((a, b) => (b.lastActiveTs || 0) - (a.lastActiveTs || 0));
+    const omote = [...world.snsAccounts.values()].find(a => a.ownerRole === 'omote');
+    const myAccount = myRole === 'ura' ? (ura || omote) : omote;
+    const followSet = world.follows?.[myRole] || new Set();
 
+    let tweets;
+    if (tlMode === 'recommend') {
+        // おすすめ = 现有 TL 语义(排除裏垢的推、排除搜索翻出来的旧推)再减去当前视角已关注的账号。
+        tweets = [...world.tweets.values()]
+            .filter(t => t.accountId)
+            .filter(t => t.accountId !== ura?.accountId) // 锁着的号不进推荐
+            .filter(t => t.accountId !== omote?.accountId) // 主人自己的推也不进推荐(真实平台不会把你自己推给你)
+            .filter(t => !t.fromSearch)
+            .filter(t => !followSet.has(t.accountId))
+            .sort((a, b) => (b.lastActiveTs || 0) - (a.lastActiveTs || 0));
+    } else {
+        // フォロー中 = 已关注的账号发的推 + 当前视角自己账号的推。
+        tweets = [...world.tweets.values()]
+            .filter(t => t.accountId)
+            .filter(t => followSet.has(t.accountId) || t.accountId === myAccount?.accountId)
+            .sort((a, b) => (b.lastActiveTs || 0) - (a.lastActiveTs || 0));
+    }
+
+    const emptyText = tlMode === 'recommend'
+        ? 'おすすめ静悄悄。点「刷新」。'
+        : 'フォロー中还没有动静。去「おすすめ」看看,或点「刷新」。';
     const body = tweets.length
         ? `<div class="or-sns-list">${tweets.map(t => renderTweetRowHtml(t, world, { snsNow: world.snsNow, seen, starred, justUpdated })).join('')}</div>`
-        : `<div class="or-empty">Pulsar 上还静悄悄。点「刷新」,听听这个世界在说什么。</div>`;
+        : `<div class="or-empty">${emptyText}</div>`;
 
     return `
         <div class="or-header">
@@ -151,6 +188,7 @@ export function renderSnsTlHtml({ world, busy, seen = {}, starred = {}, justUpda
             <button class="or-iconbtn" data-action="sns-search-open" title="搜索">${ICON_SEARCH_SM}</button>
             <button class="or-pill-btn small" data-action="sns-refresh" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : '刷新'}</button>
         </div>
+        ${tlModeTabsHtml(tlMode)}
         ${body}
         ${tabbarHtml('tl')}`;
 }
@@ -183,6 +221,8 @@ export function renderSnsMyPageHtml({ world, busy, myRole = 'omote', seen = {}, 
     const body = tweets.length
         ? `<div class="or-sns-list">${tweets.map(t => renderTweetRowHtml(t, world, { snsNow, seen, starred, showAuthor: false })).join('')}</div>`
         : `<div class="or-empty">这个账号还没有发过什么。</div>`;
+    // M6 §4:「フォロー N」——点开进纯本地的关注列表页,role 直接固定成当前这个账号的所属(表/裏各算各的)。
+    const followCount = world.follows?.[current.ownerRole]?.size || 0;
 
     return `
         <div class="or-header">
@@ -193,9 +233,10 @@ export function renderSnsMyPageHtml({ world, busy, myRole = 'omote', seen = {}, 
         ${bannerHtml(current)}
         <div class="or-sns-profile-head with-banner">
             ${avatarHtml(current, 'lg')}
-            <div class="or-sns-profile-name">${escapeHtml(current.displayName)}${lockIconHtml(current)}</div>
+            <div class="or-sns-profile-name">${escapeHtml(current.displayName)}${lockIconHtml(current)}${officialBadgeHtml(current)}</div>
             <div class="or-sns-profile-handle">@${escapeHtml(current.handle)}</div>
             ${current.bio ? `<div class="or-sns-profile-bio">${escapeHtml(current.bio)}</div>` : ''}
+            <button class="or-sns-follow-count" data-action="open-sns-follow-list" data-role="${escapeHtml(current.ownerRole)}">フォロー ${followCount}</button>
         </div>
         ${body}
         ${tabbarHtml('me')}`;
@@ -224,7 +265,7 @@ export function renderSnsTweetHtml({ tweet, world, busy, snsNow, seenAt = 0, sta
                 <button class="or-sns-row-avatarname" data-action="open-sns-profile" data-account-id="${escapeHtml(r.accountId)}">
                     ${avatarHtml(rAccount)}
                     <span class="or-sns-row-name">${escapeHtml(rAccount?.displayName || r.accountId)}</span>
-                    ${lockIconHtml(rAccount)}
+                    ${lockIconHtml(rAccount)}${officialBadgeHtml(rAccount)}
                     <span class="or-sns-row-handle">@${escapeHtml(rAccount?.handle || r.accountId)}</span>
                 </button>
                 <span class="or-sns-row-time">${formatRelativeTime(r.worldTime, snsNow)}</span>
@@ -244,7 +285,7 @@ export function renderSnsTweetHtml({ tweet, world, busy, snsNow, seenAt = 0, sta
                 <button class="or-sns-row-avatarname" data-action="open-sns-profile" data-account-id="${escapeHtml(tweet.accountId)}">
                     ${avatarHtml(account)}
                     <span class="or-sns-row-name">${escapeHtml(account?.displayName || tweet.accountId)}</span>
-                    ${lockIconHtml(account)}
+                    ${lockIconHtml(account)}${officialBadgeHtml(account)}
                     <span class="or-sns-row-handle">@${escapeHtml(account?.handle || tweet.accountId)}</span>
                 </button>
                 <div class="or-sns-op-time">${formatRelativeTime(tweet.worldTime, snsNow)}</div>
@@ -264,8 +305,11 @@ export function renderSnsTweetHtml({ tweet, world, busy, snsNow, seenAt = 0, sta
         </div>`;
 }
 
-/** 账号主页:大头像+displayName+@handle+锁icon+bio → 该账号推文流(含转发,行解剖同 TL)。 */
-export function renderSnsProfileHtml({ account, world, snsNow, seen = {}, starred = {} }) {
+/**
+ * 账号主页:大头像+displayName+@handle+锁icon+official徽标+bio → 该账号推文流(含转发,行解剖同 TL)。
+ * @param myRole 当前观测者视角(表/裏)——只用来算「フォロー中」小标签,不做按钮(观测者零输入,任务书-M6 §4)。
+ */
+export function renderSnsProfileHtml({ account, world, snsNow, seen = {}, starred = {}, myRole = 'omote' }) {
     const tweets = [...world.tweets.values()]
         .filter(t => t.accountId === account.accountId)
         .sort((a, b) => (b.lastActiveTs || 0) - (a.lastActiveTs || 0));
@@ -273,6 +317,7 @@ export function renderSnsProfileHtml({ account, world, snsNow, seen = {}, starre
     const body = tweets.length
         ? `<div class="or-sns-list">${tweets.map(t => renderTweetRowHtml(t, world, { snsNow, seen, starred, showAuthor: false })).join('')}</div>`
         : `<div class="or-empty">这个账号还没有发过什么。</div>`;
+    const followed = !!world.follows?.[myRole]?.has(account.accountId);
 
     return `
         <div class="or-header">
@@ -282,9 +327,36 @@ export function renderSnsProfileHtml({ account, world, snsNow, seen = {}, starre
         ${bannerHtml(account)}
         <div class="or-sns-profile-head with-banner">
             ${avatarHtml(account, 'lg')}
-            <div class="or-sns-profile-name">${escapeHtml(account.displayName)}${lockIconHtml(account)}</div>
+            <div class="or-sns-profile-name">${escapeHtml(account.displayName)}${lockIconHtml(account)}${officialBadgeHtml(account)}</div>
             <div class="or-sns-profile-handle">@${escapeHtml(account.handle)}</div>
+            ${followed ? `<span class="or-sns-followed-tag">フォロー中</span>` : ''}
             ${account.bio ? `<div class="or-sns-profile-bio">${escapeHtml(account.bio)}</div>` : ''}
+        </div>
+        ${body}`;
+}
+
+/**
+ * 关注列表页(任务书-M6 §4):纯本地渲染,行=头像色块+displayName+@handle,点行进该账号主页
+ * (复用现有 open-sns-profile 路由)。role 由入口按钮固定传入——裏垢视角进来的就是裏垢的关注表。
+ */
+export function renderSnsFollowListHtml({ world, role = 'omote' }) {
+    const ids = [...(world.follows?.[role] || [])];
+    const accounts = ids.map(id => world.snsAccounts.get(id)).filter(Boolean);
+    const body = accounts.length
+        ? `<div class="or-sns-list">${accounts.map(a => `
+            <button class="or-sns-follow-row" data-action="open-sns-profile" data-account-id="${escapeHtml(a.accountId)}">
+                ${avatarHtml(a)}
+                <div class="or-sns-follow-row-text">
+                    <span class="or-sns-follow-row-name">${escapeHtml(a.displayName)}${lockIconHtml(a)}${officialBadgeHtml(a)}</span>
+                    <span class="or-sns-follow-row-handle">@${escapeHtml(a.handle)}</span>
+                </div>
+            </button>`).join('')}</div>`
+        : `<div class="or-empty">还没有关注任何人。</div>`;
+
+    return `
+        <div class="or-header">
+            <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
+            <span class="or-header-title">フォロー中</span>
         </div>
         ${body}`;
 }
