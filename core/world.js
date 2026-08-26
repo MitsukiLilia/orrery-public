@@ -77,6 +77,9 @@ export function shortIdFor(residentId) {
  *   这就是「改写=独立条目、不另存历史」的全部机制:回滚删掉一条 edit,下次 fold 重放自然还原旧文本。
  *   edit 指向不存在的 noteId(理论上不该发生,防御性处理同下面「一条畸形记录」的哲学)→ 跳过 + console.warn。
  * 以上两者同样不碰 threads/forumThreads/tweets/searches/visits/worldNow/forumNow/snsNow/browserNow。
+ * community: 所属对象或 null(app='world' type='community',一世界一条,后写覆盖=只留最新,同 snsSuggest)。
+ * notices: noticeId -> { noticeId, title, body, zh?, signedBy, worldTime },M5 论坛公告——worldTime 参与
+ *   forumNow 推进(它是论坛活动),置顶(前 3 条)与折叠规则在渲染层算,fold 只原样收着不作取舍。
  */
 export function foldWorld(entries) {
     const contacts = new Map();
@@ -93,6 +96,8 @@ export function foldWorld(entries) {
     const memos = new Map();
     const snapshots = new Map();  // v0.14 网页快照:visitId -> web_snapshot(一 visit 一张,后写覆盖)
     let snsSuggest = null;        // v0.14 搜索联想:整批一条,后写覆盖=只留最新一批
+    let community = null;         // M5 所属:一世界一条,后写覆盖=只留最新(同 snsSuggest 的语义)
+    const notices = new Map();    // M5 公告:noticeId -> notice,置顶规则在渲染层算,fold 只管原样收着
 
     function ensureThread(threadId) {
         if (!threads.has(threadId)) {
@@ -161,6 +166,10 @@ export function foldWorld(entries) {
             snapshots.set(e.payload.visitId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'sns_suggest') {
             snsSuggest = { ...e.payload, ts: e.ts };
+        } else if (e.type === 'community') {
+            community = { ...e.payload, sourceFloor: e.sourceFloor, ts: e.ts }; // 后写覆盖=只留最新
+        } else if (e.type === 'notice') {
+            notices.set(e.payload.noticeId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'photo') {
             photosById.set(e.payload.photoId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'memo_note') {
@@ -208,6 +217,8 @@ export function foldWorld(entries) {
         t.lastActiveTs = times.length ? Math.max(...times) : 0;
         if (t.title) forumNow = Math.max(forumNow, t.lastActiveTs); // 帖子壳(无 title)是悬空回复,不计入时钟
     }
+    // 公告也是论坛活动(任务书-M5 §1.2):worldTime 参与 forumNow 推进,和帖子/回复同一条时钟。
+    for (const n of notices.values()) if (Number.isFinite(n.worldTime)) forumNow = Math.max(forumNow, n.worldTime);
 
     let snsNow = 0;
     for (const t of tweets.values()) {
@@ -241,6 +252,7 @@ export function foldWorld(entries) {
         searches, visits, browserNow: browserNow || null, snapshots, snsSuggest,
         photos, galleryNow: galleryNow || null,
         memos, memoNow: memoNow || null,
+        community, notices, // M5:所属(对象或 null)+ 公告表
     };
 }
 

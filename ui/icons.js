@@ -62,3 +62,6 @@ export function scallopWaveDataUri(color = '#FBF9F4') {
 // v0.13.0 Asterism 星图件:空心星=未收藏,实心星=已点亮(观测者的收藏符号——月相属于世界,星星属于观测者)
 export const ICON_STAR = '<svg viewBox="0 0 24 24"><path d="M12 3.6l2.47 5.46 5.93.62-4.43 4.02 1.24 5.84L12 16.56l-5.21 2.98 1.24-5.84-4.43-4.02 5.93-.62Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
 export const ICON_STAR_FILL = '<svg viewBox="0 0 24 24"><path d="M12 3.6l2.47 5.46 5.93.62-4.43 4.02 1.24 5.84L12 16.56l-5.21 2.98 1.24-5.84-4.43-4.02 5.93-.62Z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
+
+// M5 论坛置顶公告小图标(图钉):胶囊形针头 + 扁平肩台 + 向下的针身,手绘写意「钉在板上」的意象。
+export const ICON_PIN = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="8" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 11h10l-2 3H9Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><line x1="12" y1="14" x2="12" y2="21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';

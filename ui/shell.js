@@ -399,7 +399,10 @@ export function createShell(ctx, onExternalChange) {
             });
             markSeenAfter = [seenKey, latestTsOfThread(thread)];
         } else if (top.type === 'forum-list') {
-            screenEl.innerHTML = renderForumListHtml({ world, busy: busy.forum, boardId: top.boardId || null, page: top.page || 1, seen, justUpdated });
+            screenEl.innerHTML = renderForumListHtml({
+                world, busy: busy.forum, boardId: top.boardId || null, page: top.page || 1, seen, justUpdated,
+                expandedNotices: top.expandedNotices || new Set(), pastNoticesOpen: !!top.pastNoticesOpen,
+            });
         } else if (top.type === 'forum-thread') {
             const thread = world.forumThreads.get(top.threadId);
             if (!thread || !thread.title) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚/删除清空
@@ -534,6 +537,7 @@ export function createShell(ctx, onExternalChange) {
         parse_failed: '模型没给出能用的结果,可以再试一次',
         rolled_back: '正文刚回滚了,这次生成已作废',
         no_thread: '这条线程已经不在了',
+        community_failed: '还没能确定主人的所属,可以再试一次',
     };
 
     // 六个生成入口共用的外壳。@param app 'messenger'|'forum'|...,各持各的锁(一个 app 生成时另一个照常可用)。
@@ -711,6 +715,44 @@ export function createShell(ctx, onExternalChange) {
         top.page = page;
         pendingScroll = { fallback: 'top', key: screenKey(top) }; // 新一页从头看起
         render();
+    }
+
+    // ── M5:置顶公告——纯本地展开/收起(不耗生成),状态存在 forum-list 的 nav 帧上,同分页的做法。 ──
+
+    function doToggleNotice(noticeId) {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'forum-list' || !noticeId) return;
+        if (!top.expandedNotices) top.expandedNotices = new Set();
+        if (top.expandedNotices.has(noticeId)) top.expandedNotices.delete(noticeId);
+        else top.expandedNotices.add(noticeId);
+        render();
+    }
+
+    function doTogglePastNotices() {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'forum-list') return;
+        top.pastNoticesOpen = !top.pastNoticesOpen;
+        render();
+    }
+
+    // 改組(任务书-M5 §5):旧式(全世界型)论坛一次性清空重建,按主人的所属重新初始化。
+    // 同「抹掉这部手机」的确认方式——先问清楚不可逆的后果,再动手。
+    async function doForumReorganize() {
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        const confirmed = await ctx.callGenericPopup(
+            '改組会清空这个论坛的板块、住民、帖子与公告,按主人的所属重新初始化,不可恢复。确定吗?',
+            ctx.POPUP_TYPE.CONFIRM,
+        );
+        if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
+        await store.deleteForumAll(worldKey);
+        const top = navStack[navStack.length - 1];
+        if (top.type === 'forum-list') {
+            top.boardId = null; top.page = 1; top.expandedNotices = new Set(); top.pastNoticesOpen = false;
+        }
+        showToast('论坛已清空,点「刷新」按新所属建板');
+        await render();
+        onExternalChange?.();
     }
 
     // ── SNS「Pulsar」:独立水位的「刷新」/「生成回复」+ 反悔(单回复倒带同消息工法 / 整推级联删)。 ──
@@ -1071,6 +1113,9 @@ export function createShell(ctx, onExternalChange) {
             case 'forum-generate-more': doContinueForumThread(); break;
             case 'select-forum-board': doSelectForumBoard(el.dataset.boardId); break;
             case 'forum-page': doForumPage(parseInt(el.dataset.page, 10)); break;
+            case 'toggle-notice': doToggleNotice(el.dataset.noticeId); break;
+            case 'toggle-past-notices': doTogglePastNotices(); break;
+            case 'forum-reorganize': doForumReorganize(); break;
             case 'open-sns-tweet': navPush({ type: 'sns-tweet', tweetId: el.dataset.tweetId }); break;
             case 'open-sns-profile': navPush({ type: 'sns-profile', accountId: el.dataset.accountId }); break;
             case 'sns-refresh': doGenerateMoreSns(); break;

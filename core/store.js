@@ -324,6 +324,50 @@ export async function deleteMemoFrom(worldKey, fromWorldTime) {
     });
 }
 
+/**
+ * M5 改組:清空该世界论坛的全部内容(board/resident/forum_thread/forum_reply/forum_draft/notice,
+ * 全部 app==='forum')+ community(所属,app==='world' type==='community')。旧世界不保留——
+ * 一次性抹掉,下次「刷新」按主人的所属重新初始化(任务书-M5 §1.3)。
+ * 比 wipeWorld 窄一圈:只清论坛+所属,messenger/sns/browser/gallery/memo 与主人设定原样保留。
+ */
+export async function deleteForumAll(worldKey) {
+    if (!worldKey) return;
+    rollbackEpoch++; // 同其他删除:生成中途被改組,整批作废
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_LEDGER, 'readwrite');
+        const idx = tx.objectStore(STORE_LEDGER).index('worldKey');
+        const req = idx.openCursor(IDBKeyRange.only(worldKey));
+        req.onsuccess = () => {
+            const cursor = req.result;
+            if (!cursor) return;
+            const v = cursor.value;
+            if (v.app === 'forum' || v.type === 'community') cursor.delete();
+            cursor.continue();
+        };
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+    });
+    // 论坛水位清零,下一次刷新按「首次」跑(同 pendingOrRegrow 对空水位的处理)。
+    await setWatermark(worldKey, 'forum', -1);
+    // 清论坛的 seen/star 键:Asterism 星图里的论坛来源卡片随之消失——如实显示消失,同反悔语义。
+    // 前缀硬编码而不 import world.js 的 seenKeyForForumThread/starKeyForForumThread('forum:'/'ft:')——
+    // store.js 本来就不认业务语义(见文件头注),两处前缀改名要记得一起改,同其余 store 函数的先例。
+    const meta = await readMeta(worldKey);
+    let touched = false;
+    if (meta.seen && typeof meta.seen === 'object') {
+        for (const key of Object.keys(meta.seen)) {
+            if (key.startsWith('forum:')) { delete meta.seen[key]; touched = true; }
+        }
+    }
+    if (meta.starred && typeof meta.starred === 'object') {
+        for (const key of Object.keys(meta.starred)) {
+            if (key.startsWith('ft:')) { delete meta.starred[key]; touched = true; }
+        }
+    }
+    if (touched) await writeMeta(meta);
+}
+
 /** 抹掉这部手机:账本条目 + meta(含主人设定/水位)全删,世界回到未激活状态。 */
 export async function wipeWorld(worldKey) {
     if (!worldKey) return;

@@ -138,7 +138,12 @@
     display: flex; align-items: center; gap: 10px; padding: 10px 14px;
     flex-shrink: 0; background: var(--or-cream-2);
 }
-.or-header-title { font-size: 15px; font-weight: 600; color: var(--or-cocoa); flex: 1; }
+.or-header-title {
+    font-size: 15px; font-weight: 600; color: var(--or-cocoa); flex: 1;
+    /* M5:论坛标题换成所属名(可能是很长的公司/机关全称)后省略号截断,不撑破头部——
+       min-width:0 是关键,flex 子项默认按内容撑开,不加这条 overflow/ellipsis 都不会生效。 */
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .or-back-btn {
     width: 30px; height: 30px; border: none; background: none; color: var(--or-cocoa);
     display: flex; align-items: center; justify-content: center; border-radius: 50%;
