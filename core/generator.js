@@ -45,7 +45,7 @@ export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎�
 4. 视角合法性:「沾边」只有两种合法视角:①当事人视角,主线人物本人或其身边人用自己的小号发亲历的事;②旁观视角,其他成员以目击/听说的口吻聊公开可见的部分。🚫绝不许成员把与主线雷同的经历当成自己的亲身经历发帖——这个世界不存在恰好经历同一件事的第二组人;主线人物也绝不回复与自己经历雷同的帖子。每个成员只知道公开可见或自己亲历的事。
 5. 错位推理(旁观视角的正确打开方式):成员只看得到表面,就按内部吃瓜的天性,用隐语(「あの人」「例の件」那种气质)得出错误、夸张、偏离真相的推论,楼里越歪越远。你知道真相而成员不知道——这个落差是掲示板最好看的东西。错误推论必须从公开可见的表面自然长出:不许借「猜错」夹带正文没有的事实,也不许歪打正着说中真相核心。
 6. 公告与帖子的双轨:公告(notice)是共同体的官方通知,由部署/役職署名(総務・経理・部長・会長・幹部那一挂),件名带【重要】【再掲】【回覧】式标记,有締切,有「なお、〜」式冷酷收尾,内容全是内务(経費・備品・当直・騒音・持ち物・締切),绝不像对外公关稿——官方顔出し,成员匿名,建前与本音各据一轨。首次初始化 2〜3 条,之后每批 0〜1 条,宁缺毋滥。
-7. 匿名是铁律:成员用带所属味的默认名(「名無しの〇〇」「匿名希望(〇〇課)」那种气质)或个性网名,常带鲜明的役割語与口癖且跨帖一致。板内一切称呼只用网名或默认名;对上司、名人、主线人物一律用隐语,任何人在任何情况下都不写出真名,也不写可对号入座的役職+姓——故事人物之间就算认出了彼此的小号,也只能装作不知道,或用只有当事人才懂的方式接话,绝不点破、绝不喊名字。故事人物的小号绝不自曝真身,仅靠标志性口癖或颜文字透出「像但不明说」的网感。
+7. 匿名是铁律:成员用带所属味的默认名(「名無しの〇〇」「匿名希望(〇〇課)」那种气质)或个性网名,常带鲜明的役割語与口癖且跨帖一致。板内一切称呼只用网名或默认名;对上司、名人、主线人物一律用隐语,任何人在任何情况下都不写出真名,也不写可对号入座的役職+姓;役職与称呼只用这个所属自己的体系(材料里的「内部称呼」),绝不借用故事里其他组织的叫法——役職本身不是真名,可以直接叫,役職+姓才是禁区——故事人物之间就算认出了彼此的小号,也只能装作不知道,或用只有当事人才懂的方式接话,绝不点破、绝不喊名字。故事人物的小号绝不自曝真身,仅靠标志性口癖或颜文字透出「像但不明说」的网感。
 8. 小号是树洞:主线人物的小号不是打卡机器——它存在的意义,是承接 TA 在正文、聊天、SNS 表面上都不敢表露的那一层,用板上语癖伪装的真心话。不必每批都有;正文出现情绪重压时,小号的一帖或一楼是最高级的余波。树洞的方式必须贴合该人物已确立的性格:外放的人才长篇宣泄,寡言的人只有一行,冷淡的人也许只有两个字——性格永远优先于宣泄,树洞也绝不许 OOC。
 9. 主角的未发送草稿:当某帖戳中「{{char}}」(被议论、被误解、想反驳、想解释),可以给该帖附一条 TA 写了又删的回复草稿(myDraft)。整批至多一条,宁缺毋滥;草稿要贴合 TA 的性格与正文当下的心境,不泄露正文没有的事实。
 10. 语域随所属:组织・职场是社畜的敬语与怨念——再危险的业务也当成报销、排班、備品补充来抱怨,非法组织同理,只是把业务说成隐语;学校・小规模身内集团是若者言葉与排他的身内感;町内・地域是市井的家长里短与自治厨。仍像日系匿名掲示板(短句、「w/草」、安价跟风、歪楼、抬杠、颜文字),绝不像小说。热帖才热闹,冷帖没人理。
@@ -64,7 +64,7 @@ export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - worldTime 从正文推断,只许向后走`;
 
 export const PROMPT_G = `你是 Orrery,叙事世界观测引擎。用户想继续围观「{{community}}」内部掲示板上这个帖子的后续。基于帖子走向和各住民的身份口癖,自然地续写{{COUNT_RULE}}
-遵守:像日系匿名掲示板般跟风、歪楼、带「w/草」与颜文字,绝不像小说;住民都是这个共同体的成员,对上司、名人、主线人物一律用隐语;住民的役割語/口癖跨帖一致;每人只知道自己知道的;故事人物的小号绝不自曝、言行不得OOC(以【人物设定参考】为准);无关住民不得把与主线雷同的经历当成自己的亲历,主线人物也绝不回复与自己经历雷同的内容;匿名是铁律——一切称呼只用网名或「名無し」,任何情况下都不写出现实真名,就算认出了熟人的小号也只装作不知道、或用只有当事人才懂的方式接话,绝不点破;旁观住民看不到全貌,接话按起哄吃瓜的天性歪出错误、夸张的推论(不许借「猜错」夹带正文没有的事实);主线人物的小号若开口,承接的是台面上不敢表露的那层真心话,但方式必须贴合其已确立的性格——性格永远优先于宣泄;🚨剧情冻结——正文是这个世界唯一的剧情作者,盖楼只是余波:住民只能围绕已发生、公开可见的事继续跟风追问,绝不许爆出正文尚未发生的新事件或关系进展,也不许替剧情预告下一步;不复述正文。
+遵守:像日系匿名掲示板般跟风、歪楼、带「w/草」与颜文字,绝不像小说;住民都是这个共同体的成员,对上司、名人、主线人物一律用隐语,役職与称呼只用本所属自己的体系(材料里的「内部称呼」)、不借故事里其他组织的叫法;住民的役割語/口癖跨帖一致;每人只知道自己知道的;故事人物的小号绝不自曝、言行不得OOC(以【人物设定参考】为准);无关住民不得把与主线雷同的经历当成自己的亲历,主线人物也绝不回复与自己经历雷同的内容;匿名是铁律——一切称呼只用网名或「名無し」,任何情况下都不写出现实真名,就算认出了熟人的小号也只装作不知道、或用只有当事人才懂的方式接话,绝不点破;旁观住民看不到全貌,接话按起哄吃瓜的天性歪出错误、夸张的推论(不许借「猜错」夹带正文没有的事实);主线人物的小号若开口,承接的是台面上不敢表露的那层真心话,但方式必须贴合其已确立的性格——性格永远优先于宣泄;🚨剧情冻结——正文是这个世界唯一的剧情作者,盖楼只是余波:住民只能围绕已发生、公开可见的事继续跟风追问,绝不许爆出正文尚未发生的新事件或关系进展,也不许替剧情预告下一步;不复述正文。
 {{LANG_RULE}}
 只输出 JSON:{"replies":[{"authorId":"已有住民id或新id","newResident":{"residentId":"","handle":"","persona":"","castName":"可省略"},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}`;
 
@@ -207,7 +207,7 @@ export const PROMPT_O = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 输出
 只输出一个 JSON 对象:
-{"name":"所属的名称(原著写法,写到最贴近日常的那一层)","kind":"org|school|local","desc":"一句话:它在这个世界里是什么、主角在其中是什么身份","slug":"英数字小写短名(内网域名用)","officialName":"该所属若有对外公式账号的显示名,没有就留空字符串"}`;
+{"name":"所属的名称(原著写法,写到最贴近日常的那一层)","kind":"org|school|local","desc":"一句话:它在这个世界里是什么、主角在其中是什么身份","slug":"英数字小写短名(内网域名用)","officialName":"该所属若有对外公式账号的显示名,没有就留空字符串","titles":"这个所属内部对上司、同僚、成员的役職与称呼体系(原著写法,顿号分隔;原著没写明就按该类组织的常识给)"}`;
 
 const LANG_RULE = {
     messenger: {
@@ -253,9 +253,9 @@ const LANG_RULE = {
     // M5 所属コミュニティ推断(任务书-M5 §2):name/officialName 是原著专名,照抄写法;desc 是给
     // 观测者看的说明文字,不必跟着语言档走——这点上 ja_zh 与 ja 同档。
     community: {
-        ja: 'name 与 officialName 用日文原著写法,desc 用中文。',
-        en: 'name 与 officialName 用英文原著写法,desc 用中文。',
-        ja_zh: 'name 与 officialName 用日文原著写法,desc 用中文。',
+        ja: 'name、officialName 与 titles 用日文原著写法,desc 用中文。',
+        en: 'name、officialName 与 titles 用英文原著写法,desc 用中文。',
+        ja_zh: 'name、officialName 与 titles 用日文原著写法,desc 用中文。',
     },
 };
 // 世界观兜底(全档通用):哪天用日语玩 HP、或用英语玩日系原作,氛围细节听世界观的,别硬套黑话。
@@ -865,6 +865,11 @@ const COMMUNITY_KIND_LABEL = { org: '组织·职场', school: '学校·身内', 
 function communityKindLabel(kind) {
     return COMMUNITY_KIND_LABEL[kind] || COMMUNITY_KIND_LABEL.org; // 非法值一律归 org(任务书-M5 §1.1)
 }
+// 所属一行(论坛主生成/盖楼共用):带「内部称呼」——她真机抓到的串味(主线里另一个组织的役職叫法
+// 被借到主人所属的板上),治法是把本所属自己的称呼体系明写进材料,提示词原则 7 再立「不借别家叫法」。
+function communityDigestLine(c) {
+    return `[主人的所属] ${c.name}(${communityKindLabel(c.kind)}):${c.desc || ''}${c.titles ? `|内部称呼:${c.titles}` : ''}`;
+}
 
 // ── 论坛材料拼装(主生成用【论坛当前状态】+ 盖楼用单帖全文;castName 只在这里流动,UI 绝不读它)。──
 
@@ -875,7 +880,7 @@ function residentRosterLine(r) {
 function buildForumDigestText(world) {
     if (!world.boards.size) return '(掲示板是空的,首次生成:请先创建 3〜4 个贴合这个共同体的板块、2〜3 条公告并初始化 5〜8 名住民)';
     const parts = [];
-    if (world.community) parts.push(`[主人的所属] ${world.community.name}(${communityKindLabel(world.community.kind)}):${world.community.desc || ''}`);
+    if (world.community) parts.push(communityDigestLine(world.community));
     if (world.forumNow) parts.push(`[论坛当前世界时刻] ${fmtWorldTime(world.forumNow)}(新的 worldTime 不得早于它)`);
     // 置顶公告(任务书-M5 §4/§5):按 worldTime 倒序取前 3 条——渲染层的置顶规则搬进 digest 里再算一遍,
     // 只为提醒模型「这些已经发过了,newNotices 别撞题」,不是另一套持久化状态。
@@ -910,6 +915,7 @@ function buildForumDigestText(world) {
 
 function buildForumThreadDigestText(world, thread) {
     const parts = [];
+    if (world.community) parts.push(communityDigestLine(world.community)); // 盖楼同样要认本所属的称呼体系
     const authorHandle = world.residents.get(thread.authorId)?.handle || thread.authorId;
     parts.push(`[帖子] ${thread.title}`);
     parts.push(`${authorHandle}: ${thread.body}`);
@@ -1079,7 +1085,8 @@ function pendingOrRegrow(watermark, tip, floorWindow) {
 async function ensureCommunity(ctx, store, { worldKey, profileId, customApi, owner, language, excludeTags, world = null }) {
     // 调用方手里通常已经有折好的 world,传进来省一次全量 fold;没传才自己折。
     const folded = world || foldWorld(await store.getEntriesForWorld(worldKey));
-    if (folded.community) return folded.community; // 已推断过,不花一分 token
+    // 已推断过就不花 token;缺 titles 的是 v0.16.1 之前推的旧条目,补推一次覆盖(后写覆盖语义),不用改組
+    if (folded.community && folded.community.titles) return folded.community;
 
     const charName = owner || ctx.name2 || '主角';
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
@@ -1097,6 +1104,7 @@ async function ensureCommunity(ctx, store, { worldKey, profileId, customApi, own
     const payload = {
         name: String(parsed.name), kind: (['org', 'school', 'local'].includes(parsed.kind) ? parsed.kind : 'org'),
         desc: String(parsed.desc || ''), slug: String(parsed.slug || ''), officialName: String(parsed.officialName || ''),
+        titles: String(parsed.titles || '').trim() || '(未提供)', // 空串会被当成「缺」而每次重推,占位止损
     };
     const added = await store.addEntry({ worldKey, sourceFloor, app: 'world', type: 'community', payload });
     return { ...payload, sourceFloor: added.sourceFloor, ts: added.ts };
