@@ -88,6 +88,18 @@
             <legend>2. 世界切换</legend>
             <button class="mock-btn" data-act="chat-changed">切换聊天(新 worldKey)</button>
             <button class="mock-btn" data-act="reset-db">清空 IndexedDB(orrery 库)</button>
+            <br>
+            <label class="mock-label">从第 <input type="number" id="branchN" value="0" min="0"> 楼(含)分支</label>
+            <button class="mock-btn" data-act="branch">分支(模拟酒馆 branch/检查点)</button>
+            <p class="note" style="margin:4px 0 8px;">
+                照抄酒馆真实行为:新聊天的 metadata = 当前聊天 metadata 的拷贝 + <code>main_chat</code>=当前聊天 id
+                (冻结的 <code>orrery_world_id</code> 也被一并抄走,这正是要修的 bug 的来源)。
+            </p>
+            <label class="mock-label">改名当前聊天(不带 <code>main_chat</code>,反例)</label>
+            <button class="mock-btn" data-act="rename">改名</button>
+            <br>
+            <label class="mock-label">切到已知聊天 <select id="chatSelect"></select></label>
+            <button class="mock-btn" data-act="switch-chat">切换(模拟切回父/子聊天)</button>
         </fieldset>
 
         <fieldset>
@@ -149,6 +161,7 @@
 <script type="module">
     // ── mock 最小酒馆环境:先于 index.js 执行(同为 module script,按文档顺序保证)。 ──
     import * as store from '../core/store.js';
+    import { computeWorldKey, inheritedWorldKey } from '../core/world.js';
 
     function log(msg) {
         const el = document.getElementById('log');
@@ -178,13 +191,44 @@
     const eventSource = new MockEventEmitter();
 
     let chatCounter = 1;
-    function makeChatId() { return `demo-chat-${chatCounter}`; }
+    let renameSeq = 0;
 
+    // ctx.chat 的引用从创建起焊死在 ctx 对象上(见下方 ctx 字面量),换聊天不能整体替换这个数组,
+    // 只能原地清空重灌——同酒馆真实"换一个聊天文件"时局部 UI 状态被替换、但引用不变的行为。
     const chat = [
         { name: '小满', is_user: false, mes: '（房间里安静得只剩下时钟的声音，小满盯着手机屏幕，很久没有点开那条未读消息。）' },
         { name: '用户', is_user: true, mes: '要不要先睡一觉，明天再想？' },
     ];
     const characters = [{ avatar: 'sample-char.png', name: '小满' }];
+
+    // ── 分支/切换聊天用的最小档案库 ──
+    // chatArchive:离开某个 chatId 时把它当下的 chat 内容 + metadata 各存一份独立拷贝,回去时原样取出
+    // (真实酒馆是"每个聊天各自一个文件",这里用内存 Map 顶替)。进出档案库都拷贝一次,
+    // 活跃态的 mockChatMetadata 与档案库里存的对象永远是两份独立数据、互不牵连——
+    // "冻结钥匙"这件事(orrery_world_id 一旦写入就不再变)由数据内容本身携带,不需要靠共享引用维持。
+    // branchSeq:同一个 chatId 身上分出去过几次分支,用来编号 " - Branch #k"(分支的分支同样计数,
+    // 天然产出 "…Branch #1 - Branch #1" 这种嵌套命名——不追求酒馆真实的命名法,只求可辨、可复现)。
+    const chatArchive = new Map();
+    const branchSeq = new Map();
+    let currentChatId = 'demo-chat-1';
+    let mockChatMetadata = {};
+
+    /** 把"当前聊天"的内容存进档案库,键是它离开前的 chatId。 */
+    function snapshotCurrent() {
+        chatArchive.set(currentChatId, {
+            messages: chat.map(m => ({ ...m })),
+            metadata: { ...mockChatMetadata },
+        });
+    }
+
+    /** 切到另一个聊天:先把当前这部存档,再原地灌入目标聊天的内容——ctx.chat 引用全程不变。 */
+    function switchTo(chatId, messages, metadata) {
+        snapshotCurrent();
+        currentChatId = chatId;
+        chat.length = 0;
+        for (const m of messages) chat.push({ ...m });
+        mockChatMetadata = { ...metadata };
+    }
 
     // ── LLM fixture:按 systemPrompt 内容分流到 A/B/C/F/G 五套返回,受面板开关控制 ──
     // 语言开关读同一份 ctx.extensionSettings(手机「设置」页与这里是同一个对象引用),
@@ -560,13 +604,12 @@
         },
     };
 
-    let mockChatMetadata = {};
     const ctx = {
         chat, characters, characterId: 0, groupId: null,
         get chatMetadata() { return mockChatMetadata; },
         saveMetadataDebounced: () => {},
-        get chatId() { return makeChatId(); },
-        getCurrentChatId: makeChatId,
+        get chatId() { return currentChatId; },
+        getCurrentChatId: () => currentChatId,
         name1: '用户', name2: '小满',
         eventSource, eventTypes,
         extensionSettings: {},
@@ -583,26 +626,47 @@
             `<div>[${i}] ${m.is_user ? '用户' : m.name}: ${m.mes}</div>`).join('');
     }
 
+    /** 「2. 世界切换」里的下拉框:列出当前聊天 + 档案库里存过的全部聊天,供切回父/子用。 */
+    function renderChatSelect() {
+        const sel = document.getElementById('chatSelect');
+        if (!sel) return;
+        const ids = [currentChatId, ...chatArchive.keys()].filter((id, i, arr) => arr.indexOf(id) === i);
+        const prevValue = sel.value;
+        sel.innerHTML = ids.map(id =>
+            `<option value="${id}">${id}${id === currentChatId ? '(当前)' : ''}</option>`).join('');
+        if (ids.includes(prevValue)) sel.value = prevValue;
+    }
+
     async function renderState() {
-        const worldKey = `${characters[ctx.characterId].avatar}::${ctx.getCurrentChatId()}`;
+        // 这里刻意区分三种钥匙:legacy 是仅按文件名拼出来的(仅供参考,和真实钥匙是否冻结无关);
+        // computeWorldKey 是调用方实际会用来读账本的那个值(继承态未分叉完时是 null);
+        // inheritedWorldKey 非 null 就说明这把钥匙是从父聊天抄来的、还没轮到自己的世界——
+        // 分支按钮点下去之后这一行应该从非空变回 null。
+        const legacyKey = `${characters[ctx.characterId].avatar}::${currentChatId}`;
+        const realKey = computeWorldKey(ctx);
+        const inherited = inheritedWorldKey(ctx);
         const [wmMessenger, wmForum, wmSns, wmBrowser, wmGallery, wmMemo] = await Promise.all([
-            store.getWatermark(worldKey, 'messenger'),
-            store.getWatermark(worldKey, 'forum'),
-            store.getWatermark(worldKey, 'sns'),
-            store.getWatermark(worldKey, 'browser'),
-            store.getWatermark(worldKey, 'gallery'),
-            store.getWatermark(worldKey, 'memo'),
+            store.getWatermark(realKey, 'messenger'),
+            store.getWatermark(realKey, 'forum'),
+            store.getWatermark(realKey, 'sns'),
+            store.getWatermark(realKey, 'browser'),
+            store.getWatermark(realKey, 'gallery'),
+            store.getWatermark(realKey, 'memo'),
         ]);
         const tip = chat.length - 1;
         document.getElementById('state').textContent =
-            `worldKey = ${worldKey}\nchat.length = ${chat.length} (tip = ${tip})\n` +
+            `currentChatId = ${currentChatId}  (main_chat = ${mockChatMetadata.main_chat ?? '(无)'})\n` +
+            `computeWorldKey(ctx) = ${realKey}\ninheritedWorldKey(ctx) = ${inherited}  (非空=还没分叉完)\n` +
+            `legacy(仅供参考,不代表真实钥匙) = ${legacyKey}\n` +
+            `chat.length = ${chat.length} (tip = ${tip})\n` +
             `watermarks = { messenger: ${wmMessenger}, forum: ${wmForum}, sns: ${wmSns}, browser: ${wmBrowser}, gallery: ${wmGallery}, memo: ${wmMemo} }\n` +
             `messenger 落后 = ${wmMessenger < tip} / forum 落后 = ${wmForum < tip} / sns 落后 = ${wmSns < tip} / browser 落后 = ${wmBrowser < tip} / gallery 落后 = ${wmGallery < tip} / memo 落后 = ${wmMemo < tip}` +
             `(六个 app 各自独立——一个刷新不该清另一个的红点)`;
+        renderChatSelect();
     }
 
     async function dumpLedger() {
-        const worldKey = `${characters[ctx.characterId].avatar}::${ctx.getCurrentChatId()}`;
+        const worldKey = computeWorldKey(ctx);
         const entries = await store.getEntriesForWorld(worldKey);
         document.getElementById('ledgerDump').textContent = JSON.stringify(entries, null, 1);
     }
@@ -635,11 +699,54 @@
             log(`MESSAGE_SWIPED(${n})`);
         } else if (act === 'chat-changed') {
             chatCounter++;
-            mockChatMetadata = {}; // 新聊天=新 metadata,别把上一个世界冻结的 ID 带过去
-            chat.length = 0;
-            chat.push({ name: '小满', is_user: false, mes: '（新聊天的第一层。）' });
-            await eventSource.emit(eventTypes.CHAT_CHANGED, makeChatId());
-            log(`CHAT_CHANGED → ${makeChatId()}`);
+            const newId = `demo-chat-${chatCounter}`;
+            // 全新聊天=全新 metadata({}),不带 main_chat——不是继承来的钥匙,和分支是两回事。
+            switchTo(newId, [{ name: '小满', is_user: false, mes: '（新聊天的第一层。）' }], {});
+            await eventSource.emit(eventTypes.CHAT_CHANGED, newId);
+            log(`CHAT_CHANGED → ${newId}`);
+        } else if (act === 'branch') {
+            // 照抄酒馆真实行为(script.js saveChat):新聊天 metadata = 当前聊天 metadata 的原样拷贝 +
+            // main_chat=当前聊天 id。冻结在里面的 orrery_world_id 被一并抄走,这正是 bug 的来源——
+            // 所以这里不能像 chat-changed 那样给一个空 metadata。
+            const n = Number(document.getElementById('branchN').value);
+            const parentId = currentChatId;
+            // 分支前先摸一遍钥匙:①留个「分支前」快照供对比,②顺带确保钥匙已经冻结
+            // (酒馆里能点分支说明这部手机早被打开过,钥匙必然已冻结,这里不能让它是空的)。
+            log(`[分支前] chatId=${parentId} computeWorldKey=${computeWorldKey(ctx)} inheritedWorldKey=${inheritedWorldKey(ctx)}`);
+            const parentMetaCopy = { ...mockChatMetadata };
+            const seq = (branchSeq.get(parentId) || 0) + 1;
+            branchSeq.set(parentId, seq);
+            const branchId = `${parentId} - Branch #${seq}`;
+            const branchMessages = chat.slice(0, n + 1); // 含第 n 层
+            const branchMeta = { ...parentMetaCopy, main_chat: parentId };
+            switchTo(branchId, branchMessages, branchMeta);
+            await eventSource.emit(eventTypes.CHAT_CHANGED, branchId);
+            log(`[分支后] chatId=${currentChatId} computeWorldKey=${computeWorldKey(ctx)} inheritedWorldKey=${inheritedWorldKey(ctx)}`);
+            log(`分支:从「${parentId}」第 ${n} 楼(含)分支 → 「${branchId}」(带走 ${branchMessages.length} 层)`);
+        } else if (act === 'rename') {
+            // 反例(g):模拟酒馆改名/导入——只换 chatId 字符串,metadata 对象原样不动、不加 main_chat。
+            // 真实改名不改 chat_metadata 内容,冻结的 orrery_world_id 应该照旧生效、不触发分叉。
+            const oldId = currentChatId;
+            log(`[改名前] chatId=${oldId} computeWorldKey=${computeWorldKey(ctx)}`);
+            renameSeq++;
+            currentChatId = `${oldId}(改名#${renameSeq})`;
+            await eventSource.emit(eventTypes.CHAT_CHANGED, currentChatId);
+            log(`[改名后] chatId=${currentChatId} computeWorldKey=${computeWorldKey(ctx)} inheritedWorldKey=${inheritedWorldKey(ctx)}`);
+        } else if (act === 'switch-chat') {
+            // 切到下拉框里选中的聊天(通常用来切回父聊天,或再切回某个分支)——从档案库原样取回。
+            const target = document.getElementById('chatSelect')?.value;
+            if (!target) {
+                log('未选择聊天,已忽略');
+            } else if (target === currentChatId) {
+                log(`已经在「${target}」上,无需切换`);
+            } else if (!chatArchive.has(target)) {
+                log(`未找到「${target}」的存档(从没离开过它?)`);
+            } else {
+                const archived = chatArchive.get(target);
+                switchTo(target, archived.messages, archived.metadata);
+                await eventSource.emit(eventTypes.CHAT_CHANGED, target);
+                log(`切换聊天 → 「${currentChatId}」(从档案库恢复 ${chat.length} 层)computeWorldKey=${computeWorldKey(ctx)}`);
+            }
         } else if (act === 'reset-db') {
             indexedDB.deleteDatabase('orrery');
             log('已请求删除 IndexedDB「orrery」库,刷新页面生效');

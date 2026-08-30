@@ -102,6 +102,36 @@ export async function getEntriesForWorld(worldKey) {
 let rollbackEpoch = 0;
 export function getRollbackEpoch() { return rollbackEpoch; }
 
+/**
+ * 世界分叉(酒馆分支/检查点,见 world.js forkBranchWorld):把 from 里 sourceFloor<=tip 的条目按入账顺序
+ * 复制给 to(payload 与 ts 原样,只重发 id),世界级事实(app='world',所属推断那一挂)不看楼层一律带上——
+ * 它不是某一层长出来的,分支重推一次纯属浪费。meta 复制主人/已看水位/星标/基线,各 app 水位夹到 tip
+ * (复制到哪层,水位就只许声称到哪层)。to 已有条目=已分叉过(或两次调用前后脚到),不重复复制。
+ * 条目写在一个事务里:半途失败不留半个世界。
+ * @returns {Promise<{copied:number, skipped:boolean}>}
+ */
+export async function forkWorld(fromKey, toKey, tip) {
+    if (!fromKey || !toKey || fromKey === toKey) return { copied: 0, skipped: true };
+    if ((await getEntriesForWorld(toKey)).length) return { copied: 0, skipped: true };
+    const entries = (await getEntriesForWorld(fromKey))
+        .filter(e => e.app === 'world' || !Number.isFinite(e.sourceFloor) || e.sourceFloor <= tip);
+    await withStore(STORE_LEDGER, 'readwrite', store => {
+        // ts 原样保留:它是「我看过了」水位(meta.seen)的比对基准,重发的话分支里所有旧内容都会整批变成
+        // 未读/NEW;主键是自增 _key(下面剥掉重发),id 只是条目标识,ts 只在世界内排序,同值跨世界互不相干。
+        for (const { _key, ...e } of entries) store.add({ ...e, worldKey: toKey, id: makeId() }); // _key 是自增主键,带过去会撞键
+    });
+    const meta = await readMeta(fromKey);
+    const wm = normalizeWatermarks(meta);
+    for (const app of Object.keys(wm)) wm[app] = Math.min(wm[app], tip);
+    const newMeta = { worldKey: toKey, watermarks: wm };
+    if (meta.owner) newMeta.owner = meta.owner;
+    if (meta.seen && typeof meta.seen === 'object') newMeta.seen = { ...meta.seen };
+    if (meta.seenBaseline) newMeta.seenBaseline = meta.seenBaseline;
+    if (meta.starred && typeof meta.starred === 'object') newMeta.starred = { ...meta.starred };
+    await writeMeta(newMeta);
+    return { copied: entries.length, skipped: false };
+}
+
 /** 删除某世界内 sourceFloor >= floor 的全部条目——回滚的唯一入口(联系人也是余波,一并消失)。 */
 export async function deleteEntriesFromFloor(worldKey, floor) {
     if (!worldKey) return;

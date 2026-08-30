@@ -9,6 +9,7 @@
  * 所以首次使用时把当时的文件名 key **冻进 chat_metadata**(它躺在聊天文件里,随文件走,
  * 改名/导入导出全都带着),此后永远读 metadata——钥匙从此不再跟文件名走。
  * 旧世界零迁移:冻结值就取当时的 legacy key,老数据直接无缝。
+ * ⚠️唯一的例外是分支/检查点:它们把父聊天的钥匙也抄走了,要靠 inheritedWorldKey/forkBranchWorld 分叉。
  */
 export function computeWorldKey(ctx) {
     if (ctx.groupId) return null;
@@ -18,12 +19,73 @@ export function computeWorldKey(ctx) {
     const legacy = `${avatar}::${chatId}`;
     const meta = ctx.chatMetadata;
     if (meta && typeof meta === 'object') {
+        // 分支/检查点刚从父聊天抄来的钥匙(见 inheritedWorldKey):世界还没分叉完,先答「没有世界」——
+        // 所有调用方对 null 早有处理(群聊就是 null),比让它们在这几十毫秒里往父世界写东西安全得多。
+        if (inheritedWorldKey(ctx)) return null;
         if (meta.orrery_world_id) return meta.orrery_world_id;
         meta.orrery_world_id = legacy;
         ctx.saveMetadataDebounced?.();
         return legacy;
     }
     return legacy; // metadata 尚未就绪(启动极早期):先用 legacy 顶着,就绪后冻结的仍是同一值
+}
+
+/**
+ * 酒馆的分支/检查点会把父聊天的 chat_metadata 整份抄进新文件(script.js saveChat:
+ * `{ ...chat_metadata, ...withMetadata }`,withMetadata 只多一个 main_chat=父聊天名)——冻结在里面的
+ * orrery_world_id 也跟着被抄走,于是两个聊天共用一个世界:分支里能看到父线后半段的余波,分支里 swipe/
+ * 删楼还会按 sourceFloor 砍掉父线的账(她 2026-08-30 开分支玩不同走向时撞上)。
+ * 识别条件:main_chat 存在,且当前 id 恰好等于「父聊天的 legacy key」——说明这把钥匙是抄来的,不是
+ * 自己冻的。改名/导入不会命中(main_chat 不变、id 也不等于新名字的 legacy);分支再分支同样命中
+ * (中间那层已分叉成自己的 id,再往下抄走的正是它)。
+ * @returns {string|null} 抄来的父世界 key;不是继承来的就 null
+ */
+export function inheritedWorldKey(ctx) {
+    if (ctx.groupId) return null;
+    const avatar = ctx.characters?.[ctx.characterId]?.avatar;
+    const chatId = typeof ctx.getCurrentChatId === 'function' ? ctx.getCurrentChatId() : ctx.chatId;
+    const meta = ctx.chatMetadata;
+    if (!avatar || !chatId || !meta || typeof meta !== 'object') return null;
+    const parent = meta.main_chat;
+    if (!parent || !meta.orrery_world_id || parent === chatId) return null;
+    return meta.orrery_world_id === `${avatar}::${parent}` ? meta.orrery_world_id : null;
+}
+
+// 同一个分支在同一瞬间只分叉一次:CHAT_CHANGED 与 index.js 的启动检查可能前后脚到,第二个等第一个的结果。
+const forkInFlight = new Map();
+
+/**
+ * 分支世界分叉:把父世界里「分支点之前」的余波复制成分支自己的世界,再把新钥匙写回分支的 metadata。
+ * 分支的手机于是正好是「前 N 楼一模一样」的那部手机,之后两个世界各自生长、互不相砍。
+ * 复制失败也照样换钥匙(空世界总比继续共用父世界安全),错误留在控制台。
+ * @returns {Promise<string|null>} 分叉后的新 key;当前聊天不是待分叉的分支就 null
+ */
+export async function forkBranchWorld(ctx, store) {
+    const from = inheritedWorldKey(ctx);
+    if (!from) return null;
+    const avatar = ctx.characters?.[ctx.characterId]?.avatar;
+    const chatId = typeof ctx.getCurrentChatId === 'function' ? ctx.getCurrentChatId() : ctx.chatId;
+    const to = `${avatar}::${chatId}`;
+    if (forkInFlight.has(to)) return forkInFlight.get(to);
+    const job = (async () => {
+        const tip = (ctx.chat?.length ?? 0) - 1;
+        try {
+            const r = await store.forkWorld(from, to, tip);
+            console.info(`[Orrery] 分支世界已分叉:复制 ${r.copied} 条余波(≤第${tip}层)${r.skipped ? '(目标已有内容,跳过复制)' : ''}`);
+        } catch (err) {
+            // 失败不能只留控制台一行:分支从此是空世界,她在手机里看到的只是「什么都没有」,得让她知道是分叉炸了。
+            console.error('[Orrery] 分支世界分叉失败,改用空世界', err);
+            globalThis.toastr?.error?.('分支世界分叉失败,这个分支从空世界开始(详见控制台)', 'Orrery');
+        }
+        const meta = ctx.chatMetadata;
+        if (meta && typeof meta === 'object') {
+            meta.orrery_world_id = to;
+            ctx.saveMetadataDebounced?.();
+        }
+        return to;
+    })();
+    forkInFlight.set(to, job);
+    try { return await job; } finally { forkInFlight.delete(to); }
 }
 
 // 联系人头像色板,与 --or-* 皮肤色系同族但互相可辨。顺序固定,靠 contactId 哈希稳定取色——

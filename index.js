@@ -1,7 +1,7 @@
 // 装配层:取 ctx、绑酒馆事件、建魔杖菜单入口、挂手机 Shadow DOM。ES 相对 import 可行——
 // index.js 以 <script type="module"> 加载,浏览器按其自身 URL 解析相对路径(见 docs/VERIFICATION.md §1)。
 import { registerRollback } from './core/rollback.js';
-import { computeWorldKey, foldWorld, hasUnseenInApp } from './core/world.js';
+import { computeWorldKey, forkBranchWorld, foldWorld, hasUnseenInApp } from './core/world.js';
 import * as store from './core/store.js';
 import { createShell } from './ui/shell.js';
 import { ICON_WAND_MENU } from './ui/icons.js';
@@ -17,7 +17,7 @@ function waitForExtensionsMenu(cb) {
 
 // 自报家门:排查「更新了却在跑旧码」(酒馆本地/全局双副本、静默 pull 失败)时,
 // 让实际加载的这份代码自己在控制台亮明版本——比对扩展管理器显示的版本号即知真伪。
-export const ORRERY_VERSION = '0.17.2';
+export const ORRERY_VERSION = '0.17.3';
 console.info(`[Orrery] v${ORRERY_VERSION} 已加载 · 输出预算 65500`);
 
 function main() {
@@ -163,7 +163,8 @@ function main() {
     });
 
     ensureFab();
-    refreshBadge();
+    // 插件在聊天已经打开之后才加载/启用时,CHAT_CHANGED 早就过去了——启动时也查一次是不是待分叉的分支。
+    forkBranchWorld(ctx, store).then((forked) => { if (forked) { shell.onWorldChanged(); } refreshBadge(); });
 }
 
 if (document.readyState === 'loading') {

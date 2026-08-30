@@ -1,6 +1,6 @@
 // 回滚引擎:监听酒馆事件 → 世界倒带。只认 sourceFloor,不关心任何业务语义
 // (联系人也是普通 RippleEntry,delete-by-floor 自动把回滚期间"新认识的人"一起抹掉)。
-import { computeWorldKey } from './world.js';
+import { computeWorldKey, forkBranchWorld } from './world.js';
 
 /**
  * @param {object} ctx SillyTavern.getContext() 结果
@@ -45,7 +45,10 @@ export function registerRollback(ctx, store, onWorldChanged) {
     // 编辑楼层不触发回滚——不搞完美主义,觉得不对走手动反悔。
     eventSource.on(eventTypes.MESSAGE_EDITED, () => {});
 
-    eventSource.on(eventTypes.CHAT_CHANGED, () => {
+    // 换聊天:先看这是不是刚从父聊天抄来钥匙的分支/检查点,是就先分叉世界,再对外报世界变了——
+    // 顺序不能反,否则红点/自动刷新会拿着父世界的钥匙先跑一轮。
+    eventSource.on(eventTypes.CHAT_CHANGED, async () => {
+        await forkBranchWorld(ctx, store);
         onWorldChanged(computeWorldKey(ctx));
     });
 }
