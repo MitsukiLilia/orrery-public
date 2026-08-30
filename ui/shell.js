@@ -1018,6 +1018,7 @@ export function createShell(ctx, onExternalChange) {
                 worldKey, floorWindow: s.floorWindow,
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
                 excludeTags: s.excludeTags || '',
+                allowUserContact: !!s.allowUserContact,
             });
             if (result?.ok && result.added > 0 && top.type === 'gallery') top.seenAt = before;
             onExternalChange?.();

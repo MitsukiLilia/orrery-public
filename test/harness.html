@@ -223,10 +223,12 @@
     // 所属コミュニティ推断(PROMPT_O,M5 起论坛/浏览器都要靠它才能生成)。这里从没配过 fixture——
     // 此前一直悄悄落到最后的默认档(buildFixtureA,没有 name 字段),ensureCommunity 每次都拿到
     // community_failed,论坛主生成在这套 harness 里从未真正跑通过。这次一并补上。
+    // M7b §3:补 worldBrief(草案 5A)——缺它 ensureCommunity 就判定为旧条目,每次都重推。
     function buildFixtureO() {
         return {
             name: '雲雀珈琲店', kind: 'org', desc: '主角打工的连锁咖啡店分店',
             slug: 'hibari-coffee', officialName: '', titles: '店長、副店長、社員、アルバイト',
+            worldBrief: '令和のどこにでもある地方都市。今は梅雨明け前、駅前商店街でささやかな夏祭りの準備が進んでいる。',
         };
     }
 
@@ -371,12 +373,43 @@
         };
     }
 
+    // ── M7b §3 补的缺口:PROMPT_M(网页快照)fixture。此前 harness 里没有任何分支命中它的
+    // systemPrompt,generateWebSnapshot 在这套 harness 里恒 parse_failed,从没真正跑通过。
+    // 按 PROMPT_M §3/§5 的社内システム流派给一张 SP 版样本:青いヘッダー(ログイン中の部署)+
+    // パンくず+赤枠警告+纵向堆叠的表组(项目名一行、值一行,不横向滚动)+页顶「スマホ簡易表示(β)」横条。
+    function buildFixtureM() {
+        const html = `<div style="max-width:480px;margin:0 auto;font-family:'MS PGothic',sans-serif;background:#f2f2f2;color:#222;">
+<style>
+.m7b-topbar{background:#ffe9a8;color:#5a4200;font-size:11px;padding:4px 8px;text-align:center;border-bottom:1px solid #d8c07a;}
+.m7b-topbar a{color:#3b6bd6;margin-left:6px;}
+.m7b-header{background:#2f5fa8;color:#fff;padding:8px 10px;font-size:13px;}
+.m7b-crumb{padding:6px 10px;font-size:11px;color:#666;background:#e6e6e6;}
+.m7b-warn{margin:8px;border:2px solid #c0392b;background:#fff4f2;color:#c0392b;padding:8px;font-size:12px;}
+.m7b-row{display:flex;flex-direction:column;border-bottom:1px solid #ddd;padding:6px 10px;background:#fff;}
+.m7b-row b{font-size:11px;color:#555;}
+.m7b-row span{font-size:13px;margin-top:2px;}
+.m7b-sign{padding:8px 10px;font-size:11px;color:#777;text-align:right;}
+</style>
+<div class="m7b-topbar">スマホ簡易表示(β)<a href="#">PC版はこちら</a></div>
+<div class="m7b-header">経費精算システム<br>ログイン中:総務部</div>
+<div class="m7b-crumb">トップ &gt; 申請一覧 &gt; 詳細</div>
+<div class="m7b-warn">締切間近の申請が1件あります。至急ご確認ください。</div>
+<div class="m7b-row"><b>申請番号</b><span>EX-20260820-014</span></div>
+<div class="m7b-row"><b>件名</b><span>交通費(定期区間外)</span></div>
+<div class="m7b-row"><b>金額</b><span>¥1,280</span></div>
+<div class="m7b-row"><b>承認状況</b><span>係長承認待ち</span></div>
+<div class="m7b-sign">総務部 経理課</div>
+</div>`;
+        return { url: 'https://intra.example-office.local/keihi/detail?id=014', html };
+    }
+
     // ── M4 相册「无声的日记」fixture(K,没有续写入口,只有一个主生成)──
     // 字段名是 desc 不是 text/body/title,单独给一个,别复用其他 withZhXxx 撞错字段名。
     function withZhDesc(desc) { return langIsJaZh() ? { desc, zh: `（中译）${desc}` } : { desc }; }
-    // 8 张照片跨 2 天(第 1〜5 张锚在较早的一天、第 6〜8 张锚在较新一天,靠 delayMin 累加天然跨天,
+    // 9 张照片跨 2 天(第 1〜6 张锚在较早的一天、第 7〜9 张锚在较新一天,靠 delayMin 累加天然跨天,
     // 不用在 fixture 里手写 worldTime——同 layoutWorldTimes 的推演方式):tone 覆盖多种、含 1 张
-    // screenshot(kind:"screenshot")、1 张故意给非法 tone("nonexistent")练白名单落 street 这条路径。
+    // screenshot(kind:"screenshot")、1 张故意给非法 tone("nonexistent")练白名单落 street 这条路径、
+    // 1 张对方入镜(M7b §3:验证 PROMPT_K 新原则 5——两人已相识后「不小心拍进去的那个人」)。
     function buildFixtureK() {
         return {
             worldTime: '2026-08-20 23:10',
@@ -386,6 +419,7 @@
                 { label: 'トーク画面', ...withZhDesc('既読がついたまま返信のないトーク画面のスクショ'), tone: 'screen', kind: 'screenshot', delayMin: 5 },
                 { label: '駅前', ...withZhDesc('人がまばらな駅前のロータリー、街灯がつき始めている'), tone: 'street', kind: 'photo', delayMin: 90 },
                 { label: '謎の色', ...withZhDesc('部屋の隅、暗がりに置かれたままの傘'), tone: 'nonexistent', kind: 'photo', delayMin: 20 },
+                { label: '隣の横顔', ...withZhDesc('隣に座る誰かの横顔、気づかず笑っている、画面の端に少し入り込んだだけ'), tone: 'indoor', kind: 'photo', delayMin: 45 },
                 { label: '海', ...withZhDesc('防波堤から見た夕方前の海、波が静か'), tone: 'sea', kind: 'photo', delayMin: 700 },
                 { label: '花', ...withZhDesc('道端に咲いていた名前の知らない花'), tone: 'blossom', kind: 'photo', delayMin: 15 },
                 { label: '夜', ...withZhDesc('誰もいない真夜中の空、星がひとつも見えない'), tone: 'night', kind: 'photo', delayMin: 200 },
@@ -459,6 +493,12 @@
         }
         if (systemPrompt.includes('浏览器「Astrolabe」')) {
             const body = buildFixtureJ();
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        // M7b §3 补的缺口:PROMPT_M(网页快照)此前没有分支命中,一直悄悄落到 buildFixtureA(没有
+        // html 字段),generateWebSnapshot 恒 parse_failed。"静态快照"是 PROMPT_M 独有的措辞。
+        if (systemPrompt.includes('静态快照')) {
+            const body = buildFixtureM();
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
         if (systemPrompt.includes('手机里的相册')) {

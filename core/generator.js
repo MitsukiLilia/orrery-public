@@ -79,7 +79,7 @@ export const PROMPT_H = `你是 Orrery,一个隐形的叙事世界观测引擎�
 1. 余波,不是复述。正文里的事件不许转述;写它在 SNS 上荡开的水纹——当事人若无其事的日常推、意味深长的空リプ、突然的沉默、以及与事件无关的日常继续流动。
 2. 社交面具与情绪裂缝(本 app 的灵魂)。表垢是对外的人格面(よそ行き):礼貌语或温和口语、体面、岁月静好,可带表情或 tag;裏垢是情绪的裂缝(壁打ち,面壁倾诉):语无伦次、全角半角混杂、甚至因情绪极化而失去词汇量(限界化,如「無理」「しんどい」),极少用表情。同一事件在表与裏的落差,是这里最高级的余波——大号一句「今日は暑かった」,锁着的小号五分钟前连发三条崩溃。但崩溃的方式也必须贴合角色性格——限界化是许可不是义务,性格永远优先于氛围。
 3. 裏垢按性格涌现,不保底。不是每个人都开小号:冷淡寡言、不擅表达的人可能一辈子只有一个账号,沉默也是人格。只有性格合适的人、且剧情推到某个情绪节点时,才会诞生裏垢——开号本身就是一次事件。主人的裏垢一旦诞生,默认带锁(鍵垢);而裏垢一旦存在就不许整批缺席:正文出现重大情绪/关系进展时,本批它必须有动静——发推、改 bio、displayName 加状态后缀都算,「隔了很久才发」可以,毫无痕迹不行。
-4. 关注是人格的镜子(フォロー)。主人的表垢只关注 TA 认识的人与所属的公式账号:亲戚、朋友、同僚、上司下属、原著配角——首次初始化必须为主人建起这一圈(亲戚与朋友那一挂至少各有一个账号),并让表垢关注他们;所属若有公式账号(自治体・学校・組織那种官僚文风的お知らせ账号,official:true)也一并建立并关注,没有公式账号的所属不硬造。主人的裏垢(若存在)关注的是与心境同频的路人:病み垢的相互、恋愛相談・占い・名言 bot、深夜の独り言那一挂——按性格与剧情涌现,心境变了就取关、换关注;只有正文出现明确翻篇的时刻,才允许一次「リセット」式的清空(罕见,宁缺毋滥)。关注与取关都是余波,用 followChanges 表达;关注表为空视为首次,补齐主人已认识账号的关注。
+4. 关注是人格的镜子(フォロー)。主人的表垢只关注 TA 认识的人与所属的公式账号:亲戚、朋友、同僚、上司下属、原著配角——首次初始化必须为主人建起这一圈(5〜8 个账号,亲戚、朋友、同僚、上司下属各有代表,亲戚与朋友那一挂至少各有一个),并让表垢关注他们;这一圈里必然混着不得不关注的对象——上司、所属的公式账号、礼节上回关的人(義理フォロー),关注本身就是社交束缚,表垢的岁月静好有一半是给他们看的;所属若有公式账号(自治体・学校・組織那种官僚文风的お知らせ账号,official:true)也一并建立并关注,没有公式账号的所属不硬造。之后新建的账号优先补主人身边人,直到表垢的关注圈有 8〜12 人;无关住民按需。主人的裏垢(若存在)关注的是与心境同频的路人:病み垢的相互、恋愛相談・占い・名言 bot、深夜の独り言那一挂——按性格与剧情涌现,心境变了就取关、换关注;只有正文出现明确翻篇的时刻,才允许一次「リセット」式的清空(罕见,宁缺毋滥)。关注与取关都是余波,用 followChanges 表达;关注表为空视为首次,补齐主人已认识账号的关注。
 5. 比例律与视角合法性。本批推文约一半与主线人物/事件沾边——「沾边」只有两种合法视角:当事人(主线人物本人或身边人的账号,发与亲历相关的推)与旁观者(无关住民以目击/听说口吻聊公开可见的部分)。🚫绝不许无关住民把与主线雷同的经历当成自己的亲身经历发推——这个世界不存在恰好经历同一件事的第二组人。另一半是住民账号毫无营养的生活流水(おはよう/おやすみ打卡、抱怨通勤、天气、饭拍、安利、推活)——其中至少一条的回复区,安排主人**身边人**的账号(亲友、同事、下属那一挂)自然路过,不点破身份,让读者自己发现;这种路过只放在纯日常推下,绝不回复与主线经历雷同的内容。⭐主人本人的账号不做这种路过:现实的推特上没有人拿自己的账号到处去陌生人的回复区留言,主人的回复只会出现在已相识者的推文下;对陌生账号的内容,主人至多无言 RT 或保持沉默——主人的每一次开口都是剧情,不是活跃度。
 6. 视角纪律。每个账号只知道公开可见或自己亲历的事,不许未卜先知。
 7. 说话像真实的日本推特:短文、体言止め、省略主语;连投、跟风梗;ハッシュタグ偶尔用不滥用。不点名、不艾特的空リプ最有味——对某事/某人发表感想,只给懂的人看,绝不提及具体特征。绝不像小说。颜文字与表情按账号人格取舍——冷淡账号几乎不用。
@@ -88,7 +88,7 @@ export const PROMPT_H = `你是 Orrery,一个隐形的叙事世界观测引擎�
 10. 配图占位。推文可偶尔带图:在 body 里用「[写真:一句话描述画面]」占位,本批最多 1〜2 条带图,以饭拍、风景、日常小物为主;裏垢几乎不发图。
 11. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在 SNS 留下的一切痕迹(账号、发言、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示;两人尚未相识,就不许出现互动或撮合式讨论。故事人物的小号绝不自曝真身。禁止 OOC。
 12. {{LANG_RULE}}
-13. 规模与下限:正文有新进展时,本批固定产出 5〜8 条新推——下限 5 条是硬性契约,其中至少 2 条从不同视角回应新进展(当事人的若无其事、身边人的反应、旁观者的只言片语都算),其余为日常流水;正文没有新进展的批次才允许 3 条以下的安静。沉默只能是账号级的(某个账号这批不发声),不能是时间线级的——用户按下刷新,是要看到世界在动的。另有 0〜6 条对已有推的新回复。首次初始化时创建主人的表垢 + TA 认识的人的账号(亲戚、朋友、同僚那一挂 3〜5 个,表垢关注他们)+ 3〜5 个无关住民账号;之后每批最多新建 2 个账号。
+13. 规模与下限:正文有新进展时,本批固定产出 5〜8 条新推——下限 5 条是硬性契约,其中至少 2 条从不同视角回应新进展(当事人的若无其事、身边人的反应、旁观者的只言片语都算),其余为日常流水;正文没有新进展的批次才允许 3 条以下的安静。沉默只能是账号级的(某个账号这批不发声),不能是时间线级的——用户按下刷新,是要看到世界在动的。本批新推的作者分配:至少三分之二来自主人关注表内的账号(当前存在哪个视角就按哪个视角的关注表;主人自己的账号也算在内),其余才是无关住民——フォロー中是主人真正在看的那一屏,刷新首先要让它动。另有 0〜6 条对已有推的新回复。首次初始化时创建主人的表垢 + TA 认识的人的账号(亲戚、朋友、同僚、上司下属那一挂 5〜8 个,表垢关注他们)+ 3〜5 个无关住民账号;之后每批最多新建 2 个账号,优先补身边人。
 14. 検索の影(suggestedSearches):随每批给出 2〜4 条主人此刻会在 Pulsar 搜索栏输入的词——在意的人的话题、放不下的事、与情绪相关的 tag。与检索栏同一哲学:问不出口的,都会先出现在搜索栏。必须贴合主人性格与当下心境,是检索语式的短词组(语言随语言规则);没有可信的词就给空数组,不硬凑。
 
 # 输出
@@ -115,7 +115,7 @@ export const PROMPT_J = `你是 Orrery,一个隐形的叙事世界观测引擎�
 2. 检索像真人打字:关键词并列、省略、口语;偶尔连搜两条相近的(第一条没搜到想要的,加词细化或换个说法再搜)——笨拙本身就是心事的形状。也偶尔出现问不出口的检索:前一条词太直白、打到一半就作罢,紧接着的下一条换了个迂回的问法——两条并排,就是一次犹豫的现场。深夜时刻的检索,本身就是叙事。
 3. 性格优先。崩溃型的人查「眠れない どうすれば」,实务型的人查「駅前 薬局 営業時間」;不是每个人都把情绪交给检索栏,冷静的人可能只查正事。检索的「诚实」必须贴合主人的性格,以【人物设定参考】为准。
 4. 视角与关系阶段纪律。只能检索主人亲历、被告知或公开可见的事,正文里尚未发生的事绝不出现;对叙事另一方相关的检索同理——两人尚未相识就绝不许检索其名;相识后,检索对方提过的只言片语(病症、喜好、随口说的地名),是这个 app 最高级的余波。
-5. 浏览历史是检索的影子。一部分检索会带 1〜2 条「点进去的页面」(visits):标题像真实网页(Q&A、まとめ、攻略 wiki、商品评测、匿名掲示板のスレ,以及日本网络特产的诊断/占い/恋愛コラム/「〜な人の特徴10選」式ランキング记事那一挂——心里有事的人深夜最容易点进相性診断),站名是这个世界里的网站、贴合世界观,不写现实世界的真实网站名;另一部分浏览是与心事无关的日常惯性(天气、新闻、兴趣、购物;有所属组织/职场的主人还会掺内部业务系统那一挂——経費精算・勤怠・稟議・社内報・連絡網・福利厚生,站名带内部感,按主人的所属推断组织名,没有所属的主人不必硬造),让历史像真人的手机。
+5. 浏览历史是检索的影子。一部分检索会带 1〜2 条「点进去的页面」(visits):标题像真实网页(Q&A、まとめ、攻略 wiki、商品评测、匿名掲示板のスレ,以及日本网络特产的诊断/占い/恋愛コラム/「〜な人の特徴10選」式ランキング记事那一挂——心里有事的人深夜最容易点进相性診断),站名是这个世界里的网站、贴合世界观,不写现实世界的真实网站名;另一部分浏览是与心事无关的日常惯性(天气、新闻、兴趣、购物——全都是这个世界的:它的新闻与公共话题、它的商品与店、它的季节行事,材料里若给出[世界简报]以它为准,不写泛互联网的通用内容;有所属组织/职场的主人还会掺内部业务系统那一挂——経費精算・勤怠・稟議・社内報・連絡網・福利厚生,站名带内部感,按主人的所属推断组织名,没有所属的主人不必硬造),让历史像真人的手机。
 6. {{LANG_RULE}}
 7. 规模与下限:正文有新进展时,本批 3〜6 条新检索(其中至少 2 条与新进展相关)+ 0〜4 条独立浏览;没有新进展的批次才允许 1〜2 条的安静。用户按下刷新,是要看到痕迹的。
 8. 🚨OOC 纪律:一切检索与浏览必须符合【人物设定参考】与正文已确立的性格和关系阶段,不得自行发明重大设定,不许未卜先知。
@@ -132,11 +132,11 @@ export const PROMPT_J = `你是 Orrery,一个隐形的叙事世界观测引擎�
 export const PROMPT_K = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里的相册——相机胶卷与截图,属于故事世界本身。相册是无声的日记:拍下什么、什么时候拍、什么没有拍,都是心事的形状。给你的材料:①故事正文的最新进展 ②相册当前状态(已有的照片与截图)。请推演这段进展之后,相册里自然会新增的痕迹。
 
 # 原则
-1. 快门,不是复述。照片拍的是正文事件在主人眼里留下的「舍不得让它过去的一瞬」——或者与事件毫无关系的日常惯性。绝不把正文剧情摆拍成照片;事件本身往往不在画面里,画面里是它的余光:散场后的空座位、没喝完的咖啡、回家路上的天空。
+1. 快门,不是复述。照片拍的是正文事件在主人眼里留下的「舍不得让它过去的一瞬」——或者与事件毫无关系的日常惯性。绝不把正文剧情摆拍成照片;事件本身往往不在画面里,画面里是它的余光:散场后的空座位、没喝完的咖啡、回家路上的天空。但人不是事件——镜头对人的态度见 5。
 2. 描述是镜头语言。desc 只写画面里有什么(构图、光线、物件、边角的意外入镜),像给看不见照片的人念照片;绝不写心情、绝不解释为什么拍。感情藏在「拍了什么」和「什么时候拍」里——深夜时刻的一张没有任何人的天空,比任何文字都响。
 3. 性格优先。谁会拍什么:爱吃的人拍饭,实务型拍白板和收据,不擅表达的人只拍风景不自拍;不是每个人都常拍照,克制的人相册许久不动一次也真实。以【人物设定参考】为准。
 4. 截图也是心事。主人偶尔截下聊天画面、帖子、推文(kind:"screenshot"):想给谁看却没发出去的、怕它消失所以留底的、会反复回看的。截图的 desc 写明是什么画面(「〇〇とのトーク画面」式),画面内容要与故事世界一致,不得虚构明显不存在的对话或帖子。一批最多 1 张截图,多数批次没有。
-5. 视角与关系阶段纪律。只能拍主人在场亲眼所见的画面;正文尚未发生的事绝不出现;两人尚未相识,对方的身影就绝不会入镜——相识后,画面边角「不小心拍进去的那个人」,是这个 app 最高级的余波。
+5. 镜头随关系阶段。只能拍主人在场亲眼所见的画面;正文尚未发生的事绝不出现。对叙事另一方:两人尚未相识,对方的身影绝不入镜;相识后,画面边角「不小心拍进去的那个人」是最高级的余波;交往之后,对方成为被摄体是理所当然——正面、侧脸、吃饭、背影、ツーショット,以及只有主人才看得到的角度(毫无防备的睡颜、刚起床的背影),这个阶段每批至少 1 张对方入镜。仍受 3 约束:寡言克制的人也许只拍一张背影,但会拍。关系阶段以正文已确立的为准,不许自行升温。
 6. {{LANG_RULE}}
 7. 规模与下限:正文有新进展时,本批 2〜5 张——下限 2 张是硬性契约,其中至少 1 张与新进展有关(正面或余光都算),其余是日常惯性打底;没有新进展的批次才允许 0〜2 张的安静。用户按下刷新,是想翻到新照片的。
 8. 🚨OOC 纪律与 tone 契约:一切照片必须符合【人物设定参考】与正文已确立的性格和关系阶段,不得自行发明重大设定,不许未卜先知。tone 必须从给定清单里选最贴合画面主色的那个,不许自造。
@@ -178,11 +178,11 @@ export const PROMPT_L = `你是 Orrery,一个隐形的叙事世界观测引擎�
 export const PROMPT_M = `你是 Orrery,一个隐形的叙事世界观测引擎。主人「{{char}}」的浏览器历史里有一条记录,用户点开了它——请把那个页面完整地呈现出来:这是故事世界里一张真实存在的网页的静态快照。
 
 # 原则
-1. 页面是独立运转的公共物。它写给这个世界的所有人看,不是写给主角的:里面是路人的声音、运营者的口吻、广告位的聒噪——这个页面不知道主角是谁。内容与检索意图契合(医疗科普、商品评测、情感问答那一挂),但绝不提及主线剧情或当事人,绝不写出只有剧情当事人才知道的事。
+1. 页面是独立运转的公共物。它写给这个世界的所有人看,不是写给主角的:里面是路人的声音、运营者的口吻、广告位的聒噪——这个页面不知道主角是谁。它属于这个世界:材料里若给出【世界简报】与【世界观背景】,页面的时代感、地名、商品、公共话题都以它们为准,可以聊这个世界公开可见的事。内容与检索意图契合(医疗科普、商品评测、情感问答那一挂),但绝不提及主线剧情或当事人,绝不写出只有剧情当事人才知道的事。
 2. 忠于记录。页面内容必须与给你的[页面标题][站名](以及来源检索词,若有)严丝合缝——标题承诺了什么(「特徴10選」就有十条,「診断結果」就有结果框),页面就交付什么。
 3. 极致的日式网页复刻。调动你对日本互联网的全部语料记忆,精准还原各流派的版式气质与特有文案:匿名掲示板(>>安価、名無し、极简灰线)/まとめ(红蓝特大粗体、大面积引用块、假广告位、「いかがでしたか?」)/Q&A(ベストアンサー标识、提问与回答的气泡)/クチコミ评测(CSS 星级★★★★☆、「20代女性/敏感肌」式用户属性标签、条形评分)/诊断・占い(夸张的结果大字框与煽り文句)/大百科(曖昧さ回避警告框、带主观吐槽的概要、右侧信息卡)/社内システム・イントラ(旧式 OA 的表组布局、青いヘッダー、「ログイン中:〇〇部」、パンくず、赤枠警告、部署名署名)——按站名与标题判断这是哪一挂,大胆用 blockquote/table/details 与内联 <style> 搭 UI 小件(阴影卡片、标签、面包屑、气泡),网页的「土味」与「个性」本身就是趣味。
 4. 像完整的网页,不只是一篇文章:带上伪造的站头导航、相关链接区(SP 版里折到正文下方;链接一律 href="#",它们不会被点通)。
-5. 移动端布局纪律。这张页是在手机屏幕上被点开的:默认按 SP 版(スマホ版)渲染——单栏、流式宽度(不给外层容器写固定 px 宽),站头导航/相关链接区折到正文下方,或收成横向一行的链接列;广告位只做横幅(正文上方、段间、底部),🚫绝不做侧栏;正文区的可读性永远优先于装饰。唯一例外:社内システム・イントラ・老式业务系统那一挂,可以故意保留桌面版式(「社内システムがスマホ非対応」本身就是日本网络的一个笑点)——但此时必须给最外层容器写明确的 min-width(900px 级),让整页横向滚动,🚫绝不许多列布局在窄屏下互相挤压、正文列缩到不可读。
+5. 移动端布局纪律。这张页是在手机屏幕上被点开的:一律按 SP 版(スマホ版)渲染——单栏、流式宽度(不给外层容器写固定 px 宽,🚫不写 min-width),站头导航/相关链接区折到正文下方,或收成横向一行的链接列;广告位只做横幅(正文上方、段间、底部),🚫绝不做侧栏;正文区的可读性永远优先于装饰。社内システム・イントラ・老式业务系统那一挂同样按 SP 版:旧式 OA 的气质全保留(青いヘッダー、「ログイン中:〇〇部」、パンくず、赤枠警告、部署署名、表组),但表组改成纵向堆叠(项目名一行、值一行),🚫绝不横向滚动;页顶加一条「スマホ簡易表示(β)」小横条(可附「PC版はこちら」,href="#")——强行套壳的土味留着,吃力不留。
 6. 技术边界:输出单一 HTML 片段(不含 <html>/<head>/<body> 外壳,从最外层容器 div 直接开始);样式集中写在顶部一个 <style> 块;🚫绝不写 <script>,🚫绝不引用任何外部资源(字体、图库都不行);图片一律用色块 <div> 代替,里面写上素材说明文字(「[画像:頭を抱えるスーツの男性のフリー素材]」式——フリー素材感本身就是日式网页的一大笑点)。
 7. 篇幅:一屏到两屏的信息量(正文 300〜800 字级),重心放在首屏视觉冲击与核心内容区,不写巨型长文。
 8. {{LANG_RULE}}
@@ -210,7 +210,7 @@ export const PROMPT_O = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 输出
 只输出一个 JSON 对象:
-{"name":"所属的名称(原著写法,写到最贴近日常的那一层)","kind":"org|school|local","desc":"一句话:它在这个世界里是什么、主角在其中是什么身份","slug":"英数字小写短名(内网域名用)","officialName":"该所属若有对外公式账号的显示名,没有就留空字符串","titles":"这个所属内部对上司、同僚、成员的役職与称呼体系(原著写法,顿号分隔;原著没写明就按该类组织的常识给)"}`;
+{"name":"所属的名称(原著写法,写到最贴近日常的那一层)","kind":"org|school|local","desc":"一句话:它在这个世界里是什么、主角在其中是什么身份","slug":"英数字小写短名(内网域名用)","officialName":"该所属若有对外公式账号的显示名,没有就留空字符串","titles":"这个所属内部对上司、同僚、成员的役職与称呼体系(原著写法,顿号分隔;原著没写明就按该类组织的常识给)","worldBrief":"这个世界的简报,2〜3 行:时代与技术水准、地域与季节、社会情勢、此刻公开可见的热点话题——只写这个世界的公共面,不写主角的私事"}`;
 
 const LANG_RULE = {
     messenger: {
@@ -253,12 +253,12 @@ const LANG_RULE = {
         en: '备忘用地道的英文便签体书写:碎片短语、清单式换行、随性的小写,notes-to-self 的省略语气。本提示词里的日系参照一律换算成英语圈对应物。不要输出 zh 字段。',
         ja_zh: '备忘用地道的日文メモ体书写:片言隻句、体言止め、清单式换行;写给自己的备忘里不会出现敬语,每条同时给出中文翻译字段 zh。',
     },
-    // M5 所属コミュニティ推断(任务书-M5 §2):name/officialName 是原著专名,照抄写法;desc 是给
-    // 观测者看的说明文字,不必跟着语言档走——这点上 ja_zh 与 ja 同档。
+    // M5 所属コミュニティ推断(任务书-M5 §2):name/officialName 是原著专名,照抄写法;desc 与
+    // worldBrief(M7b §2.5 新增)是给观测者看的说明文字,不必跟着语言档走——这点上 ja_zh 与 ja 同档。
     community: {
-        ja: 'name、officialName 与 titles 用日文原著写法,desc 用中文。',
-        en: 'name、officialName 与 titles 用英文原著写法,desc 用中文。',
-        ja_zh: 'name、officialName 与 titles 用日文原著写法,desc 用中文。',
+        ja: 'name、officialName 与 titles 用日文原著写法,desc 与 worldBrief 用中文。',
+        en: 'name、officialName 与 titles 用英文原著写法,desc 与 worldBrief 用中文。',
+        ja_zh: 'name、officialName 与 titles 用日文原著写法,desc 与 worldBrief 用中文。',
     },
 };
 // 世界观兜底(全档通用):哪天用日语玩 HP、或用英语玩日系原作,氛围细节听世界观的,别硬套黑话。
@@ -1166,8 +1166,9 @@ function pendingOrRegrow(watermark, tip, floorWindow) {
 async function ensureCommunity(ctx, store, { worldKey, profileId, customApi, owner, language, excludeTags, world = null }) {
     // 调用方手里通常已经有折好的 world,传进来省一次全量 fold;没传才自己折。
     const folded = world || foldWorld(await store.getEntriesForWorld(worldKey));
-    // 已推断过就不花 token;缺 titles 的是 v0.16.1 之前推的旧条目,补推一次覆盖(后写覆盖语义),不用改組
-    if (folded.community && folded.community.titles) return folded.community;
+    // 已推断过就不花 token;缺 titles(v0.16.1 之前)或缺 worldBrief(M7b 之前)的都是旧条目,
+    // 补推一次覆盖(后写覆盖语义,同 v0.16.1 补 titles 的路子),不用改組。
+    if (folded.community && folded.community.titles && folded.community.worldBrief) return folded.community;
 
     const charName = owner || ctx.name2 || '主角';
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
@@ -1186,6 +1187,7 @@ async function ensureCommunity(ctx, store, { worldKey, profileId, customApi, own
         name: String(parsed.name), kind: (['org', 'school', 'local'].includes(parsed.kind) ? parsed.kind : 'org'),
         desc: String(parsed.desc || ''), slug: String(parsed.slug || ''), officialName: String(parsed.officialName || ''),
         titles: String(parsed.titles || '').trim() || '(未提供)', // 空串会被当成「缺」而每次重推,占位止损
+        worldBrief: String(parsed.worldBrief || '').trim() || '(未提供)', // 同上,worldBrief 空串同样止损
     };
     const added = await store.addEntry({ worldKey, sourceFloor, app: 'world', type: 'community', payload });
     return { ...payload, sourceFloor: added.sourceFloor, ts: added.ts };
@@ -1967,9 +1969,25 @@ async function runBrowserPageGeneration(ctx, store, { worldKey, visitId, profile
     const fromQuery = visit.fromQueryId ? world.searches.get(visit.fromQueryId)?.text : null;
     // 所属コミュニティ(任务书-M5 §4):有就加一行,没有就不加——这里不调 ensureCommunity(不为一张
     // 快照页额外花一次推断),只读浏览器主生成早先已经落好的 world.community。
+    // M7b §1.1(草案 5A):community.worldBrief 有就再加一行,页面的时代感/公共话题才有依据可循。
     const community = world.community;
-    const communityLine = community ? `\n【主人的所属】${community.name}——${community.desc || ''}${community.slug ? `(若这是内网页面,域名用 intra.${community.slug}.〜 那一挂)` : ''}` : '';
-    const userContent = `${notes.text}【页面标题】${visit.title}\n【站名】${visit.site || '(未知)'}${fromQuery ? `\n【来源检索词】${fromQuery}(主人搜了它,从结果里点进了这一页)` : ''}${communityLine}`;
+    const communityLine = community ? `\n【主人的所属】${community.name}——${community.desc || ''}${community.slug ? `(若这是内网页面,域名用 intra.${community.slug}.〜 那一挂)` : ''}${community.worldBrief ? `\n【世界简报】${community.worldBrief}` : ''}` : '';
+    // M7b §1.2(草案 5B):页面不知道主角是谁(原则1不变),但它属于这个世界——用页面自己的标题/
+    // 站名/来源检索词当扫描文本触发世界书条目,页面才写得出这个世界公开可见的地名/机构/事件,
+    // 而不必依赖「主角最近几层正文碰巧提到它」。零额外 LLM 调用(getWorldInfoPrompt 是本地世界书
+    // 检索,不是模型请求);写法照 buildCastReference 里的 wi 段,失败静默降级不阻塞生成。
+    let wiSection = '';
+    try {
+        if (typeof ctx.getWorldInfoPrompt === 'function') {
+            const scanTexts = [visit.title, visit.site, fromQuery].filter(Boolean);
+            const wi = await ctx.getWorldInfoPrompt(scanTexts, maxContextSize(ctx), true);
+            const wiBlob = (wi?.worldInfoString || '').trim();
+            if (wiBlob) wiSection = `\n\n【世界观背景(激活的世界书条目;页面属于这个世界,可以写这个世界公开可见的事,但仍然不知道主角是谁)】\n${wiBlob}`;
+        }
+    } catch (err) {
+        console.warn('[Orrery] 网页快照世界书激活失败,跳过', err);
+    }
+    const userContent = `${notes.text}【页面标题】${visit.title}\n【站名】${visit.site || '(未知)'}${fromQuery ? `\n【来源检索词】${fromQuery}(主人搜了它,从结果里点进了这一页)` : ''}${communityLine}${wiSection}`;
     logContextShape('网页快照', userContent, notes.keys);
     const systemPrompt = PROMPT_M.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('webpage', language));
 
@@ -2072,7 +2090,11 @@ async function runBrowserMainGeneration(ctx, store, { worldKey, floorWindow, pro
     // 所属コミュニティ(任务书-M5 §4):浏览器不靠它立身份,推断失败不阻塞——照常生成,只是不带所属行。
     const community = await ensureCommunity(ctx, store, { worldKey, profileId, customApi, owner: charName, language, excludeTags, world });
     if (community) world.community = community;
-    const communityLine = community ? `[主人的所属] ${community.name}(${communityKindLabel(community.kind)}):${community.desc || ''}\n\n` : '';
+    // M7b §1.1(草案 5A):community.worldBrief 有就再加一行——日常惯性浏览(原则5)才有「这个世界的
+    // 公共话题/商品/季节行事」可以对齐,不必自己现编。
+    const communityLine = community
+        ? `[主人的所属] ${community.name}(${communityKindLabel(community.kind)}):${community.desc || ''}\n\n${community.worldBrief ? `[世界简报] ${community.worldBrief}\n\n` : ''}`
+        : '';
     // 同 messenger/forum/sns 的点名警示,换成浏览器语境的措辞(检索视角而非注册身份)。
     const userSideName = (ctx.name1 || '').trim();
     const caution = (userSideName && userSideName !== charName)
@@ -2151,7 +2173,7 @@ async function runBrowserMainGeneration(ctx, store, { worldKey, floorWindow, pro
 // ── M4:相册主生成:独立水位、独立触发(app 内「刷新」),消化 newPhotos。
 //    没有续写/续聊入口——v1 没有详情页续写,只有主刷新(任务书-M4 §一)。 ──
 
-async function runGalleryMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, excludeTags }) {
+async function runGalleryMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags }) {
     await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'gallery');
     const tip = ctx.chat.length - 1;
@@ -2161,10 +2183,15 @@ async function runGalleryMainGeneration(ctx, store, { worldKey, floorWindow, pro
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
     const charName = owner || ctx.name2 || '主角';
     // 同 messenger/forum/sns/browser 的点名警示,换成相册语境的措辞(任务书-M4 §三 caution 措辞)。
+    // M7b §1.3(草案 7A):caution 接开关——allowUserContact 关着时是原来那句禁入镜的红线;开着说明
+    // 两人已相识,换成 PROMPT_K 原则 5(镜头随关系阶段)的引子,让模型知道可以拍、按哪个阶段拍。
     const userSideName = (ctx.name1 || '').trim();
-    const caution = (userSideName && userSideName !== charName)
-        ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。不得出现以「${userSideName}」为主角的摆拍;两人尚未相识时,「${userSideName}」的身影绝不许入镜。\n\n`
-        : '';
+    let caution = '';
+    if (userSideName && userSideName !== charName) {
+        caution = allowUserContact
+            ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方,两人已相识:TA 可以入镜,镜头语言按原则 5 的关系阶段走,以正文已确立的阶段为准。\n\n`
+            : `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。不得出现以「${userSideName}」为主角的摆拍;两人尚未相识时,「${userSideName}」的身影绝不许入镜。\n\n`;
+    }
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
     const notes = await buildInjectedNotes(ctx);
     const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}【相册当前状态】\n${buildGalleryDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
