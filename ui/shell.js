@@ -17,6 +17,7 @@ import {
 } from '../core/generator.js';
 import { manualRevert } from '../core/rollback.js';
 import { escapeHtml } from '../core/escape.js';
+import { formatClock } from '../core/worldtime.js';
 import {
     ICON_BACK, ICON_CHEVRON_RIGHT, ICON_CHECK, ICON_MINUS, ICON_PLUS, ICON_CLOSE,
     ICON_APP_MESSENGER, ICON_APP_SETTINGS, ICON_APP_FORUM, ICON_APP_MEMO, ICON_APP_SNS, ICON_APP_GALLERY,
@@ -186,7 +187,7 @@ function renderProfilePickerHtml(profiles, currentProfileId) {
  *   但"生成更多"/"刷新"是手机内部发起的动作,没有对应的酒馆事件,得靠这个回调补上)
  */
 export function createShell(ctx, onExternalChange) {
-    let host = null, shadow = null, root = null, screenEl = null, toastEl = null;
+    let host = null, shadow = null, root = null, screenEl = null, toastEl = null, statusClockEl = null;
     let navStack = [{ type: 'grid' }];
     let lastWorldKey;               // 上次渲染时的世界;变了就把导航栈清回网格(见 render)
     // 生成锁按 app 分:她的用法是一边等消息生成一边去翻论坛,共用一把锁会把整部手机锁死。
@@ -344,6 +345,12 @@ export function createShell(ctx, onExternalChange) {
         if (!screenEl) return;
         applyTheme();
         const { worldKey, world, tip, watermarks, seen, starred } = await currentWorld();
+        // M7c §1.4:状态栏时钟——worldClock 是世界内时刻(六个 app 共用的现在),不是现实时钟;
+        // 静态壳只搭一次(见 mount()),这里每帧按最新 worldClock 刷新文字/显隐。
+        if (statusClockEl) {
+            if (world.worldClock) { statusClockEl.textContent = formatClock(world.worldClock); statusClockEl.hidden = false; }
+            else statusClockEl.hidden = true;
+        }
         // 换聊天=换了另一部手机:上一部停在谁的对话里,与这部毫无关系,退回网格重新开始。
         // (导航状态本身是跨开合保留的,见 open();只有换世界才清。)
         if (worldKey !== lastWorldKey) {
@@ -383,7 +390,7 @@ export function createShell(ctx, onExternalChange) {
             };
             screenEl.innerHTML = renderGridHtml(dots, settings().theme || 'seasalt');
         } else if (top.type === 'messenger-list') {
-            screenEl.innerHTML = renderThreadListHtml({ world, busy: busy.messenger, seen, justUpdated });
+            screenEl.innerHTML = renderThreadListHtml({ world, busy: busy.messenger, seen, justUpdated, worldNow: world.worldClock });
         } else if (top.type === 'messenger-thread') {
             const thread = world.threads.get(top.threadId);
             const ok = thread && (thread.kind === 'group' ? !!thread.group : world.contacts.has(top.threadId));
@@ -394,7 +401,7 @@ export function createShell(ctx, onExternalChange) {
                 pendingScroll = { fallback: top.seenAt > 0 ? 'bottom' : 'top', key };
             }
             screenEl.innerHTML = renderThreadHtml({
-                thread, world, busy: busy.messenger, worldNow: world.worldNow,
+                thread, world, busy: busy.messenger, worldNow: world.worldClock,
                 seenAt: top.seenAt, replyBatch: settings().threadReplyBatch,
             });
             markSeenAfter = [seenKey, latestTsOfThread(thread)];
@@ -412,7 +419,7 @@ export function createShell(ctx, onExternalChange) {
                 pendingScroll = { fallback: top.seenAt > 0 ? 'bottom' : 'top', key };
             }
             screenEl.innerHTML = renderForumThreadHtml({
-                thread, world, busy: busy.forum, forumNow: world.forumNow,
+                thread, world, busy: busy.forum, forumNow: world.worldClock,
                 seenAt: top.seenAt, starred, replyBatch: settings().forumReplyBatch,
             });
             markSeenAfter = [seenKey, latestTsOfForumThread(thread)];
@@ -420,7 +427,7 @@ export function createShell(ctx, onExternalChange) {
             // task-007 底导两 tab:时间线=表账号能刷到的面;「我的」=主人主页(表/裏切换住这边)。
             if ((top.tab || 'tl') === 'me') {
                 screenEl.innerHTML = renderSnsMyPageHtml({
-                    world, busy: busy.sns, myRole: top.myRole || 'omote', seen, starred, snsNow: world.snsNow,
+                    world, busy: busy.sns, myRole: top.myRole || 'omote', seen, starred, snsNow: world.worldClock,
                 });
             } else {
                 // 任务书-M6 §1.2:tlMode 默认值——该视角关注表非空→following,空→recommend
@@ -444,14 +451,14 @@ export function createShell(ctx, onExternalChange) {
                 pendingScroll = { fallback: top.seenAt > 0 ? 'bottom' : 'top', key };
             }
             screenEl.innerHTML = renderSnsTweetHtml({
-                tweet, world, busy: busy.sns, snsNow: world.snsNow,
+                tweet, world, busy: busy.sns, snsNow: world.worldClock,
                 seenAt: top.seenAt, starred, replyBatch: settings().snsReplyBatch,
             });
             markSeenAfter = [seenKey, latestTsOfTweet(tweet)];
         } else if (top.type === 'sns-profile') {
             const account = world.snsAccounts.get(top.accountId);
             if (!account) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚清空(理论上账号不会被单删,防御性兜底)
-            screenEl.innerHTML = renderSnsProfileHtml({ account, world, snsNow: world.snsNow, seen, starred, myRole: currentSnsMyRole() });
+            screenEl.innerHTML = renderSnsProfileHtml({ account, world, snsNow: world.worldClock, seen, starred, myRole: currentSnsMyRole() });
         } else if (top.type === 'sns-follow-list') {
             // 任务书-M6 §4:纯本地渲染,role 是入口按钮固定传入的(裏垢视角点进来的就是裏垢的关注表)。
             screenEl.innerHTML = renderSnsFollowListHtml({ world, role: top.role === 'ura' ? 'ura' : 'omote' });
@@ -462,7 +469,7 @@ export function createShell(ctx, onExternalChange) {
             if (top.seenAt === undefined) top.seenAt = seen[seenKey] || 0;
             screenEl.innerHTML = renderBrowserHtml({
                 world, busy: busy.browser, tab: top.tab || 'search',
-                seenAt: top.seenAt, browserNow: world.browserNow,
+                seenAt: top.seenAt, browserNow: world.worldClock,
             });
             markSeenAfter = [seenKey, latestTsOfBrowser(world)];
         } else if (top.type === 'gallery') {
@@ -470,7 +477,7 @@ export function createShell(ctx, onExternalChange) {
             // 详情屏(galleryPhoto)不单独追踪 seenAt,回到这一屏才继续推进水位。
             const seenKey = seenKeyForGallery();
             if (top.seenAt === undefined) top.seenAt = seen[seenKey] || 0;
-            screenEl.innerHTML = renderGalleryListHtml({ world, busy: busy.gallery, seenAt: top.seenAt, galleryNow: world.galleryNow });
+            screenEl.innerHTML = renderGalleryListHtml({ world, busy: busy.gallery, seenAt: top.seenAt, galleryNow: world.worldClock });
             markSeenAfter = [seenKey, latestTsOfGallery(world)];
         } else if (top.type === 'galleryPhoto') {
             const photo = world.photos.find(p => p.photoId === top.photoId);
@@ -479,7 +486,7 @@ export function createShell(ctx, onExternalChange) {
         } else if (top.type === 'memo') {
             const seenKey = seenKeyForMemo();
             if (top.seenAt === undefined) top.seenAt = seen[seenKey] || 0;
-            screenEl.innerHTML = renderMemoListHtml({ world, busy: busy.memo, seenAt: top.seenAt, memoNow: world.memoNow });
+            screenEl.innerHTML = renderMemoListHtml({ world, busy: busy.memo, seenAt: top.seenAt, memoNow: world.worldClock });
             markSeenAfter = [seenKey, latestTsOfMemo(world)];
         } else if (top.type === 'memoNote') {
             const note = world.memos.get(top.noteId);
@@ -488,7 +495,7 @@ export function createShell(ctx, onExternalChange) {
         } else if (top.type === 'sns-search') {
             screenEl.innerHTML = renderSnsSearchHtml({ world });
         } else if (top.type === 'sns-search-result') {
-            screenEl.innerHTML = renderSnsSearchResultHtml({ word: top.word, world, busy: busy.sns, seen, starred, snsNow: world.snsNow });
+            screenEl.innerHTML = renderSnsSearchResultHtml({ word: top.word, world, busy: busy.sns, seen, starred, snsNow: world.worldClock });
         } else if (top.type === 'webPage') {
             const visit = world.visits.get(top.visitId);
             if (!visit) { navStack = [{ type: 'grid' }]; return render(); } // 已被倒带清空
@@ -1141,7 +1148,7 @@ export function createShell(ctx, onExternalChange) {
             case 'open-thread': navPush({ type: 'messenger-thread', threadId: el.dataset.threadId }); break;
             case 'refresh': doGenerateMore(); break;
             case 'generate-more': doContinueThread(); break;
-            case 'revert': doRevert(Number(el.dataset.ts)); break;
+            case 'revert': doRevert(Number(el.dataset.seq)); break;
             case 'open-forum-thread': navPush({ type: 'forum-thread', threadId: el.dataset.threadId }); break;
             case 'forum-refresh': doGenerateMoreForum(); break;
             case 'forum-generate-more': doContinueForumThread(); break;
@@ -1232,7 +1239,7 @@ export function createShell(ctx, onExternalChange) {
         if (floorRow) {
             longPressTimer = setTimeout(() => {
                 suppressNextClick = true;
-                doForumRevertFloor(Number(floorRow.dataset.ts));
+                doForumRevertFloor(Number(floorRow.dataset.seq));
             }, 550);
             return;
         }
@@ -1248,7 +1255,7 @@ export function createShell(ctx, onExternalChange) {
         if (snsReplyRow) {
             longPressTimer = setTimeout(() => {
                 suppressNextClick = true;
-                doRevertTweetReply(Number(snsReplyRow.dataset.ts));
+                doRevertTweetReply(Number(snsReplyRow.dataset.seq));
             }, 550);
             return;
         }
@@ -1256,7 +1263,7 @@ export function createShell(ctx, onExternalChange) {
         if (browserRow) {
             longPressTimer = setTimeout(() => {
                 suppressNextClick = true;
-                doBrowserRevert(Number(browserRow.dataset.ts));
+                doBrowserRevert(Number(browserRow.dataset.worldtime));
             }, 550);
             return;
         }
@@ -1264,7 +1271,7 @@ export function createShell(ctx, onExternalChange) {
         if (galleryPh) {
             longPressTimer = setTimeout(() => {
                 suppressNextClick = true;
-                doGalleryRevert(Number(galleryPh.dataset.ts));
+                doGalleryRevert(Number(galleryPh.dataset.worldtime));
             }, 550);
             return;
         }
@@ -1272,7 +1279,7 @@ export function createShell(ctx, onExternalChange) {
         if (memoRow) {
             longPressTimer = setTimeout(() => {
                 suppressNextClick = true;
-                doMemoRevert(Number(memoRow.dataset.ts));
+                doMemoRevert(Number(memoRow.dataset.worldtime));
             }, 550);
         }
     }
@@ -1299,7 +1306,7 @@ export function createShell(ctx, onExternalChange) {
         const floorRow = e.target.closest('.or-forum-floor-row');
         if (floorRow) {
             e.preventDefault();
-            doForumRevertFloor(Number(floorRow.dataset.ts));
+            doForumRevertFloor(Number(floorRow.dataset.seq));
             return;
         }
         const snsRow = e.target.closest('.or-sns-row');
@@ -1311,25 +1318,25 @@ export function createShell(ctx, onExternalChange) {
         const snsReplyRow = e.target.closest('.or-sns-reply-row');
         if (snsReplyRow) {
             e.preventDefault();
-            doRevertTweetReply(Number(snsReplyRow.dataset.ts));
+            doRevertTweetReply(Number(snsReplyRow.dataset.seq));
             return;
         }
         const browserRow = e.target.closest('.or-browser-row');
         if (browserRow) {
             e.preventDefault();
-            doBrowserRevert(Number(browserRow.dataset.ts));
+            doBrowserRevert(Number(browserRow.dataset.worldtime));
             return;
         }
         const galleryPh = e.target.closest('.or-ph');
         if (galleryPh) {
             e.preventDefault();
-            doGalleryRevert(Number(galleryPh.dataset.ts));
+            doGalleryRevert(Number(galleryPh.dataset.worldtime));
             return;
         }
         const memoRow = e.target.closest('.or-memo-row');
         if (memoRow) {
             e.preventDefault();
-            doMemoRevert(Number(memoRow.dataset.ts));
+            doMemoRevert(Number(memoRow.dataset.worldtime));
             return;
         }
         const row = e.target.closest('.or-msg-row');
@@ -1359,7 +1366,7 @@ export function createShell(ctx, onExternalChange) {
             <div class="or-backdrop" data-action="close-backdrop"></div>
             <div class="or-phone">
                 <div class="or-statusbar">
-                    <span class="or-statusbar-label">Orrery</span>
+                    <span class="or-statusbar-label">Orrery<span class="or-statusbar-clock" hidden></span></span>
                     <span class="or-statusbar-icons">${ICON_HUD_STARS}${ICON_HUD_RING}</span>
                     <button class="or-statusbar-star" data-action="open-asterism" title="星图">${ICON_STAR}</button>
                     <button class="or-close-btn" data-action="close-phone" title="收起手机">${ICON_CLOSE}</button>
@@ -1371,6 +1378,7 @@ export function createShell(ctx, onExternalChange) {
         shadow.appendChild(root);
         screenEl = root.querySelector('.or-screen');
         toastEl = root.querySelector('.or-toast');
+        statusClockEl = root.querySelector('.or-statusbar-clock');
 
         root.addEventListener('click', onClick);
         root.addEventListener('change', onFieldChange);

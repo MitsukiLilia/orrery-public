@@ -4,31 +4,13 @@
 // 系统自带 app,不起化名——不带品牌条,标题就是「备忘录」。
 import { ICON_BACK } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
+import { formatRelativeTime, formatFullTime } from '../../core/worldtime.js';
 
 export const MEMO_APP_ID = 'memo';
 export const MEMO_SKIN_URL = new URL('./skin.css', import.meta.url).href;
 
-function isSameDay(ts1, ts2) {
-    const a = new Date(ts1), b = new Date(ts2);
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-// 相对时间:x分钟前/x小时前/昨天/M月D日,参照系是备忘录最新世界时刻(memoNow)——照 forum 的
-// formatRelativeTime 思路抄(apps 互相零依赖,自己独立一份同款式)。
-function formatRelativeTime(ts, refNow) {
-    const ref = refNow || Date.now();
-    const diffMin = Math.max(0, Math.floor((ref - ts) / 60000));
-    if (diffMin < 60) return `${diffMin}分钟前`;
-    const diffHour = Math.floor(diffMin / 60);
-    if (diffHour < 24) return `${diffHour}小时前`;
-    if (isSameDay(ts, ref - 86400000)) return '昨天';
-    const d = new Date(ts);
-    return `${d.getMonth() + 1}月${d.getDate()}日`;
-}
-function formatFullTime(ts) {
-    const d = new Date(ts);
-    return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
+// isSameDay/formatRelativeTime/formatFullTime 收进 core/worldtime.js(M7c §2)——六个 app 此前
+// 各揣一份一模一样的副本,现在都从那里 import。
 
 function genSpinnerHtml() {
     return '<span class="or-orrery-spinner"></span>'; // 天象仪加载演出,样式在 ui/shell.css
@@ -46,7 +28,7 @@ function splitFirstLine(text) {
 function renderRow(n, seenAt, memoNow) {
     const isNew = seenAt > 0 && n.ts > seenAt; // seenAt=0(从没进过)不点,整屏都是新的没必要逐行点
     const { title, rest } = splitFirstLine(n.text);
-    return `<button class="or-memo-row" data-ts="${n.latestTs}" data-action="open-memo-note" data-note-id="${escapeHtml(n.noteId)}">
+    return `<button class="or-memo-row" data-worldtime="${n.latestTs}" data-action="open-memo-note" data-note-id="${escapeHtml(n.noteId)}">
         ${isNew ? '<span class="or-memo-new-dot"></span>' : ''}
         <div class="or-memo-row-body">
             <div class="or-memo-row-title">${escapeHtml(title)}</div>

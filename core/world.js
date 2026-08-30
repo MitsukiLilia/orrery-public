@@ -75,7 +75,7 @@ export function anonIdFor(threadId, key) {
 
 /**
  * 账本 fold 成世界状态:{ contacts, groups, threads, worldNow, boards, residents, forumThreads, forumNow,
- *   snsAccounts, tweets, snsNow, searches, visits, browserNow }。
+ *   snsAccounts, tweets, snsNow, searches, visits, browserNow, worldClock }。
  * threads: threadId -> { threadId, kind:'dm'|'group', contactId?, group?, messages:[], summaries:[], unread, lastMessage }
  * dm 的 threadId===contactId;群聊的 threadId===groupId,成员内联在 group.members(不必是通讯录好友)。
  * forumThreads: threadId -> { threadId, boardId, title, authorId?, anon?, body, zh?, worldTime, replies:[](按
@@ -102,6 +102,7 @@ export function anonIdFor(threadId, key) {
  * follows: { omote: Set<accountId>, ura: Set<accountId> }——M6 关注表,按账本顺序回放 sns_follow
  *   (follow=add,unfollow=delete;Set 语义天然让"unfollow 一个不在表里的 id"是 no-op)。fold 收尾时
  *   过滤掉 accountId 已不在 snsAccounts 里的悬空关注(账号被回滚/删除的防御性兜底,同 memo_edit 的第二道闸)。
+ * worldClock: 六个 xxxNow 里的最大值(M7c 单一世界钟,见下方 return 前的长注),六个都空才是 null。
  */
 export function foldWorld(entries) {
     const contacts = new Map();
@@ -291,6 +292,15 @@ export function foldWorld(entries) {
         }
     }
 
+    // M7c 单一 worldClock(时间统一):此前六个 app 各自把自己的 xxxNow 当「现在」讲给 LLM、
+    // 也各自当 UI 的相对时间参照——于是六个 app 各管各的钟,互不知情(真机症状:消息刚推到
+    // 今晚,论坛还停在三天前却显示"刚刚",新一批论坛帖又可能被模型标进比消息更早的时刻)。
+    // worldClock 取六者的最大值:谁的动静最新,就代表"整部手机此刻确定活到多晚"——全手机的
+    // 现在不该早于任何一个 app 已经走到的时刻。六个 app 自己的 xxxNow 语义不变、原样保留
+    // (红点/NEW/latestTsOf* 仍靠它们认"这个 app 有没有新动静"),worldClock 只是叠加在上面的
+    // 一把统一读数,不取代它们。六个都还是空世界(0)时 worldClock 才是 null。
+    const worldClock = Math.max(worldNow, forumNow, snsNow, browserNow, galleryNow, memoNow) || null;
+
     return {
         contacts, groups, threads, worldNow: worldNow || null,
         boards, residents, forumThreads, forumNow: forumNow || null,
@@ -300,6 +310,7 @@ export function foldWorld(entries) {
         memos, memoNow: memoNow || null,
         community, notices, // M5:所属(对象或 null)+ 公告表
         follows, // M6:{ omote: Set, ura: Set } 关注表
+        worldClock, // M7c:整部手机六个 app 共用的「现在」,见上方长注
     };
 }
 

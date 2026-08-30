@@ -4,26 +4,14 @@
 import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_LOCK, ICON_CAMERA, ICON_REPLY_SM, ICON_RT_SM, ICON_MOON, ICON_STAR, ICON_STAR_FILL, ICON_SEARCH_SM, ICON_OFFICIAL_BADGE } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
 import { monogramFor, colorForContact, seenKeyForTweet, newReplyCountOfTweet, starKeyForTweet } from '../../core/world.js';
+import { formatRelativeTime } from '../../core/worldtime.js';
 
 export const SNS_APP_ID = 'sns';
 export const SNS_SKIN_URL = new URL('./skin.css', import.meta.url).href;
 
-function isSameDay(ts1, ts2) {
-    const a = new Date(ts1), b = new Date(ts2);
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-// 相对时间:x分钟前/x小时前/昨天/M月D日,参照系是 SNS 最新世界时刻(snsNow),照 forum 的 formatRelativeTime 思路抄。
-function formatRelativeTime(ts, refNow) {
-    const ref = refNow || Date.now();
-    const diffMin = Math.max(0, Math.floor((ref - ts) / 60000));
-    if (diffMin < 60) return `${diffMin}分钟前`;
-    const diffHour = Math.floor(diffMin / 60);
-    if (diffHour < 24) return `${diffHour}小时前`;
-    if (isSameDay(ts, ref - 86400000)) return '昨天';
-    const d = new Date(ts);
-    return `${d.getMonth() + 1}月${d.getDate()}日`;
-}
+// isSameDay/formatRelativeTime 收进 core/worldtime.js(M7c §2)——六个 app 此前各揣一份一模一样
+// 的副本,现在都从那里 import。相对时间的参照系是 world.worldClock(整部手机的现在,不是 SNS
+// 自己的 snsNow;M7c 起六个 app 统一参照同一把钟)。
 
 function genSpinnerHtml() {
     return '<span class="or-orrery-spinner"></span>'; // 天象仪加载演出,样式在 ui/shell.css
@@ -178,7 +166,7 @@ export function renderSnsTlHtml({ world, busy, seen = {}, starred = {}, justUpda
         ? 'おすすめ静悄悄。点「刷新」。'
         : 'フォロー中还没有动静。去「おすすめ」看看,或点「刷新」。';
     const body = tweets.length
-        ? `<div class="or-sns-list">${tweets.map(t => renderTweetRowHtml(t, world, { snsNow: world.snsNow, seen, starred, justUpdated })).join('')}</div>`
+        ? `<div class="or-sns-list">${tweets.map(t => renderTweetRowHtml(t, world, { snsNow: world.worldClock, seen, starred, justUpdated })).join('')}</div>`
         : `<div class="or-empty">${emptyText}</div>`;
 
     return `
@@ -260,7 +248,7 @@ export function renderSnsTweetHtml({ tweet, world, busy, snsNow, seenAt = 0, sta
         }
         const rAccount = world.snsAccounts.get(r.accountId);
         const rZh = r.zh && r.zh !== r.body ? `<div class="or-zh">${renderBodyHtml(r.zh)}</div>` : '';
-        repliesHtml += `<div class="or-sns-reply-row" data-ts="${r.ts}">
+        repliesHtml += `<div class="or-sns-reply-row" data-seq="${r.ts}">
             <div class="or-sns-reply-head">
                 <button class="or-sns-row-avatarname" data-action="open-sns-profile" data-account-id="${escapeHtml(r.accountId)}">
                     ${avatarHtml(rAccount)}

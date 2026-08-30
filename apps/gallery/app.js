@@ -5,6 +5,7 @@
 import { ICON_BACK, ICON_SCREENSHOT_BADGE } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
 import { GALLERY_TONES } from '../../core/world.js';
+import { isSameDay, formatDateSep, formatFullTime } from '../../core/worldtime.js';
 
 export const GALLERY_APP_ID = 'gallery';
 export const GALLERY_SKIN_URL = new URL('./skin.css', import.meta.url).href;
@@ -16,23 +17,8 @@ function safeTone(tone) {
     return GALLERY_TONES.includes(tone) ? tone : 'street';
 }
 
-function isSameDay(ts1, ts2) {
-    const a = new Date(ts1), b = new Date(ts2);
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-// 按日分组小标题:今天/昨天/M月D日,参照系是相册最新世界时刻(galleryNow)——照 browser 的
-// formatDateSep 思路抄(apps 互相零依赖,不借 browser/skin.css 的样式也不借它的函数)。
-function formatDateSep(ts, refNow) {
-    const ref = refNow || Date.now();
-    if (isSameDay(ts, ref)) return '今天';
-    if (isSameDay(ts, ref - 86400000)) return '昨天';
-    const d = new Date(ts);
-    return `${d.getMonth() + 1}月${d.getDate()}日`;
-}
-function formatFullTime(ts) {
-    const d = new Date(ts);
-    return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
+// isSameDay/formatDateSep/formatFullTime 收进 core/worldtime.js(M7c §2)——六个 app 此前各揣
+// 一份一模一样的副本,现在都从那里 import。
 
 function genSpinnerHtml() {
     return '<span class="or-orrery-spinner"></span>'; // 天象仪加载演出,样式在 ui/shell.css
@@ -56,7 +42,7 @@ function renderThumb(p, seenAt) {
     const tone = safeTone(p.tone);
     const isScreenshot = p.kind === 'screenshot';
     const isNew = seenAt > 0 && p.ts > seenAt; // seenAt=0(从没进过)不点,整屏都是新的没必要逐块点
-    return `<button class="or-ph or-tone-block" data-tone="${tone}" data-ts="${p.worldTime}" data-action="open-gallery-photo" data-photo-id="${escapeHtml(p.photoId)}">
+    return `<button class="or-ph or-tone-block" data-tone="${tone}" data-worldtime="${p.worldTime}" data-action="open-gallery-photo" data-photo-id="${escapeHtml(p.photoId)}">
         ${isScreenshot ? `<span class="or-ph-kind-badge">${ICON_SCREENSHOT_BADGE}</span>` : ''}
         ${isNew ? '<span class="or-ph-new-dot"></span>' : ''}
         <span class="or-ph-label">${escapeHtml(p.label)}</span>

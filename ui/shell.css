@@ -79,6 +79,9 @@
     padding: 12px 20px 4px; color: var(--or-cocoa);
 }
 .or-statusbar-label { font-size: 12px; font-weight: 600; letter-spacing: .04em; }
+/* M7c §1.4:worldClock(整部手机六个 app 共用的现在)的 HH:MM——挂在标题文字里而不是单独一个
+   flex 子项,不打乱 .or-statusbar 原有 space-between 四段布局;纯色小字,无渐变,三主题通用 token。 */
+.or-statusbar-clock { margin-left: 8px; font-weight: 400; color: var(--or-cocoa-light); letter-spacing: 0; }
 .or-statusbar-icons { display: flex; align-items: center; gap: 6px; }
 .or-close-btn {
     width: 32px; height: 32px; margin-left: 10px; border: none; border-radius: 50%;

@@ -6,28 +6,16 @@ import {
     resolveSender, monogramFor, colorForContact,
     seenKeyForThread, unreadCountOfThread,
 } from '../../core/world.js';
+import { isSameDay, formatDateSep, formatRelativeTime, formatClock } from '../../core/worldtime.js';
 
 export const MESSENGER_APP_ID = 'messenger';
 export const MESSENGER_SKIN_URL = new URL('./skin.css', import.meta.url).href;
 
-function isSameDay(ts1, ts2) {
-    const a = new Date(ts1), b = new Date(ts2);
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
+// isSameDay/formatDateSep/formatClock 收进 core/worldtime.js(M7c §2)——六个 app 此前各揣一份
+// 一模一样的副本,现在都从那里 import。isSameMinute 是消息线程自己独有的判据(同一分钟内连发
+// 的气泡省略中间的时间戳),不在收编范围内,留在本地。
 function isSameMinute(ts1, ts2) {
     return Math.floor(ts1 / 60000) === Math.floor(ts2 / 60000);
-}
-function formatClock(ts) {
-    const d = new Date(ts);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-// 「今天/昨天」的参照系是世界最新时刻(refNow),不是现实时钟——手机活在故事里。
-function formatDateSep(ts, refNow) {
-    const ref = refNow || Date.now();
-    if (isSameDay(ts, ref)) return '今天';
-    if (isSameDay(ts, ref - 86400000)) return '昨天';
-    const d = new Date(ts);
-    return `${d.getMonth() + 1}月${d.getDate()}日`;
 }
 
 function genSpinnerHtml() {
@@ -45,7 +33,9 @@ function groupAvatarHtml(group) {
  * @param seen 「我看过了」水位表(见 core/world.js 长注);未读数只认它,不认 payload.read
  * @param justUpdated 刚刚这一次刷新里长出新消息的 threadId 集合——只用来播一次入场动效
  */
-export function renderThreadListHtml({ world, busy, seen = {}, justUpdated = null }) {
+// @param worldNow M7c:整部手机的现在(shell 传 world.worldClock)——线程行右上角的相对时间参照它,
+//   不是这条线程自己的 displayTs;论坛/SNS 列表行的时间小字是同一个参照系,这里补齐消息这边此前缺的一环。
+export function renderThreadListHtml({ world, busy, seen = {}, justUpdated = null, worldNow }) {
     const threads = [...world.threads.values()]
         .filter(t => t.kind === 'group' ? !!t.group : world.contacts.has(t.contactId))
         .sort((a, b) => (b.lastMessage?.displayTs || 0) - (a.lastMessage?.displayTs || 0));
@@ -61,6 +51,7 @@ export function renderThreadListHtml({ world, busy, seen = {}, justUpdated = nul
                     : (isGroup ? (resolveSender(world, t, t.lastMessage.sender)?.name || '?') : '');
                 preview = `${who ? escapeHtml(who) + ': ' : ''}${escapeHtml(t.lastMessage.text)}`;
             }
+            const timeText = t.lastMessage ? formatRelativeTime(t.lastMessage.displayTs, worldNow) : '';
             const avatar = isGroup
                 ? groupAvatarHtml(t.group)
                 : `<div class="or-avatar" style="background-color:${world.contacts.get(t.contactId).color}">${escapeHtml(world.contacts.get(t.contactId).monogram)}</div>`;
@@ -71,7 +62,10 @@ export function renderThreadListHtml({ world, busy, seen = {}, justUpdated = nul
             return `<button class="${cls}" data-action="open-thread" data-thread-id="${escapeHtml(t.threadId)}">
                 ${avatar}
                 <div class="or-thread-body">
-                    <span class="or-thread-name">${escapeHtml(name)}</span>
+                    <div class="or-thread-toprow">
+                        <span class="or-thread-name">${escapeHtml(name)}</span>
+                        ${timeText ? `<span class="or-thread-time">${timeText}</span>` : ''}
+                    </div>
                     <span class="or-thread-preview">${preview}</span>
                 </div>
                 ${unread ? `<div class="or-unread-badge">${unread > 99 ? '99+' : unread}</div>` : ''}
@@ -143,10 +137,10 @@ export function renderThreadHtml({ thread, world, busy, worldNow, seenAt = 0, re
             : '';
         const senderName = (isGroup && showAvatar && sender) ? `<div class="or-sender-name">${escapeHtml(sender.name)}</div>` : '';
         const zhLine = m.zh && m.zh !== m.text ? `<div class="or-zh">${escapeHtml(m.zh)}</div>` : '';
-        body += `<div class="or-msg-row ${isMe ? 'me' : ''}" data-ts="${m.ts}">`;
+        body += `<div class="or-msg-row ${isMe ? 'me' : ''}" data-seq="${m.ts}">`;
         body += senderName;
         body += `<div class="or-msg-line">${avatar}<div class="or-msg-col"><div class="or-bubble">${escapeHtml(m.text)}${zhLine}</div></div>`;
-        body += `<button class="or-msg-revert" data-action="revert" data-ts="${m.ts}" title="从这条起删除本线程之后的所有消息">${ICON_UNDO}</button></div>`;
+        body += `<button class="or-msg-revert" data-action="revert" data-seq="${m.ts}" title="从这条起删除本线程之后的所有消息">${ICON_UNDO}</button></div>`;
         body += meta;
         body += `</div>`;
     }

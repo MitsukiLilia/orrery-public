@@ -14,7 +14,11 @@
     color: var(--or-white); font-size: 17px; font-weight: 600;
 }
 .or-thread-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.or-thread-name { font-size: 14.5px; font-weight: 600; color: var(--or-cocoa); }
+/* M7c:名字行改成 flex,右端挤出一枚时间小字——token 同论坛/SNS 列表行的时间样式(cocoa-light、
+   margin-left:auto 靠右),深浅色主题都读得清。 */
+.or-thread-toprow { display: flex; align-items: center; gap: 8px; }
+.or-thread-name { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 600; color: var(--or-cocoa); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.or-thread-time { font-size: 11px; color: var(--or-cocoa-light); flex-shrink: 0; margin-left: auto; }
 .or-thread-preview {
     font-size: 12.5px; color: var(--or-cocoa-light);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

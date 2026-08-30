@@ -4,26 +4,14 @@
 import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_STAR, ICON_STAR_FILL, ICON_PIN, ICON_SEND } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
 import { shortIdFor, seenKeyForForumThread, newReplyCountOfForumThread, starKeyForForumThread, anonIdFor } from '../../core/world.js';
+import { formatRelativeTime } from '../../core/worldtime.js';
 
 export const FORUM_APP_ID = 'forum';
 export const FORUM_SKIN_URL = new URL('./skin.css', import.meta.url).href;
 
-function isSameDay(ts1, ts2) {
-    const a = new Date(ts1), b = new Date(ts2);
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-// 相对时间:x分钟前/x小时前/昨天/M月D日,参照系是论坛最新世界时刻(forumNow),不是现实时钟。
-function formatRelativeTime(ts, refNow) {
-    const ref = refNow || Date.now();
-    const diffMin = Math.max(0, Math.floor((ref - ts) / 60000));
-    if (diffMin < 60) return `${diffMin}分钟前`;
-    const diffHour = Math.floor(diffMin / 60);
-    if (diffHour < 24) return `${diffHour}小时前`;
-    if (isSameDay(ts, ref - 86400000)) return '昨天';
-    const d = new Date(ts);
-    return `${d.getMonth() + 1}月${d.getDate()}日`;
-}
+// isSameDay/formatRelativeTime 收进 core/worldtime.js(M7c §2)——六个 app 此前各揣一份一模一样
+// 的副本,现在都从那里 import。相对时间的参照系是 world.worldClock(整部手机的现在,不是论坛
+// 自己的 forumNow;M7c 起六个 app 统一参照同一把钟)。
 
 function genSpinnerHtml() {
     return '<span class="or-orrery-spinner"></span>'; // 天象仪加载演出,样式在 ui/shell.css
@@ -112,7 +100,7 @@ export function renderForumListHtml({
                     ${neverOpened ? '<span class="or-forum-new">NEW</span>' : ''}
                 </div>
                 <div class="or-forum-title">${escapeHtml(t.title)}</div>
-                <div class="or-forum-meta">${escapeHtml(authorLabel(world, t, t.threadId))} · ${t.replyCount} 回复 · ${formatRelativeTime(t.lastActiveTs, world.forumNow)}${newReplies ? `<span class="or-forum-newreply">+${newReplies} 新回复</span>` : ''}</div>
+                <div class="or-forum-meta">${escapeHtml(authorLabel(world, t, t.threadId))} · ${t.replyCount} 回复 · ${formatRelativeTime(t.lastActiveTs, world.worldClock)}${newReplies ? `<span class="or-forum-newreply">+${newReplies} 新回复</span>` : ''}</div>
             </button>`;
         }).join('')}</div>`
         : `<div class="or-empty">论坛还是空的,点「刷新」按主人的所属建板。</div>`;
@@ -154,7 +142,7 @@ export function renderForumThreadHtml({ thread, world, busy, forumNow, seenAt = 
             repliesHtml += `<div class="or-new-sep" data-new-anchor><span>以下是新回复</span></div>`;
             sepDone = true;
         }
-        repliesHtml += `<div class="or-forum-floor-row" data-ts="${r.ts}">
+        repliesHtml += `<div class="or-forum-floor-row" data-seq="${r.ts}">
             <div class="or-forum-floor-head">
                 <span class="or-forum-floor-num">${i + 1}F</span>
                 <span class="or-forum-floor-author">${escapeHtml(authorLabel(world, r, thread.threadId))}</span>

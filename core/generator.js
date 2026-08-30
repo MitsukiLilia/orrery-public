@@ -827,10 +827,20 @@ function senderNameFn(world, thread) {
     return (senderId) => senderId === 'me' ? '我' : (resolveSender(world, thread, senderId)?.name || senderId);
 }
 
+// M7c 单一 worldClock(8A):六个 digest 共用同一句「世界现在」——定义只有这一处,不会六处各抄
+// 一份、改一处漏五处。调用方各自判断 world.worldClock 是否存在再决定要不要塞这一行(同下面
+// communityDigestLine 的先例:辅助函数只管拼文本,「加不加」交给调用方)。
+function worldClockLine(world) {
+    return `[世界当前公认时刻] ${fmtWorldTime(world.worldClock)}(整部手机六个 app 共用的现在;新的 worldTime 不得早于它,只许向后走)`;
+}
+
 function buildWorldDigestText(world) {
     if (!world.contacts.size && !world.groups.size) return '(手机是空的,这是第一次生成)';
     const parts = [];
-    if (world.worldNow) parts.push(`[手机当前世界时刻] ${fmtWorldTime(world.worldNow)}(新的 worldTime 不得早于它)`);
+    if (world.worldClock) parts.push(worldClockLine(world));
+    // 原先这行自己扛着钳制语气(新 worldTime 只许比它晚);现在钳制交给上面统一的世界现在行,
+    // 这里退化成单纯的信息行(消息 app 自己最近一次动静),xxxNow 的语义没变,只是不再兼任"现在"。
+    if (world.worldNow) parts.push(`[消息最近一次动静] ${fmtWorldTime(world.worldNow)}`);
     parts.push('[联系人名册]');
     for (const c of world.contacts.values()) {
         parts.push(`- id=${c.contactId} name=${c.name} relation=${c.relation || ''}`);
@@ -914,7 +924,8 @@ function buildForumDigestText(world) {
     if (!world.boards.size) return '(掲示板是空的,首次生成:请先创建 3〜4 个贴合这个共同体的板块、2〜3 条公告,并只注册固定住民——主线人物及其身边人的小号;其余发言者一律用 anon)';
     const parts = [];
     if (world.community) parts.push(communityDigestLine(world.community));
-    if (world.forumNow) parts.push(`[论坛当前世界时刻] ${fmtWorldTime(world.forumNow)}(新的 worldTime 不得早于它)`);
+    if (world.worldClock) parts.push(worldClockLine(world));
+    if (world.forumNow) parts.push(`[论坛最近一次动静] ${fmtWorldTime(world.forumNow)}`);
     // 置顶公告(任务书-M5 §4/§5):按 worldTime 倒序取前 3 条——渲染层的置顶规则搬进 digest 里再算一遍,
     // 只为提醒模型「这些已经发过了,newNotices 别撞题」,不是另一套持久化状态。
     const pinnedNotices = [...world.notices.values()].sort((a, b) => (b.worldTime || 0) - (a.worldTime || 0)).slice(0, 3);
@@ -997,7 +1008,8 @@ function buildSnsDigestText(world) {
     const parts = [];
     // M6 §3:所属背景行,写法与 buildForumDigestText 顶部那行同源(communityKindLabel 两处共用)。
     if (world.community) parts.push(`[主人的所属] ${world.community.name}(${communityKindLabel(world.community.kind)}):${world.community.desc || ''}`);
-    if (world.snsNow) parts.push(`[SNS 当前世界时刻] ${fmtWorldTime(world.snsNow)}(新的 worldTime 不得早于它)`);
+    if (world.worldClock) parts.push(worldClockLine(world));
+    if (world.snsNow) parts.push(`[SNS 最近一次动静] ${fmtWorldTime(world.snsNow)}`);
     parts.push('[账号名册]');
     for (const a of world.snsAccounts.values()) parts.push(accountRosterLine(a, world));
     parts.push(buildSnsFollowLine(world));
@@ -1037,8 +1049,9 @@ function buildSnsTweetDigestText(world, tweet) {
 function buildBrowserDigestText(world) {
     if (!world.searches.size && !world.visits.size) return '(浏览器是空的,这是第一次生成)';
     const parts = [];
+    if (world.worldClock) parts.push(worldClockLine(world));
     if (world.browserNow) {
-        parts.push(`[浏览器当前世界时刻] ${fmtWorldTime(world.browserNow)}(新的 worldTime 不得早于它;新检索不得与已有记录重复或高度相似)`);
+        parts.push(`[浏览器最近一次动静] ${fmtWorldTime(world.browserNow)}(新检索不得与已有记录重复或高度相似)`);
     }
     // 两型按世界时间混排,最近 15 条,最新在前(同 recentTweets/recentThreads 的排序习惯)。
     const mixed = [
@@ -1055,8 +1068,9 @@ function buildBrowserDigestText(world) {
 function buildGalleryDigestText(world) {
     if (!world.photos.length) return '(相册是空的,这是第一次生成)';
     const parts = [];
+    if (world.worldClock) parts.push(worldClockLine(world));
     if (world.galleryNow) {
-        parts.push(`[相册当前世界时刻] ${fmtWorldTime(world.galleryNow)}(新照片不得与已有的重复或高度相似)`);
+        parts.push(`[相册最近一次动静] ${fmtWorldTime(world.galleryNow)}(新照片不得与已有的重复或高度相似)`);
     }
     // 最近 15 张,最新在前(同 recentTweets/recentThreads/浏览器 mixed 的排序习惯;world.photos 本身是
     // foldWorld 按 worldTime 升序输出的,这里单独倒序一遍给模型看"最近发生的",不改 foldWorld 的契约)。
@@ -1079,8 +1093,9 @@ function splitMemoFirstLine(text) {
 function buildMemoDigestText(world) {
     if (!world.memos.size) return '(备忘录是空的,这是第一次生成)';
     const parts = [];
+    if (world.worldClock) parts.push(worldClockLine(world));
     if (world.memoNow) {
-        parts.push(`[备忘录当前世界时刻] ${fmtWorldTime(world.memoNow)}(改写请引用下列 id;新备忘不得与已有的重复)`);
+        parts.push(`[备忘录最近一次动静] ${fmtWorldTime(world.memoNow)}(改写请引用下列 id;新备忘不得与已有的重复)`);
     }
     // 全部备忘各带 noteId(任务书-M4 §三:edits 要反查 id,一条都不能省)。
     for (const m of world.memos.values()) {
@@ -1228,9 +1243,11 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
 
     const touchedThreads = new Set();
     let addedCount = 0;
-    // 锚严格晚于 worldNow(同论坛的钳制):线程内有 batchTail/layoutWorldTimes 保单调,但锚若
-    // 倒退,只动到旧线程的批次会把新消息标进过去,线程列表(按最新消息排)随之倒挂。
-    const notBefore = world.worldNow ? world.worldNow + 60000 : null;
+    // 锚严格晚于 worldClock(整部手机的现在,M7c 起不再只看 worldNow 自己那本账;同论坛的钳制):
+    // 线程内有 batchTail/layoutWorldTimes 保单调,但锚若倒退,只动到旧线程的批次会把新消息标进
+    // 过去,线程列表(按最新消息排)随之倒挂——钳到 worldClock 而不是 worldNow,是为了不让消息
+    // 落后于论坛/SNS/浏览器等其他 app 已经走到的时刻。
+    const notBefore = world.worldClock ? world.worldClock + 60000 : null;
     const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? notBefore ?? Date.now(), notBefore ?? 0);
     // 批内线程尾时刻:world.threads 是批次开始前的静态快照,循环里从不更新。同一次响应里
     // 两个块落到同一条线程时(模型重复同一 threadId,或经身份归一后被合并),第二块若仍读旧快照,
@@ -1367,7 +1384,9 @@ async function runThreadContinue(ctx, store, { worldKey, threadId, floorWindow, 
     if (!parsed.messages.length) return { ok: true, added: 0 };
 
     const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
-    const anchor = thread.lastMessage?.displayTs ?? world.worldNow ?? Date.now();
+    // 锚=max(这条线程自己的尾时刻, worldClock)(M7c):线程尾保单调是线程内部的事,但一条久未
+    // 更新的线程被点开续聊时,不该让它的时刻落回比其他 app 更早的过去——地板抬到整部手机的现在。
+    const anchor = Math.max(thread.lastMessage?.displayTs ?? 0, world.worldClock ?? 0) || Date.now();
     const valid = parsed.messages.filter(m => m && m.text);
     const times = layoutWorldTimes(valid, anchor, thread.lastMessage?.displayTs);
     for (let i = 0; i < valid.length; i++) {
@@ -1450,10 +1469,11 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
     if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
 
-    // 锚严格晚于 forumNow:提示词里的「不得早于」挡不住正文日期含糊时模型随机挑日(新批帖子
-    // 会整批标进过去,列表按 lastActiveTs 倒序时沉到旧批下面)。这道代码钳制 M2 起各 app 都有,
-    // 论坛是 M1 建的一直没回填;+1 分钟是防钳平后与旧最新帖同刻,稳定排序仍让新帖垫底。
-    const notBefore = world.forumNow ? world.forumNow + 60000 : null;
+    // 锚严格晚于 worldClock(M7c 起钳的是整部手机的现在,不再只看论坛自己的 forumNow):提示词
+    // 里光靠一句文字挡不住正文日期含糊时模型随机挑日(新批帖子会整批标进过去,列表按 lastActiveTs
+    // 倒序时沉到旧批下面)。这道代码钳制 M2 起各 app 都有,论坛是 M1 建的一直没回填;+1 分钟是
+    // 防钳平后与旧最新帖同刻,稳定排序仍让新帖垫底。
+    const notBefore = world.worldClock ? world.worldClock + 60000 : null;
     const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? notBefore ?? Date.now(), notBefore ?? 0);
     let addedCount = 0;
 
@@ -1631,7 +1651,9 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWin
     if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
 
     const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
-    let anchor = thread.replies.length ? thread.replies[thread.replies.length - 1].worldTime : (thread.worldTime || Date.now());
+    // 尾=最后一楼的 worldTime,没有回复就是帖子本身的 worldTime(同 runThreadContinue 的写法):
+    // 再钳一次 worldClock 的地板,一个久没人回的帖子被点开盖楼时不会落回比其他 app 更早的过去。
+    let anchor = Math.max(thread.replies.length ? thread.replies[thread.replies.length - 1].worldTime : (thread.worldTime || 0), world.worldClock ?? 0) || Date.now();
     let addedCount = 0;
 
     // 草稿发出:不管模型这次给不给续写,先把主人这一楼落进账本——它是真实论坛活动,worldTime
@@ -1781,9 +1803,10 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
         return `tr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     }
 
-    // 锚=max(worldTime 解析值, snsNow)(任务书 §2),推自锚点按 delayMin 排开,回复再依推内 delayMin 排开。
+    // 锚=max(worldTime 解析值, worldClock)(M7c 起钳整部手机的现在,不再只看 snsNow 自己那本账),
+    // 推自锚点按 delayMin 排开,回复再依推内 delayMin 排开。
     const parsedWt = parseWorldTime(parsed.worldTime);
-    const anchor = Math.max(parsedWt ?? (world.snsNow ?? Date.now()), world.snsNow ?? 0);
+    const anchor = Math.max(parsedWt ?? (world.worldClock ?? Date.now()), world.worldClock ?? 0);
 
     // retweetOf 只认「已经入账的推」(同 forum 的 replyToFloor/threadId 纪律):自己这批新推的 id 还没生成,
     // 模型不可能预知,天然不可能被合法引用——查无此推整条丢弃。
@@ -1927,9 +1950,10 @@ async function runSnsSearchGeneration(ctx, store, { worldKey, word, floorWindow,
         accountBudget--;
     }
 
-    // 结果推=世界里已存在的旧推:worldTime 按 hoursAgo 落在 snsNow 之前,不搅时间线;
-    // 带 fromSearch 标记——TL 过滤它(搜索不灌时间线),发帖者主页不过滤(旧推出现在主页天经地义)。
-    const baseNow = world.snsNow ?? Date.now();
+    // 结果推=世界里已存在的旧推:worldTime 按 hoursAgo 落在 worldClock 之前(M7c 起以整部手机的
+    // 现在为基准,不再只看 SNS 自己的 snsNow),不搅时间线;带 fromSearch 标记——TL 过滤它
+    // (搜索不灌时间线),发帖者主页不过滤(旧推出现在主页天经地义)。
+    const baseNow = world.worldClock ?? Date.now();
     let added = 0;
     for (const t of Array.isArray(parsed.tweets) ? parsed.tweets : []) {
         if (!t?.body || !t?.accountId) continue;
@@ -2064,7 +2088,8 @@ async function runSnsTweetContinue(ctx, store, { worldKey, tweetId, floorWindow,
     }
     if (!valid.length) return { ok: true, added: 0 };
 
-    const anchor = tweet.replies.length ? tweet.replies[tweet.replies.length - 1].worldTime : (tweet.worldTime || Date.now());
+    // 尾=最后一条回复或推本身(同 runForumThreadContinue 的写法),再钳一次 worldClock 的地板。
+    const anchor = Math.max(tweet.replies.length ? tweet.replies[tweet.replies.length - 1].worldTime : (tweet.worldTime || 0), world.worldClock ?? 0) || Date.now();
     const times = layoutWorldTimes(valid, anchor, anchor);
     for (let i = 0; i < valid.length; i++) {
         const rp = valid[i];
@@ -2117,8 +2142,9 @@ async function runBrowserMainGeneration(ctx, store, { worldKey, floorWindow, pro
     function makeQueryId() { return `sq_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
     function makeVisitId() { return `bv_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
 
-    // 锚=max(worldTime 解析值, browserNow)(同 SNS 的锚点写法),新检索自锚点按 delayMin 排开。
-    const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? (world.browserNow ?? Date.now()), world.browserNow ?? 0);
+    // 锚=max(worldTime 解析值, worldClock)(同 SNS 的锚点写法,M7c 起钳整部手机的现在),
+    // 新检索自锚点按 delayMin 排开。
+    const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? (world.worldClock ?? Date.now()), world.worldClock ?? 0);
 
     const validSearches = [];
     for (const s of Array.isArray(parsed.newSearches) ? parsed.newSearches : []) {
@@ -2208,8 +2234,9 @@ async function runGalleryMainGeneration(ctx, store, { worldKey, floorWindow, pro
     // 新实体 id 不让 LLM 现造(M1 教训),照 makeQueryId/makeVisitId 的思路自造。
     function makePhotoId() { return `ph_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
 
-    // 锚=max(worldTime 解析值, galleryNow)(同浏览器的锚点写法),新照片自锚点按 delayMin 排开。
-    const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? (world.galleryNow ?? Date.now()), world.galleryNow ?? 0);
+    // 锚=max(worldTime 解析值, worldClock)(同浏览器的锚点写法,M7c 起钳整部手机的现在),
+    // 新照片自锚点按 delayMin 排开。
+    const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? (world.worldClock ?? Date.now()), world.worldClock ?? 0);
 
     const validPhotos = [];
     for (const p of Array.isArray(parsed.newPhotos) ? parsed.newPhotos : []) {
@@ -2265,9 +2292,10 @@ async function runMemoMainGeneration(ctx, store, { worldKey, floorWindow, profil
     function makeNoteId() { return `mm_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
     function makeEditId() { return `me_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
 
-    // 锚=max(worldTime 解析值, memoNow),newNotes 与 edits 各自独立自锚点排开(同浏览器 newSearches/
-    // newVisits 的写法——两个数组各是各的时间线,不互相接续,谁的 delayMin 都从同一个锚点起算)。
-    const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? (world.memoNow ?? Date.now()), world.memoNow ?? 0);
+    // 锚=max(worldTime 解析值, worldClock)(M7c 起钳整部手机的现在),newNotes 与 edits 各自独立
+    // 自锚点排开(同浏览器 newSearches/newVisits 的写法——两个数组各是各的时间线,不互相接续,
+    // 谁的 delayMin 都从同一个锚点起算)。
+    const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? (world.worldClock ?? Date.now()), world.worldClock ?? 0);
 
     const validNotes = [];
     for (const n of Array.isArray(parsed.newNotes) ? parsed.newNotes : []) {

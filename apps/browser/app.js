@@ -4,27 +4,13 @@
 import { ICON_BACK, ICON_LOCK, ICON_SEARCH_SM, ICON_STAR, ICON_STAR_FILL } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
 import { starKeyForVisit } from '../../core/world.js';
+import { isSameDay, formatDateSep, formatClock } from '../../core/worldtime.js';
 
 export const BROWSER_APP_ID = 'browser';
 export const BROWSER_SKIN_URL = new URL('./skin.css', import.meta.url).href;
 
-function isSameDay(ts1, ts2) {
-    const a = new Date(ts1), b = new Date(ts2);
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-// 按日分组小标题:今天/昨天/M月D日,参照系是浏览器最新世界时刻(browserNow),照 messenger 的
-// formatDateSep 思路抄(apps 互相零依赖,不借 messenger/skin.css 的样式也不借它的函数)。
-function formatDateSep(ts, refNow) {
-    const ref = refNow || Date.now();
-    if (isSameDay(ts, ref)) return '今天';
-    if (isSameDay(ts, ref - 86400000)) return '昨天';
-    const d = new Date(ts);
-    return `${d.getMonth() + 1}月${d.getDate()}日`;
-}
-function formatClock(ts) {
-    const d = new Date(ts);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
+// isSameDay/formatDateSep/formatClock 收进 core/worldtime.js(M7c §2)——六个 app 此前各揣一份
+// 一模一样的副本,现在都从那里 import。
 
 function genSpinnerHtml() {
     return '<span class="or-orrery-spinner"></span>'; // 天象仪加载演出,样式在 ui/shell.css
@@ -65,7 +51,7 @@ export function renderBrowserHtml({ world, busy, tab = 'search', seenAt = 0, bro
             const dotHtml = isNew ? '<span class="or-browser-dot"></span>' : '';
             if (isSearch) {
                 const zhLine = it.zh && it.zh !== it.text ? `<div class="or-zh">${escapeHtml(it.zh)}</div>` : '';
-                return `<div class="or-browser-row" data-ts="${it.worldTime}">
+                return `<div class="or-browser-row" data-worldtime="${it.worldTime}">
                     ${dotHtml}
                     <div class="or-browser-row-icon">${ICON_SEARCH_SM}</div>
                     <div class="or-browser-row-body">
@@ -76,7 +62,7 @@ export function renderBrowserHtml({ world, busy, tab = 'search', seenAt = 0, bro
             }
             const zhLine = it.zh && it.zh !== it.title ? `<div class="or-zh">${escapeHtml(it.zh)}</div>` : '';
             const fromTag = it.fromQueryId ? '<span class="or-browser-from-query">←检索</span>' : '';
-            return `<div class="or-browser-row clickable" data-ts="${it.worldTime}" data-action="open-web-page" data-visit-id="${escapeHtml(it.visitId)}">
+            return `<div class="or-browser-row clickable" data-worldtime="${it.worldTime}" data-action="open-web-page" data-visit-id="${escapeHtml(it.visitId)}">
                 ${dotHtml}
                 <div class="or-browser-row-body">
                     <div class="or-browser-row-text">${escapeHtml(it.title)}${fromTag}${zhLine}</div>
