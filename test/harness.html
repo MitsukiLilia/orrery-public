@@ -96,9 +96,12 @@
             <label class="mock-label"><input type="checkbox" id="fxBroken"> 模拟解析失败(两次都返回垃圾文本)</label><br>
             <label class="mock-label"><input type="checkbox" id="fxEmptyB"> 续聊/盖楼返回空 messages/replies(测试「暂无新动静」)</label><br>
             <p class="note" style="margin:8px 0 0;">
-                fixture 按 systemPrompt 内容自动路由(SNS 的两条排在「续写」检查之前,因为 PROMPT_I 本身也含「续写」二字):
+                fixture 按 systemPrompt 内容自动路由(SNS/论坛的续写档都排在「续写」检查之前,因为 PROMPT_G/I
+                本身也含「续写」二字):
                 含「压缩成 5 行以内」→摘要(C)/含「登录中的 SNS」→SNS 主生成(H,首刷/二刷两版按账本是否已有账号自动切换)/
-                含「围观这条推文」→SNS 回复续写(I)/含「匿名论坛」→论坛主生成(F)/含「围观这个帖子」→论坛盖楼(G)/
+                含「围观这条推文」→SNS 回复续写(I)/含「判断主角」→所属コミュニティ推断(O,论坛/浏览器
+                生成前都会先调它一次,一世界只推一次、结果永久缓存)/含「手机里的内部掲示板」→论坛主生成(F)/
+                含「内部掲示板上这个帖子的后续」→论坛盖楼(G)/
                 含「浏览器「Astrolabe」」→浏览器主生成(J,没有续写入口,只有这一条)/
                 含「手机里的相册」→相册主生成(K,没有续写入口,只有这一条)/
                 含「手机里的备忘录」→备忘录主生成(L,首刷/二刷两版按账本是否已有备忘自动切换,二刷会对首刷第一条清单做一次改写)/
@@ -217,7 +220,19 @@
     }
     const FIXTURE_C = '愛子与主角保持日常联系，语气轻松，暂无未解决话题，情绪基调平稳。';
 
-    // 首次论坛主生成:2 板块 + 3 住民(1 名带 castName,验证 UI 绝不渲染真名)+ 2 帖(1 帖带 2 楼回复,含 replyToFloor)。
+    // 所属コミュニティ推断(PROMPT_O,M5 起论坛/浏览器都要靠它才能生成)。这里从没配过 fixture——
+    // 此前一直悄悄落到最后的默认档(buildFixtureA,没有 name 字段),ensureCommunity 每次都拿到
+    // community_failed,论坛主生成在这套 harness 里从未真正跑通过。这次一并补上。
+    function buildFixtureO() {
+        return {
+            name: '雲雀珈琲店', kind: 'org', desc: '主角打工的连锁咖啡店分店',
+            slug: 'hibari-coffee', officialName: '', titles: '店長、副店長、社員、アルバイト',
+        };
+    }
+
+    // M7a 首次论坛主生成:2 板块 + 1 名固定住民(castName='千夏',身边人而非主人本人——验证
+    // UI 绝不渲染真名,同时留主人自己在这个世界里"尚无固定住民",好让 G fixture 走 ownerResident 分支)
+    // + 2 帖(第 1 帖楼主与一楼回复都是 anon、二楼回复是固定住民,含 replyToFloor;附一条 myDraft)。
     function buildFixtureF() {
         return {
             worldTime: '2026-08-10 23:40',
@@ -226,21 +241,20 @@
                 { boardId: 'b_gossip', name: '八卦', desc: '谁看见谁了' },
             ],
             newResidents: [
-                { residentId: 'r_neko', handle: '夜猫子', persona: '深夜出没,句尾爱加「(小声)」' },
-                { residentId: 'r_bread', handle: '面包忍者', persona: '打工人,吐槽欲旺盛' },
-                { residentId: 'r_shadow', handle: '路过的影子', persona: '话少但总在场', castName: '小满' },
+                { residentId: 'r_shadow', handle: '路过的影子', persona: '话少但总在场', castName: '千夏' },
             ],
             newThreads: [
                 {
-                    boardId: 'b_gossip', authorId: 'r_neko', title: '刚刚在便利店看到不熟的两个人',
+                    boardId: 'b_gossip', anon: { key: 'a1', name: '名無しの野次馬' }, title: '刚刚在便利店看到不熟的两个人',
                     ...withZhBody('真的很奇怪的气氛(小声)'),
                     replies: [
-                        { authorId: 'r_bread', ...withZhBody('爆瓜爆瓜'), delayMin: 2 },
+                        { anon: { key: 'a2', name: '匿名希望' }, ...withZhBody('爆瓜爆瓜'), delayMin: 2 },
                         { authorId: 'r_shadow', ...withZhBody('……可能只是路过吧'), delayMin: 5, replyToFloor: 1 },
                     ],
+                    myDraft: withZh('明明我什么都没做啊…'),
                 },
                 {
-                    boardId: 'b_life', authorId: 'r_bread', title: '今天又被老板骂了,谁懂',
+                    boardId: 'b_life', anon: { key: 'a3', name: '疲れたOL' }, title: '今天又被老板骂了,谁懂',
                     ...withZhBody('干活累死,嘴还不能停'),
                     replies: [],
                 },
@@ -248,11 +262,26 @@
             newReplies: [],
         };
     }
-    function buildFixtureG() {
-        return { replies: [
-            { authorId: 'r_bread', ...withZhBody('笑死,前排吃瓜'), delayMin: 1 },
-            { authorId: 'r_neko', ...withZhBody('别说了我也想问(小声)'), delayMin: 3, replyToFloor: 1 },
+    // 【本帖的名無し】digest 行里现取第一个已出现的 key(格式 `key=xxx name=… ID:…`),
+    // 拿来验证 G fixture 真的"沿用了材料里已出现的 key"而不是每次都起新的。
+    function extractExistingAnonKey(userContent) {
+        const m = /\[本帖的名無し\][^\n]*?key=(\S+)/.exec(userContent || '');
+        return m ? m[1] : null;
+    }
+    // M7a 论坛盖楼:回复里混三种身份——沿用材料里已出现的 anon key 一次、起一个全新 key 一次、
+    // 固定住民(F 里注册的 r_shadow)一次;当 userContent 带着【主人刚刚发出的回复】且注明
+    // 「尚无固定住民」时,照 PROMPT_G 的契约给出 ownerResident 为主人的小号起名。
+    function buildFixtureG(userContent) {
+        const reusedKey = extractExistingAnonKey(userContent) || 'a1';
+        const body = { replies: [
+            { anon: { key: reusedKey, name: '名無しの野次馬' }, ...withZhBody('笑死,前排吃瓜'), delayMin: 1 },
+            { anon: { key: 'a9', name: '通りすがり' }, ...withZhBody('第一次路过,什么情况'), delayMin: 2 },
+            { authorId: 'r_shadow', ...withZhBody('……可能只是路过吧'), delayMin: 3, replyToFloor: 1 },
         ] };
+        if ((userContent || '').includes('主人刚刚发出的回复') && (userContent || '').includes('尚无固定住民')) {
+            body.ownerResident = { residentId: 'r_owner_fx', handle: '名無しの主', persona: '', castName: '' };
+        }
+        return body;
     }
 
     // ── M2 SNS「Pulsar」fixture(H/I) ──
@@ -418,7 +447,13 @@
             const body = emptyMore ? { replies: [] } : buildFixtureI();
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
-        if (systemPrompt.includes('匿名论坛')) {
+        if (systemPrompt.includes('判断主角')) {
+            const body = buildFixtureO();
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        // M7a:PROMPT_F 已从「匿名论坛」改写成「内部掲示板」(v0.15 起),这里的匹配词早就该跟着换了
+        // ——旧词从没命中过,论坛主生成 fixture 一直悄悄落到最后的默认档(buildFixtureA),这次顺手修。
+        if (systemPrompt.includes('手机里的内部掲示板')) {
             const body = buildFixtureF();
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
@@ -435,8 +470,11 @@
             const body = isFirstTime ? buildFixtureLFirst() : buildFixtureLRegrow(extractExistingMemoId(userContent));
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
-        if (systemPrompt.includes('围观这个帖子')) {
-            const body = emptyMore ? { replies: [] } : buildFixtureG();
+        // 同上:PROMPT_G 的措辞是「内部掲示板上这个帖子的后续」,不是「围观这个帖子」——旧词碰巧
+        // 落进了下面「续写」那一档(PROMPT_G 里也有「续写」二字),盖楼一直在吃 messenger 的 B fixture、
+        // parse_failed 一直被静默吃掉,这次一并修。
+        if (systemPrompt.includes('内部掲示板上这个帖子的后续')) {
+            const body = emptyMore ? { replies: [] } : buildFixtureG(userContent);
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
         if (systemPrompt.includes('续写')) {

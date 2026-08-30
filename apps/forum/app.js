@@ -1,9 +1,9 @@
 // 论坛:纯渲染,不碰 ctx、不挂事件监听——事件委托统一在 ui/shell.js(同 apps/messenger/app.js 的模式)。
-// 用户只读:零输入框,唯二操作走 shell 的 data-action(刷新/生成更多)+ 长按/右键反悔。
+// 用户只读:帖底的回复框是主人屏幕上的那一格(只读、不可点),观测者唯二操作走 shell 的 data-action(刷新/生成更多)+ 长按/右键反悔。
 // castName 只活在 core/世界数据层,这个文件从不读它——住民短 ID 用 world.shortIdFor,不暴露真名。
-import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_STAR, ICON_STAR_FILL, ICON_PIN } from '../../ui/icons.js';
+import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_STAR, ICON_STAR_FILL, ICON_PIN, ICON_SEND } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
-import { shortIdFor, seenKeyForForumThread, newReplyCountOfForumThread, starKeyForForumThread } from '../../core/world.js';
+import { shortIdFor, seenKeyForForumThread, newReplyCountOfForumThread, starKeyForForumThread, anonIdFor } from '../../core/world.js';
 
 export const FORUM_APP_ID = 'forum';
 export const FORUM_SKIN_URL = new URL('./skin.css', import.meta.url).href;
@@ -29,9 +29,12 @@ function genSpinnerHtml() {
     return '<span class="or-orrery-spinner"></span>'; // 天象仪加载演出,样式在 ui/shell.css
 }
 
-function handleWithId(world, residentId) {
-    const r = world.residents.get(residentId);
-    return r ? `${r.handle} #${shortIdFor(residentId)}` : String(residentId);
+// M7a §4:作者标签——item 是折好的帖子或楼层(authorId/anon 二选一)。次抛匿名现算展示 ID
+// (anonIdFor 按 threadId+key 哈希,同一帖同一 key 永远同一个 ID);固定住民沿用旧的 handle #短ID。
+function authorLabel(world, item, threadId) {
+    if (item.anon) return `${item.anon.name} ID:${anonIdFor(threadId, item.anon.key)}`;
+    const r = world.residents.get(item.authorId);
+    return r ? `${r.handle} #${shortIdFor(item.authorId)}` : String(item.authorId);
 }
 
 // 每页帖数(2026-08-21 月月点单分页,参考 Perigee 论坛):翻页纯本地渲染,不耗生成。
@@ -109,7 +112,7 @@ export function renderForumListHtml({
                     ${neverOpened ? '<span class="or-forum-new">NEW</span>' : ''}
                 </div>
                 <div class="or-forum-title">${escapeHtml(t.title)}</div>
-                <div class="or-forum-meta">${escapeHtml(handleWithId(world, t.authorId))} · ${t.replyCount} 回复 · ${formatRelativeTime(t.lastActiveTs, world.forumNow)}${newReplies ? `<span class="or-forum-newreply">+${newReplies} 新回复</span>` : ''}</div>
+                <div class="or-forum-meta">${escapeHtml(authorLabel(world, t, t.threadId))} · ${t.replyCount} 回复 · ${formatRelativeTime(t.lastActiveTs, world.forumNow)}${newReplies ? `<span class="or-forum-newreply">+${newReplies} 新回复</span>` : ''}</div>
             </button>`;
         }).join('')}</div>`
         : `<div class="or-empty">论坛还是空的,点「刷新」按主人的所属建板。</div>`;
@@ -154,7 +157,7 @@ export function renderForumThreadHtml({ thread, world, busy, forumNow, seenAt = 
         repliesHtml += `<div class="or-forum-floor-row" data-ts="${r.ts}">
             <div class="or-forum-floor-head">
                 <span class="or-forum-floor-num">${i + 1}F</span>
-                <span class="or-forum-floor-author">${escapeHtml(handleWithId(world, r.authorId))}</span>
+                <span class="or-forum-floor-author">${escapeHtml(authorLabel(world, r, thread.threadId))}</span>
                 <span class="or-forum-floor-time">${formatRelativeTime(r.worldTime, forumNow)}</span>
             </div>
             ${Number.isFinite(r.replyToFloor) && r.replyToFloor > 0 ? `<div class="or-forum-quote">&gt;&gt;${r.replyToFloor}</div>` : ''}
@@ -163,14 +166,19 @@ export function renderForumThreadHtml({ thread, world, busy, forumNow, seenAt = 
     });
     if (!thread.replies.length) repliesHtml = `<div class="or-empty">还没有人回复。</div>`;
 
-    // 主角写了又删的回复草稿(task-006 提案三):渲染成一条未发送的输入痕迹,划删除线=「写了又删」。
-    // 它只存在于主角的屏幕上——住民看不见,digest 也不进 LLM 上下文,纯 UI 私密层。
+    // M7a §4 输入框常驻(草案 3A):删掉原来帖内散落的「未发送回复」卡片,改成帖底一条只读的
+    // 「回复框」——它不是聊天输入框,没有 input/contenteditable/data-action,观测者点不动、
+    // 编辑不了,只是在还原主人此刻屏幕上真实存在的那一格。有草稿时显示草稿原文+送出前的光标,
+    // 没有草稿就是空占位符;生成按钮的文案由它决定(有草稿=先发出再续写)。
     const d = thread.myDraft;
-    const draftHtml = d?.text ? `<div class="or-forum-draft">
-        <div class="or-forum-draft-label">未发送的回复</div>
-        <div class="or-forum-draft-body">${escapeHtml(d.text)}</div>
-        ${d.zh && d.zh !== d.text ? `<div class="or-forum-draft-zh">${escapeHtml(d.zh)}</div>` : ''}
-    </div>` : '';
+    const hasDraft = !!d?.text;
+    const composerHtml = `<div class="or-forum-composer ${hasDraft ? 'has-draft' : ''}">
+            <div class="or-forum-composer-box">${hasDraft
+        ? `<span class="or-forum-composer-text">${escapeHtml(d.text)}</span><span class="or-forum-caret"></span>`
+        : `<span class="or-forum-composer-placeholder">回复这个帖子…</span>`}</div>
+            <span class="or-forum-composer-send ${hasDraft ? 'on' : ''}">${ICON_SEND}</span>
+        </div>
+        ${hasDraft && d.zh && d.zh !== d.text ? `<div class="or-forum-composer-zh">${escapeHtml(d.zh)}</div>` : ''}`;
 
     return `
         <div class="or-header">
@@ -180,18 +188,18 @@ export function renderForumThreadHtml({ thread, world, busy, forumNow, seenAt = 
         <div class="or-forum-scroll">
             <div class="or-forum-op">
                 <div class="or-forum-op-title">${escapeHtml(thread.title)}</div>
-                <div class="or-forum-op-author">${escapeHtml(handleWithId(world, thread.authorId))} · ${formatRelativeTime(thread.worldTime, forumNow)}${starBtn}</div>
+                <div class="or-forum-op-author">${escapeHtml(authorLabel(world, thread, thread.threadId))} · ${formatRelativeTime(thread.worldTime, forumNow)}${starBtn}</div>
                 <div class="or-forum-op-body">${escapeHtml(thread.body)}${thread.zh && thread.zh !== thread.body ? `<div class="or-zh">${escapeHtml(thread.zh)}</div>` : ''}</div>
             </div>
             <div class="or-forum-replies">${repliesHtml}</div>
-            ${draftHtml}
         </div>
+        ${composerHtml}
         <div class="or-chat-footer">
             <div class="or-batch">
                 <button data-action="stepper" data-field="forumReplyBatch" data-delta="-1" ${busy ? 'disabled' : ''}>${ICON_MINUS}</button>
                 <span class="or-batch-value">${replyBatch}</span>
                 <button data-action="stepper" data-field="forumReplyBatch" data-delta="1" ${busy ? 'disabled' : ''}>${ICON_PLUS}</button>
             </div>
-            <button class="or-pill-btn" data-action="forum-generate-more" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : '生成回复'}</button>
+            <button class="or-pill-btn" data-action="forum-generate-more" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : (hasDraft ? '发出并生成回复' : '生成回复')}</button>
         </div>`;
 }

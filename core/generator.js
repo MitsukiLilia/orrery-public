@@ -2,7 +2,7 @@
 // M1 拍板:A/B/B_GROUP 原本写死的语言原则行,改成 {{LANG_RULE}} 占位,运行时按全局语言开关(zh/ja_zh)替换。
 // 2026-08-16 日系氛围强化落地(评审+圈选轨迹见 docs/2026-08-16-提示词日系强化.md);此外仍只做 {{占位符}} 替换。
 // 2026-08-21 语言体系改版(月月拍板):ja(默认)/en/ja_zh 三档,zh 档退役;网感文化圈随语言档切换,细节以世界观为准。
-import { foldWorld, uncoveredMessages, monogramFor, colorForContact, resolveSender, GALLERY_TONES } from './world.js';
+import { foldWorld, uncoveredMessages, monogramFor, colorForContact, resolveSender, GALLERY_TONES, anonIdFor } from './world.js';
 
 export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」的手机。给你的材料:①故事正文的最新进展 ②这部手机的当前状态(联系人、已有聊天)。请推演:这段进展之后,这部手机上自然会出现哪些新动静。
 
@@ -14,7 +14,7 @@ export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎�
 5. {{LANG_RULE}}
 6. 克制与规模感:本次共 2〜8 条消息,分布在 1〜3 个线程。通讯录是主人生活的横截面,不是无限清单——总量维持在真人手机的活跃规模(约 6〜12 个线程),接近上限时优先让已有线程发生新动静而不是添人。新联系人必须有名有姓有身份:优先从【人物设定参考】与原著既定事实里挖掘(上级、下属、家人、原著配角——关系疏远、冷淡、常年不联系的家人也是家人,催婚的、只发节日祝福的都很真实);故事开始前主人不是空心人。没有名字的路人不配进通讯录。一次最多新建 1 位(首次生成除外,首次可推断 2〜4 位初始化)。
 7. 🚨联系人纪律(绝对红线,违反即全盘失败)。手机里只能出现主人**在剧情中已经认识、且合理交换过联系方式**的人。判断只看剧情事实,不看叙事结构:正文哪怕通篇是两个人的双线叙事,只要剧情里他们尚未相识,对方就绝不能出现在通讯录——素未谋面的人不会躺在彼此的手机里。不要被任何先验带偏(比如默认两位主角是恋人或熟人)。宁缺勿滥:联系人晚一点出现,永远比过早出现真实。
-8. 熟稔度纪律。就算是真联系人,消息的语气亲疏也必须匹配剧情当前的关系阶段:刚认识就客气生分,熟人才随意,恋人才亲昵。关系阶段以正文为准,不许自行升温。
+8. 熟稔度纪律。就算是真联系人,消息的语气亲疏也必须匹配剧情当前的关系阶段:刚认识就客气生分,熟人才随意,恋人才亲昵。关系阶段以正文为准,不许自行升温;也不许倒退——材料里若给出【主人已在私密处流露的心境】,主人可以嘴硬、可以口是心非,但真心所在的阶段不得低于它。
 9. 群聊也是余波的舞台,而且群聊有谱系:对上的汇报群、对下的指挥群、家族群、朋友群、同好群——主人在不同群里露出不同的人格面(工作群拘谨、朋友群放松、家族群潜水)。建群要有剧情或原著设定依据,别只盯着一种群造;首次初始化最多 1 个,之后按需。主人可以全程潜水;群成员不必都是通讯录好友,但每个成员要有稳定的 id 和身份感。
 10. OOC 纪律。主线人物及其身边人的一切言行,必须符合【人物设定参考】与正文已确立的性格;参考里没有的地方保持克制,不得自行发明重大设定。
 
@@ -27,11 +27,11 @@ export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - read:sender 为 me 时表示对方是否已读;sender 为他人时表示主角是否已读。用它演出已读不回。`;
 
 export const PROMPT_B_GROUP = `你是 Orrery,叙事世界观测引擎。用户想继续围观主角「{{char}}」手机里的群聊「{{group}}」(成员:{{members}})。基于最近的聊天走向和各人身份,自然地续写{{COUNT_RULE}}
-遵守:消息像真实的 LINE 聊天(短句连发、读空气、颜文字按角色性格取舍——冷淡角色几乎不用);每个人只知道自己视角内的事;🚨剧情冻结——正文是这个世界唯一的剧情作者,群聊只是余波:停留在正文已演到的时刻与关系阶段之内,写对已发生之事的反应、读空气的日常、已有话题的延续,绝不抢在正文前面发生新事件或关系进展(重大决定、关系变化都是正文的职权),话题滑向新进展时让人刹住或岔开;不复述正文;{{LANG_RULE}}
+遵守:消息像真实的 LINE 聊天(短句连发、读空气、颜文字按角色性格取舍——冷淡角色几乎不用);每个人只知道自己视角内的事;🚨剧情冻结——正文是这个世界唯一的剧情作者,群聊只是余波:停留在正文已演到的时刻与关系阶段之内,写对已发生之事的反应、读空气的日常、已有话题的延续,绝不抢在正文前面发生新事件或关系进展(重大决定、关系变化都是正文的职权),话题滑向新进展时让人刹住或岔开;不复述正文;主人的口吻可以嘴硬,但真心所在的阶段不得低于材料里【主人已在私密处流露的心境】(若有);{{LANG_RULE}}
 只输出 JSON:{"messages":[{"sender":"me 或成员id","text":"","zh":"","delayMin":0,"read":true}]}`;
 
 export const PROMPT_B = `你是 Orrery,叙事世界观测引擎。用户想继续围观主角「{{char}}」手机里与「{{contact}}」的这段聊天。基于双方关系、最近的故事进展与聊天走向,自然地续写{{COUNT_RULE}}
-遵守:消息像真实的 LINE 聊天(短句连发、读空气、颜文字按角色性格取舍——冷淡角色几乎不用);🚨剧情冻结——正文是这个世界唯一的剧情作者,聊天只是余波:停留在正文已演到的时刻与关系阶段之内,写对已发生之事的感想、读空气的日常、已有话题的延续,绝不抢在正文前面发生新事件或关系进展(告白、更进一步的亲密、重大决定都是正文的职权),话题滑向新进展时让人刹住或岔开——欲言又止本身就是余波,紧张感留给正文去兑现;不复述正文;{{LANG_RULE}}
+遵守:消息像真实的 LINE 聊天(短句连发、读空气、颜文字按角色性格取舍——冷淡角色几乎不用);🚨剧情冻结——正文是这个世界唯一的剧情作者,聊天只是余波:停留在正文已演到的时刻与关系阶段之内,写对已发生之事的感想、读空气的日常、已有话题的延续,绝不抢在正文前面发生新事件或关系进展(告白、更进一步的亲密、重大决定都是正文的职权),话题滑向新进展时让人刹住或岔开——欲言又止本身就是余波,紧张感留给正文去兑现;不复述正文;主人的口吻可以嘴硬,但真心所在的阶段不得低于材料里【主人已在私密处流露的心境】(若有);{{LANG_RULE}}
 只输出 JSON:{"messages":[{"sender":"me 或 {{contactId}}","text":"","zh":"","delayMin":0,"read":true}]}`;
 
 export const PROMPT_C = `把下面这段聊天记录压缩成 5 行以内的中立摘要,保留:关系变化、约定与承诺、未解决的话题、双方情绪基调。只输出摘要正文。`;
@@ -45,28 +45,31 @@ export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎�
 4. 视角合法性:「沾边」只有两种合法视角:①当事人视角,主线人物本人或其身边人用自己的小号发亲历的事;②旁观视角,其他成员以目击/听说的口吻聊公开可见的部分。🚫绝不许成员把与主线雷同的经历当成自己的亲身经历发帖——这个世界不存在恰好经历同一件事的第二组人;主线人物也绝不回复与自己经历雷同的帖子。每个成员只知道公开可见或自己亲历的事。
 5. 错位推理(旁观视角的正确打开方式):成员只看得到表面,就按内部吃瓜的天性,用隐语(「あの人」「例の件」那种气质)得出错误、夸张、偏离真相的推论,楼里越歪越远。你知道真相而成员不知道——这个落差是掲示板最好看的东西。错误推论必须从公开可见的表面自然长出:不许借「猜错」夹带正文没有的事实,也不许歪打正着说中真相核心。
 6. 公告与帖子的双轨:公告(notice)是共同体的官方通知,由部署/役職署名(総務・経理・部長・会長・幹部那一挂),件名带【重要】【再掲】【回覧】式标记,有締切,有「なお、〜」式冷酷收尾,内容全是内务(経費・備品・当直・騒音・持ち物・締切),绝不像对外公关稿——官方顔出し,成员匿名,建前与本音各据一轨。首次初始化 2〜3 条,之后每批 0〜1 条,宁缺毋滥。
-7. 匿名是铁律:成员用带所属味的默认名(「名無しの〇〇」「匿名希望(〇〇課)」那种气质)或个性网名,常带鲜明的役割語与口癖且跨帖一致。板内一切称呼只用网名或默认名;对上司、名人、主线人物一律用隐语,任何人在任何情况下都不写出真名,也不写可对号入座的役職+姓;役職与称呼只用这个所属自己的体系(材料里的「内部称呼」),绝不借用故事里其他组织的叫法——役職本身不是真名,可以直接叫,役職+姓才是禁区——故事人物之间就算认出了彼此的小号,也只能装作不知道,或用只有当事人才懂的方式接话,绝不点破、绝不喊名字。故事人物的小号绝不自曝真身,仅靠标志性口癖或颜文字透出「像但不明说」的网感。
-8. 小号是树洞:主线人物的小号不是打卡机器——它存在的意义,是承接 TA 在正文、聊天、SNS 表面上都不敢表露的那一层,用板上语癖伪装的真心话。不必每批都有;正文出现情绪重压时,小号的一帖或一楼是最高级的余波。树洞的方式必须贴合该人物已确立的性格:外放的人才长篇宣泄,寡言的人只有一行,冷淡的人也许只有两个字——性格永远优先于宣泄,树洞也绝不许 OOC。
-9. 主角的未发送草稿:当某帖戳中「{{char}}」(被议论、被误解、想反驳、想解释),可以给该帖附一条 TA 写了又删的回复草稿(myDraft)。整批至多一条,宁缺毋滥;草稿要贴合 TA 的性格与正文当下的心境,不泄露正文没有的事实。
-10. 语域随所属:组织・职场是社畜的敬语与怨念——再危险的业务也当成报销、排班、備品补充来抱怨,非法组织同理,只是把业务说成隐语;学校・小规模身内集团是若者言葉与排他的身内感;町内・地域是市井的家长里短与自治厨。仍像日系匿名掲示板(短句、「w/草」、安价跟风、歪楼、抬杠、颜文字),绝不像小说。热帖才热闹,冷帖没人理。
-11. 克制:本批 2〜4 个新帖(每帖 0〜5 楼)+ 0〜6 条对已有帖的新回复;允许有的板块毫无动静。
-12. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在板上留下的一切痕迹(小号发言、被目击、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示——两人尚未相识,就不许出现「看到他们走在一起」这类目击或撮合式讨论。掲示板永远落后于正文半步:绝不抢在正文前面发生或预告新事件。禁止 OOC。
-13. {{LANG_RULE}}
+7. 匿名是铁律:板内一切称呼只用网名或默认名;对上司、名人、主线人物一律用隐语,任何人在任何情况下都不写出真名,也不写可对号入座的役職+姓;役職与称呼只用这个所属自己的体系(材料里的「内部称呼」),绝不借用故事里其他组织的叫法——役職本身不是真名,可以直接叫,役職+姓才是禁区——故事人物之间就算认出了彼此的小号,也只能装作不知道,或用只有当事人才懂的方式接话,绝不点破、绝不喊名字。故事人物的小号绝不自曝真身,仅靠标志性口癖或颜文字透出「像但不明说」的网感。
+8. 人口与 ID:这块板上有几百号人,绝大多数发言者是一次性的名無し——用 anon 表达:name 是带所属味的默认名(「名無しの〇〇」「匿名希望(〇〇課)」那种气质,按这个所属自己写),key 是帖内的短标记,同一帖里同 key=同一个人(可以回来接话),不同帖之间 key 不复用、ID 每帖重抽;一帖里的楼多数来自不同的名無し,翻来覆去只有几个人说话是不真实的。只有主线人物及其身边人(亲友、同僚、上司下属、原著配角)才是固定住民:有固定网名(コテハン)与永久 ID,役割語与口癖跨帖一致,注册时必带 castName。newResidents 只为固定住民建;无名路人绝不注册成住民。
+9. 察しと生存本能:成员对「上面的人」有职场动物的嗅觉——某帖或某楼透出高位者的气质(役割語的位阶、只有上面的人才知道的事、习惯性措辞、与公告口吻的重合)时,板上会默契察觉但绝不点破:察觉直接改写之后各楼的语域——骤然切成敬语、楼里突然安静、生硬地转移话题、翼賛式的跟风附和、或用只有内部人才懂的暗号提醒别人「察しろ」;整板心照不宣是常态,没有人会写出那是谁。察觉的对象不限主人,任何高位者的小号都会触发;匿名铁律不因察觉而松动。
+10. 小号是树洞,树洞不说谎:主线人物的小号承接 TA 在正文、聊天、SNS 表面上都不敢表露的那一层——它的内容必须与正文已确立的关系阶段一致;材料里若给出【主人已在私密处流露的心境】,小号的真心不得低于那个水位。伪装只许发生在语气与称呼上(板上语癖、照れ隠し、嘴硬、故作轻描淡写),绝不许在内容层面把对方说回更早阶段的定位、或划清界限——关系已经推进之后再这么写就是 OOC。下意识替对方打圆场、护短、对议论对方的楼反应过度,都是比宣泄更高级的树洞。不必每批都有;正文出现情绪重压时,小号的一帖或一楼是最高级的余波。树洞的方式必须贴合该人物已确立的性格:外放的人才长篇宣泄,寡言的人只有一行,冷淡的人也许只有两个字——性格永远优先于宣泄,树洞也绝不许 OOC。
+11. 主角的未发送草稿:当某帖戳中「{{char}}」(被议论、被误解、想反驳、想解释),可以给该帖附一条 TA 写了又删的回复草稿(myDraft)。整批至多一条,宁缺毋滥;草稿要贴合 TA 的性格与正文当下的心境,不泄露正文没有的事实。
+12. 语域随所属:组织・职场是社畜的敬语与怨念——再危险的业务也当成报销、排班、備品补充来抱怨,非法组织同理,只是把业务说成隐语;学校・小规模身内集团是若者言葉与排他的身内感;町内・地域是市井的家长里短与自治厨。仍像日系匿名掲示板(短句、「w/草」、安价跟风、歪楼、抬杠、颜文字),绝不像小说。热帖才热闹,冷帖没人理。
+13. 克制:本批 2〜4 个新帖(每帖 0〜5 楼)+ 0〜6 条对已有帖的新回复;允许有的板块毫无动静。
+14. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在板上留下的一切痕迹(小号发言、被目击、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示——两人尚未相识,就不许出现「看到他们走在一起」这类目击或撮合式讨论。掲示板永远落后于正文半步:绝不抢在正文前面发生或预告新事件。禁止 OOC。
+15. {{LANG_RULE}}
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newBoards":[{"boardId":"","name":"","desc":"一句话"}],"newNotices":[{"noticeId":"","title":"件名","body":"","zh":"","signedBy":"部署或役職名"}],"newResidents":[{"residentId":"","handle":"网名","persona":"身份与口癖一句话","castName":"仅当是故事人物的小号才写其真名,否则省略"}],"newThreads":[{"boardId":"","title":"","authorId":"","body":"","zh":"","replies":[{"authorId":"","body":"","zh":"","delayMin":0,"replyToFloor":0}],"myDraft":{"text":"","zh":""}}],"newReplies":[{"threadId":"","replies":[{"authorId":"","body":"","zh":"","delayMin":0,"replyToFloor":0}]}],"myDraft":{"threadId":"已有帖id","text":"","zh":""}}
+{"worldTime":"YYYY-MM-DD HH:MM","newBoards":[{"boardId":"","name":"","desc":"一句话"}],"newNotices":[{"noticeId":"","title":"件名","body":"","zh":"","signedBy":"部署或役職名"}],"newResidents":[{"residentId":"","handle":"固定网名","persona":"身份与口癖一句话","castName":"这个小号的真身(故事人物或其身边人的真名,必填)"}],"newThreads":[{"boardId":"","title":"","authorId":"固定住民id,与 anon 二选一","anon":{"key":"帖内短标记","name":"名無し系默认名"},"body":"","zh":"","replies":[{"authorId":"固定住民id,与 anon 二选一","anon":{"key":"","name":""},"body":"","zh":"","delayMin":0,"replyToFloor":0}],"myDraft":{"text":"","zh":""}}],"newReplies":[{"threadId":"","replies":[{"authorId":"","anon":{"key":"","name":""},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}],"myDraft":{"threadId":"已有帖id","text":"","zh":""}}
 - newBoards 仅首次初始化时给出(3〜4 个,按内部板的逻辑分:連絡・通達系/雑談系/苦情・目安箱系/譲渡・シフト系那一挂,名字贴合这个共同体,不要通用模板味);之后为空数组
 - newNotices 首次 2〜3 条,之后 0〜1 条;signedBy 只写部署/役職,不写人名
-- 首次初始化同时创建 5〜8 名住民;之后每批最多新建 2 名。authorId 必须是已有或本批新建的 residentId
+- 首次初始化只注册固定住民(主线人物及其身边人的小号,2〜5 名,必带 castName);之后每批最多新建 2 名。每一楼的发言者要么给 authorId(已有或本批新建的固定住民 id),要么给 anon(名無し),二者只写一个;两者都没有的楼作废
 - replyToFloor 仅在明确回应某楼时给出;delayMin=距上一楼的分钟数
 - myDraft=主角写了又删的未发送回复草稿:附在某个 newThreads 条目内=给那个新帖;顶层带 threadId=给已有帖。整批至多一条,没有就整个省略该字段
 - worldTime 从正文推断,只许向后走`;
 
 export const PROMPT_G = `你是 Orrery,叙事世界观测引擎。用户想继续围观「{{community}}」内部掲示板上这个帖子的后续。基于帖子走向和各住民的身份口癖,自然地续写{{COUNT_RULE}}
-遵守:像日系匿名掲示板般跟风、歪楼、带「w/草」与颜文字,绝不像小说;住民都是这个共同体的成员,对上司、名人、主线人物一律用隐语,役職与称呼只用本所属自己的体系(材料里的「内部称呼」)、不借故事里其他组织的叫法;住民的役割語/口癖跨帖一致;每人只知道自己知道的;故事人物的小号绝不自曝、言行不得OOC(以【人物设定参考】为准);无关住民不得把与主线雷同的经历当成自己的亲历,主线人物也绝不回复与自己经历雷同的内容;匿名是铁律——一切称呼只用网名或「名無し」,任何情况下都不写出现实真名,就算认出了熟人的小号也只装作不知道、或用只有当事人才懂的方式接话,绝不点破;旁观住民看不到全貌,接话按起哄吃瓜的天性歪出错误、夸张的推论(不许借「猜错」夹带正文没有的事实);主线人物的小号若开口,承接的是台面上不敢表露的那层真心话,但方式必须贴合其已确立的性格——性格永远优先于宣泄;🚨剧情冻结——正文是这个世界唯一的剧情作者,盖楼只是余波:住民只能围绕已发生、公开可见的事继续跟风追问,绝不许爆出正文尚未发生的新事件或关系进展,也不许替剧情预告下一步;不复述正文。
+遵守:像日系匿名掲示板般跟风、歪楼、带「w/草」与颜文字,绝不像小说;住民都是这个共同体的成员,对上司、名人、主线人物一律用隐语,役職与称呼只用本所属自己的体系(材料里的「内部称呼」)、不借故事里其他组织的叫法;板上有几百号人,绝大多数发言者是一次性的名無し(用 anon 表达:同帖同 key=同一人,可沿用材料里[本帖的名無し]已出现的 key 让某人回来接话,新人就起新 key),只有主线人物及其身边人才是固定住民(authorId,役割語/口癖跨帖一致;newResident 只为他们新建、必带 castName);每人只知道自己知道的;故事人物的小号绝不自曝、言行不得OOC(以【人物设定参考】为准);无关住民不得把与主线雷同的经历当成自己的亲历,主线人物也绝不回复与自己经历雷同的内容;匿名是铁律——一切称呼只用网名或「名無し」,任何情况下都不写出现实真名,就算认出了熟人的小号也只装作不知道、或用只有当事人才懂的方式接话,绝不点破;察しと生存本能——某楼透出高位者的气质时,之后各楼默契察觉但绝不点破,语域随之改写(骤切敬语、突然安静、生硬转话题、翼賛式附和、暗号提醒「察しろ」),没有人写出那是谁;旁观住民看不到全貌,接话按起哄吃瓜的天性歪出错误、夸张的推论(不许借「猜错」夹带正文没有的事实);主线人物的小号若开口,承接的是台面上不敢表露的那层真心话——内容与正文已确立的关系阶段(及材料里【主人已在私密处流露的心境】的水位,若有)一致,伪装只在语气与称呼,绝不在内容上把对方说回更早阶段,方式必须贴合其已确立的性格——性格永远优先于宣泄;材料里若有【主人刚刚发出的回复】,它就是本帖最新的一楼(作者=主人的小号),续写必须以它为前提、不得复述它,住民对它的反应照常适用察し与吃瓜的天性;若那一节注明主人尚无固定住民,用 ownerResident 为主人的小号起一个固定网名(必带 castName);🚨剧情冻结——正文是这个世界唯一的剧情作者,盖楼只是余波:住民只能围绕已发生、公开可见的事继续跟风追问,绝不许爆出正文尚未发生的新事件或关系进展,也不许替剧情预告下一步;不复述正文。
 {{LANG_RULE}}
-只输出 JSON:{"replies":[{"authorId":"已有住民id或新id","newResident":{"residentId":"","handle":"","persona":"","castName":"可省略"},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}`;
+只输出 JSON:{"ownerResident":{"residentId":"","handle":"","persona":"","castName":""},"replies":[{"authorId":"固定住民id,与 anon 二选一","anon":{"key":"帖内短标记","name":"名無し系默认名"},"newResident":{"residentId":"","handle":"","persona":"","castName":"必填"},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}
+- ownerResident 只在材料要求为主人起小号时给出,否则省略`;
 
 // ── M2:SNS「Pulsar」提示词(H/I),任务书 §4 逐字嵌入,一个字都不许改写。 ──
 
@@ -877,8 +880,38 @@ function residentRosterLine(r) {
     return `- id=${r.residentId} handle=${r.handle} persona=${r.persona || ''}${r.castName ? ` castName=${r.castName}` : ''}`;
 }
 
+// M7a §1.1/§3:帖/楼的作者标注——固定住民写 handle(现状不变),次抛匿名写「name[key=xxx]」。
+// obj 是折好的 forumThread 或 reply(已经过 claimSpeaker 归一,authorId/anon 二选一)。
+function digestAuthorTag(world, obj) {
+    if (obj.anon) return `${obj.anon.name}[key=${obj.anon.key}]`;
+    return world.residents.get(obj.authorId)?.handle || obj.authorId;
+}
+
+// M7a §1.1:消化层的身份认领——固定住民优先(authorId 能反查到在册住民就用它),退到次抛匿名
+// (anon.name 非空就收,key 缺省取 name,截断护栏防止模型把整段话塞进 key),两者都没有就是
+// 一条既无身份也无面具的楼,只能丢弃。只负责"消化已经在册的身份",不负责注册新住民——
+// newResidents/newResident 的登记(含 castName 必填)必须在调用它之前就做完。
+// 命中哪一路就把 obj 改写成只剩那一个字段,入账 payload 不会同时带 authorId 与 anon。
+function claimSpeaker(world, obj) {
+    const rid = resolveByHandle(world.residents, obj?.authorId, 'residentId');
+    if (rid) {
+        obj.authorId = rid;
+        delete obj.anon;
+        return true;
+    }
+    const name = String(obj?.anon?.name || '').trim();
+    if (name) {
+        const key = String(obj.anon.key || name).trim().slice(0, 24) || 'x';
+        obj.anon = { key, name: name.slice(0, 40) };
+        delete obj.authorId;
+        return true;
+    }
+    console.warn('[Orrery] 楼层既非固定住民也无匿名信息,已丢弃');
+    return false;
+}
+
 function buildForumDigestText(world) {
-    if (!world.boards.size) return '(掲示板是空的,首次生成:请先创建 3〜4 个贴合这个共同体的板块、2〜3 条公告并初始化 5〜8 名住民)';
+    if (!world.boards.size) return '(掲示板是空的,首次生成:请先创建 3〜4 个贴合这个共同体的板块、2〜3 条公告,并只注册固定住民——主线人物及其身边人的小号;其余发言者一律用 anon)';
     const parts = [];
     if (world.community) parts.push(communityDigestLine(world.community));
     if (world.forumNow) parts.push(`[论坛当前世界时刻] ${fmtWorldTime(world.forumNow)}(新的 worldTime 不得早于它)`);
@@ -891,8 +924,11 @@ function buildForumDigestText(world) {
     }
     parts.push('[板块列表]');
     for (const b of world.boards.values()) parts.push(`- id=${b.boardId} name=${b.name} desc=${b.desc || ''}`);
-    parts.push('[住民名册]');
-    for (const r of world.residents.values()) parts.push(residentRosterLine(r));
+    // M7a §1.1/§3:名册只列固定住民(castName 非空)——一次性的名無し不占用这张表,住民规模
+    // 也就不再随刷新次数膨胀;旧世界里没有 castName 的老住民照旧存在于 world.residents(旧楼
+    // 照旧按 handle 渲染),只是不再被列进这里,自然沉底。
+    parts.push('[固定住民名册(只有主线人物及其身边人;其余发言者一律用 anon)]');
+    for (const r of world.residents.values()) if (r.castName) parts.push(residentRosterLine(r));
     // 近 10 帖带一楼摘要(2026-08-21 月月点单):此前只给 5 帖、且只有标题,模型看不见一楼在聊什么,
     // 撞话题是必然。更早的旧帖不再进上下文=自然沉底,newReplies 也只许指向这 10 帖——和真论坛一样。
     const recentThreads = [...world.forumThreads.values()]
@@ -903,11 +939,10 @@ function buildForumDigestText(world) {
         parts.push('\n[最近的帖子(新帖不得与它们话题重复或高度相似;newReplies 只能指向这里列出的帖——更早的旧帖已沉底,不再理会)]');
     }
     for (const t of recentThreads) {
-        const authorHandle = world.residents.get(t.authorId)?.handle || t.authorId;
-        parts.push(`\n[帖 ${t.threadId}] ${t.title}(作者 ${authorHandle})`);
+        parts.push(`\n[帖 ${t.threadId}] ${t.title}(作者 ${digestAuthorTag(world, t)})`);
         if (t.body) parts.push(`  1F: ${String(t.body).slice(0, 120)}`);
         for (const r of t.replies.slice(-2)) {
-            parts.push(`  ${world.residents.get(r.authorId)?.handle || r.authorId}: ${r.body}`);
+            parts.push(`  ${digestAuthorTag(world, r)}: ${r.body}`);
         }
     }
     return parts.join('\n');
@@ -916,15 +951,21 @@ function buildForumDigestText(world) {
 function buildForumThreadDigestText(world, thread) {
     const parts = [];
     if (world.community) parts.push(communityDigestLine(world.community)); // 盖楼同样要认本所属的称呼体系
-    const authorHandle = world.residents.get(thread.authorId)?.handle || thread.authorId;
     parts.push(`[帖子] ${thread.title}`);
-    parts.push(`${authorHandle}: ${thread.body}`);
+    parts.push(`${digestAuthorTag(world, thread)}: ${thread.body}`);
+    // 本帖已出现的匿名 key 去重列出(先出现先列,同 Map 的插入序):模型续写时可以照着这张表
+    // 认出「这个 key 之前说过话」,选择让 TA 回来接话,而不是每楼都平白生出一个新的名無し。
+    const anonKeys = new Map();
+    if (thread.anon) anonKeys.set(thread.anon.key, thread.anon.name);
     thread.replies.forEach((r, i) => {
-        const h = world.residents.get(r.authorId)?.handle || r.authorId;
-        parts.push(`${i + 1}F ${h}${r.replyToFloor ? `(回复>>${r.replyToFloor})` : ''}: ${r.body}`);
+        parts.push(`${i + 1}F ${digestAuthorTag(world, r)}${r.replyToFloor ? `(回复>>${r.replyToFloor})` : ''}: ${r.body}`);
+        if (r.anon) anonKeys.set(r.anon.key, r.anon.name);
     });
-    parts.push('\n[住民名册]');
-    for (const r of world.residents.values()) parts.push(residentRosterLine(r));
+    if (anonKeys.size) {
+        parts.push(`[本帖的名無し] ${[...anonKeys].map(([key, name]) => `key=${key} name=${name} ID:${anonIdFor(thread.threadId, key)}`).join(' / ')}`);
+    }
+    parts.push('\n[固定住民名册(只有主线人物及其身边人;其余发言者一律用 anon)]');
+    for (const r of world.residents.values()) if (r.castName) parts.push(residentRosterLine(r));
     return parts.join('\n');
 }
 
@@ -1050,6 +1091,46 @@ function buildMemoDigestText(world) {
     return parts.join('\n');
 }
 
+// ── M7a 跨 app 感情棘轮(草案 1A + 星璇漏项②)。──
+// 病象:主人在备忘录里写崩溃、在裏垢发泄、在论坛草稿里写了又删,回头去 DM/群聊/论坛盖楼里,
+// 嘴上却还能全盘否认到「关系原点」——台面上的伪装没问题,但台面下的真心不该比这些独处/匿名时
+// 流露的更早。三处材料都是从已经 fold 好的 world 里现取,不新增账本类型、不另起水位。
+// 时间倒序各取一点点(备忘 3/裏垢 3/草稿 2),标题行与要点行逐字来自任务书 §1.3,喂给五处消费方
+// (§1.3 点名的那五个函数)时统一放在「正文小节之后、【xx 当前状态】之前」,让它跟 regrowHint
+// 一样贴着「当前状态」而不是塞进最前面的稳定前缀——但它比 regrowHint 更靠前,因为这是「事实材料」
+// 不是「这一趟怎么做」的临时指令。
+function buildOwnerInnerStateText(world) {
+    const lines = [];
+
+    const recentMemos = [...world.memos.values()]
+        .sort((a, b) => (b.latestTs || 0) - (a.latestTs || 0)).slice(0, 3);
+    for (const m of recentMemos) {
+        const { title, rest } = splitMemoFirstLine(m.text);
+        lines.push(`- 备忘(${fmtWorldTime(m.latestTs)}):${title} — ${rest.slice(0, 80)}`);
+    }
+
+    // 裏垢:世界里只会有一个 ownerRole==='ura' 的账号(runSnsMainGeneration 的互斥归一保证),
+    // RT(retweetOf 存在)的 body 天然是空串,天生被 filter 的 t.body 挡掉,不必单独判断 retweetOf。
+    const uraAccount = [...world.snsAccounts.values()].find(a => a.ownerRole === 'ura');
+    if (uraAccount) {
+        const uraTweets = [...world.tweets.values()]
+            .filter(t => t.accountId === uraAccount.accountId && t.body)
+            .sort((a, b) => (b.worldTime || 0) - (a.worldTime || 0)).slice(0, 3);
+        for (const t of uraTweets) lines.push(`- 裏垢(${fmtWorldTime(t.worldTime)}):${t.body.slice(0, 80)}`);
+    }
+
+    const draftThreads = [...world.forumThreads.values()]
+        .filter(t => t.myDraft?.text)
+        .sort((a, b) => (b.myDraft.worldTime || 0) - (a.myDraft.worldTime || 0)).slice(0, 2);
+    for (const t of draftThreads) {
+        lines.push(`- 写了又删的回复草稿(${fmtWorldTime(t.myDraft.worldTime)}):${t.myDraft.text.slice(0, 80)}`);
+    }
+
+    if (!lines.length) return '';
+    return `【主人已在私密处流露的心境(只作水位参照:这些是 TA 独处或匿名时的真话,住民与联系人都看不到;`
+        + `台面上可以嘴硬、可以伪装语气,但真心走到的阶段不得倒退到比这更早;绝不复述这些原文)】\n${lines.join('\n')}\n\n`;
+}
+
 // ── 水位 → 本批「新进展」的起点(messenger/forum 共用)。──
 // M1 水位重构后不靠事件累积,完全推导——冷启动的存量楼层、流式丢事件的楼层都自动补上。
 // 2026-08-13 起「新进展」与「上下文范围」彻底分家:上下文默认是整本聊天(见 buildFloorContextText),
@@ -1131,7 +1212,7 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
     const notes = await buildInjectedNotes(ctx);
     // regrowHint 从队首挪到队尾:它是「本次这一趟怎么做」的临时指令,贴着输出更有效;
     // 更要紧的是队首要留给不变的材料——前缀稳定,连续几次生成才吃得到 provider 的缓存。
-    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}【手机当前状态】\n${buildWorldDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
+    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}${buildOwnerInnerStateText(world)}【手机当前状态】\n${buildWorldDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
     logContextShape('消息生成', userContent, notes.keys);
     const systemPrompt = PROMPT_A.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('messenger', language));
 
@@ -1272,11 +1353,15 @@ async function runThreadContinue(ctx, store, { worldKey, threadId, floorWindow, 
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
     const notes = await buildInjectedNotes(ctx);
     const recent = buildFloorSection(ctx, { newFrom: null, floorWindow: floorWindow ?? 0, excludeTags, background: true });
-    const userContent = `${castRef}${notes.text}${recent}【这段聊天的记录】\n${buildThreadDigestText(thread, senderNameFn(world, thread)) || '(还没有聊天记录)'}`;
+    const userContent = `${castRef}${notes.text}${recent}${buildOwnerInnerStateText(world)}【这段聊天的记录】\n${buildThreadDigestText(thread, senderNameFn(world, thread)) || '(还没有聊天记录)'}`;
     logContextShape('消息续聊', userContent, notes.keys);
 
+    // 回滚纪元闸(M7a §1.4):续写/续聊/搜索/快照这五个函数此前一直没补——生成期间用户在酒馆里
+    // 删楼/swipe,回滚代表更晚的意图,整批作废,同六个主生成的道理,只是补得晚。
+    const epoch = store.getRollbackEpoch();
     const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || !Array.isArray(parsed.messages)) return { ok: false, error: 'parse_failed' };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
     if (!parsed.messages.length) return { ok: true, added: 0 };
 
     const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
@@ -1352,7 +1437,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
         : '';
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
     const notes = await buildInjectedNotes(ctx);
-    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}【论坛当前状态】\n${buildForumDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
+    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}${buildOwnerInnerStateText(world)}【论坛当前状态】\n${buildForumDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
     logContextShape('论坛生成', userContent, notes.keys);
     const systemPrompt = PROMPT_F.replaceAll('{{char}}', charName).replaceAll('{{community}}', community.name).replaceAll('{{LANG_RULE}}', langRule('forum', language));
 
@@ -1399,25 +1484,24 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
         addedCount++;
     }
 
+    // M7a §1.1:固定住民必带 castName(它就是「主线人物及其身边人的小号」的定义本身)——
+    // 缺 castName 的条目一律丢弃,不再像旧版那样容许"住民但无真身"的空挂号,一次性的名無し
+    // 从这版起该走 anon,不该占用 newResidents 的预算与账本条目。
     for (const r of Array.isArray(parsed.newResidents) ? parsed.newResidents : []) {
-        if (!allowUserContact && r?.castName && isUserSide(r.castName, ctx)) {
+        if (!r?.castName) {
+            if (r?.handle) console.warn('[Orrery] 新住民', r.handle, '缺 castName(固定住民只能是主线人物及其身边人),已丢弃');
+            continue;
+        }
+        if (!allowUserContact && isUserSide(r.castName, ctx)) {
             console.warn('[Orrery] 已拦下叙事另一方越界注册住民小号:', r.castName);
             continue;
         }
         if (!r?.residentId || !r?.handle || world.residents.has(String(r.residentId))) continue;
         const residentId = String(r.residentId);
-        const payload = { residentId, handle: String(r.handle), persona: r.persona || '' };
-        if (r.castName) payload.castName = String(r.castName); // 小号真名——只进账本/LLM 上下文,UI 绝不读它
+        const payload = { residentId, handle: String(r.handle), persona: r.persona || '', castName: String(r.castName) };
         const added = await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'forum', type: 'resident', payload });
         world.residents.set(residentId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
     }
-
-    // 认领即归一:校验的同时把 handle 写法归位成 residentId(改写原对象);真查无此人才丢弃(任务书 §4)
-    const claimAuthor = (obj) => {
-        const rid = resolveByHandle(world.residents, obj?.authorId, 'residentId');
-        if (rid) obj.authorId = rid;
-        return !!rid;
-    };
 
     // newThreads 的 schema(PROMPT_F §5)没有 threadId 字段——新帖的 id 由模型现造是天然不稳定的,
     // Orrery 自己发一个(同 store.js 的 makeId 哲学,不查重,碰撞概率低到可以不管)。
@@ -1432,26 +1516,28 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     const draftCandidates = [];
 
     for (const t of Array.isArray(parsed.newThreads) ? parsed.newThreads : []) {
-        if (!t?.boardId || !t?.title || !claimAuthor(t) || !world.boards.has(String(t.boardId))) {
+        if (!t?.boardId || !t?.title || !claimSpeaker(world, t) || !world.boards.has(String(t.boardId))) {
             // 丢弃是既定策略(查无此人/查无此板的帖不入账),但必须留声——否则又是「后端有、前端空」
             if (t?.title) console.warn('[Orrery] 新帖', t.title, '因板块或作者查无此项被丢弃');
             continue;
         }
         const threadId = makeForumThreadId();
         const payload = {
-            threadId, boardId: String(t.boardId), title: String(t.title), authorId: String(t.authorId),
+            threadId, boardId: String(t.boardId), title: String(t.title),
             body: String(t.body || ''), worldTime: anchor,
         };
+        if (t.authorId) payload.authorId = String(t.authorId); else payload.anon = t.anon; // 二选一(§1.1)
         { const z = cleanZh(t.zh, t.body, language); if (z) payload.zh = z; }
         await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'forum', type: 'forum_thread', payload });
         addedCount++;
         world.forumThreads.set(threadId, { ...payload, replies: [] });
 
-        const replies = (Array.isArray(t.replies) ? t.replies : []).filter(rp => rp?.body && claimAuthor(rp));
+        const replies = (Array.isArray(t.replies) ? t.replies : []).filter(rp => rp?.body && claimSpeaker(world, rp));
         const times = layoutWorldTimes(replies, anchor, anchor);
         for (let i = 0; i < replies.length; i++) {
             const rp = replies[i];
-            const rpayload = { threadId, authorId: String(rp.authorId), body: String(rp.body), worldTime: times[i] };
+            const rpayload = { threadId, body: String(rp.body), worldTime: times[i] };
+            if (rp.authorId) rpayload.authorId = String(rp.authorId); else rpayload.anon = rp.anon;
             { const z = cleanZh(rp.zh, rp.body, language); if (z) rpayload.zh = z; }
             { const rf = validReplyToFloor(rp.replyToFloor, i + 1); if (rf !== undefined) rpayload.replyToFloor = rf; }
             await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'forum', type: 'forum_reply', payload: rpayload });
@@ -1465,12 +1551,13 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
         const thread = world.forumThreads.get(String(nr.threadId));
         if (!thread?.title) continue; // 帖不存在,丢弃
         const threadId = thread.threadId;
-        const replies = (Array.isArray(nr.replies) ? nr.replies : []).filter(rp => rp?.body && claimAuthor(rp));
+        const replies = (Array.isArray(nr.replies) ? nr.replies : []).filter(rp => rp?.body && claimSpeaker(world, rp));
         const tailTs = thread.replies.length ? thread.replies[thread.replies.length - 1].worldTime : thread.worldTime;
         const times = layoutWorldTimes(replies, anchor, tailTs);
         for (let i = 0; i < replies.length; i++) {
             const rp = replies[i];
-            const rpayload = { threadId, authorId: String(rp.authorId), body: String(rp.body), worldTime: times[i] };
+            const rpayload = { threadId, body: String(rp.body), worldTime: times[i] };
+            if (rp.authorId) rpayload.authorId = String(rp.authorId); else rpayload.anon = rp.anon;
             { const z = cleanZh(rp.zh, rp.body, language); if (z) rpayload.zh = z; }
             { const rf = validReplyToFloor(rp.replyToFloor, thread.replies.length + 1); if (rf !== undefined) rpayload.replyToFloor = rf; }
             await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'forum', type: 'forum_reply', payload: rpayload });
@@ -1505,6 +1592,17 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWin
     const thread = world.forumThreads.get(threadId);
     if (!thread?.title) return { ok: false, error: 'no_thread' };
 
+    const charName = owner || ctx.name2 || '主角';
+    // 草稿发出(M7a §1.2/§3):有未发送草稿时,先看主人是不是已经有固定住民——castName 等于
+    // charName、或 castName 含 charName(带注记的写法)都算;没有的话,起名字的活交给模型
+    // (ownerResident),这里只负责查有没有。
+    const draft = thread.myDraft;
+    // ⚠️只许单向包含(castName 含整个 charName):身边人常与主人同姓,若反过来让「charName 含 castName」
+    // 也算命中,一个 castName 只写了姓的亲戚小号就会被当成主人,草稿发到别人名下。宁可多注册一个
+    // 主人小号,不可把主人的话安到亲戚头上。
+    const ownerRes = draft ? [...world.residents.values()].find(r => r.castName
+        && (r.castName === charName || r.castName.includes(charName))) : null;
+
     // {{community}}:盖楼不重新推断(那是主生成的活),world.community 缺失时按任务书-M5 §4
     // 用「この掲示板」兜底——不阻塞盖楼(旧世界/推断失败之后仍能继续围观已有帖子)。
     const systemPrompt = PROMPT_G
@@ -1513,50 +1611,88 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWin
         .replaceAll('{{COUNT_RULE}}', countRule('forum', count));
     // 同 runThreadContinue:盖楼也补上摘要与正文近况,否则住民只能凭一个帖子的字面意思接话,
     // 主线人物的小号一开口就回到关系原点。
-    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), owner || ctx.name2);
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
     const notes = await buildInjectedNotes(ctx);
     const recent = buildFloorSection(ctx, { newFrom: null, floorWindow: floorWindow ?? 0, excludeTags, background: true });
-    const userContent = `${castRef}${notes.text}${recent}${buildForumThreadDigestText(world, thread)}`;
+    // 草稿本身不进 buildForumThreadDigestText(住民看不见未发送的东西),只在这里额外告诉模型
+    // 「主人马上要发出这一楼」,让续写的住民能对它自然产生反应——放在 digest 末尾,同 regrowHint
+    // 的位置哲学(临时指令贴着输出更有效,不挤占前面稳定材料的缓存)。
+    const draftNote = draft?.text
+        ? `\n\n【主人刚刚发出的回复】(主人=「${charName}」;${ownerRes ? `作者=固定住民 ${ownerRes.handle}` : '主人尚无固定住民,请用 ownerResident 为主人的小号起一个固定网名'})\n${draft.text}`
+        : '';
+    const userContent = `${castRef}${notes.text}${recent}${buildOwnerInnerStateText(world)}${buildForumThreadDigestText(world, thread)}${draftNote}`;
     logContextShape('论坛盖楼', userContent, notes.keys);
 
+    const epoch = store.getRollbackEpoch();
     const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || !Array.isArray(parsed.replies)) return { ok: false, error: 'parse_failed' };
-    if (!parsed.replies.length) return { ok: true, added: 0 };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
 
     const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
+    let anchor = thread.replies.length ? thread.replies[thread.replies.length - 1].worldTime : (thread.worldTime || Date.now());
+    let addedCount = 0;
+
+    // 草稿发出:不管模型这次给不给续写,先把主人这一楼落进账本——它是真实论坛活动,worldTime
+    // 排在现有楼层之后、模型续写的楼层之前,anchor 随之前移,后续消化与 replyToFloor 校验都以它为基。
+    if (draft?.text) {
+        let resolvedOwner = ownerRes;
+        if (!resolvedOwner) {
+            const or = parsed.ownerResident;
+            const residentId = (or?.residentId && or?.handle)
+                ? String(or.residentId)
+                : `r_owner_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; // 模型没给,本地兜底起名
+            const payload = { residentId, handle: String(or?.handle || '名無し'), persona: or?.persona || '', castName: charName };
+            const added = await store.addEntry({ worldKey, sourceFloor, app: 'forum', type: 'resident', payload });
+            resolvedOwner = { ...payload, sourceFloor: added.sourceFloor, ts: added.ts };
+            world.residents.set(residentId, resolvedOwner);
+        }
+        anchor += 60000;
+        const rpayload = { threadId, authorId: resolvedOwner.residentId, body: String(draft.text), worldTime: anchor, fromDraftId: draft.draftId };
+        { const z = cleanZh(draft.zh, draft.text, language); if (z) rpayload.zh = z; }
+        await store.addEntry({ worldKey, sourceFloor, app: 'forum', type: 'forum_reply', payload: rpayload });
+        thread.replies.push(rpayload); // 内存快照同步,后续 replyToFloor 校验以它为基(同现状注释的做法)
+        addedCount++;
+    }
+
+    // 消化模型的 replies:固定住民(含盖楼新建,预算 2 名、必带 castName)优先命中,退到 anon,
+    // 两者都没有则整楼作废——同 claimSpeaker 的判定顺序,只是新建住民这一步需要额外的预算与
+    // user 硬防线,claimSpeaker 本身不管这些。
     let newResidentBudget = 2;
     const valid = [];
-    for (const rp of parsed.replies) {
+    for (const rp of Array.isArray(parsed.replies) ? parsed.replies : []) {
         if (!rp?.body) continue;
-        let authorId = rp.authorId ? String(rp.authorId) : null;
-        if (!authorId) continue;
-        // handle 写法先归位;归不上的才可能是本批合法新建的住民
-        const resolved = resolveByHandle(world.residents, authorId, 'residentId');
-        if (resolved) { authorId = resolved; rp.authorId = resolved; }
-        if (!world.residents.has(authorId)) {
+        if (rp.authorId && !resolveByHandle(world.residents, rp.authorId, 'residentId')) {
             const nr = rp.newResident;
-            if (!(nr?.residentId && String(nr.residentId) === authorId && newResidentBudget > 0)) continue; // 查无此人且非法新建,丢弃
-            if (!allowUserContact && nr.castName && isUserSide(nr.castName, ctx)) { console.warn('[Orrery] 已拦下叙事另一方越界注册住民小号(盖楼):', nr.castName); continue; }
-            const payload = { residentId: authorId, handle: String(nr.handle || '?'), persona: nr.persona || '' };
-            if (nr.castName) payload.castName = String(nr.castName);
-            const added = await store.addEntry({ worldKey, sourceFloor, app: 'forum', type: 'resident', payload });
-            world.residents.set(authorId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
-            newResidentBudget--;
+            const residentId = String(rp.authorId);
+            if (nr?.residentId && String(nr.residentId) === residentId && newResidentBudget > 0) {
+                if (!nr.castName) {
+                    console.warn('[Orrery] 盖楼新建住民缺 castName,已丢弃:', nr.handle || residentId);
+                } else if (!allowUserContact && isUserSide(nr.castName, ctx)) {
+                    console.warn('[Orrery] 已拦下叙事另一方越界注册住民小号(盖楼):', nr.castName);
+                } else {
+                    const payload = { residentId, handle: String(nr.handle || '?'), persona: nr.persona || '', castName: String(nr.castName) };
+                    const added = await store.addEntry({ worldKey, sourceFloor, app: 'forum', type: 'resident', payload });
+                    world.residents.set(residentId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
+                    newResidentBudget--;
+                }
+            }
         }
+        if (!claimSpeaker(world, rp)) continue;
         valid.push(rp);
     }
-    if (!valid.length) return { ok: true, added: 0 };
+    if (!valid.length) return { ok: true, added: addedCount }; // 草稿发出本身已经是「有变化」,不必再有新回复
 
-    const anchor = thread.replies.length ? thread.replies[thread.replies.length - 1].worldTime : (thread.worldTime || Date.now());
     const times = layoutWorldTimes(valid, anchor, anchor);
     for (let i = 0; i < valid.length; i++) {
         const rp = valid[i];
-        const rpayload = { threadId, authorId: String(rp.authorId), body: String(rp.body), worldTime: times[i] };
+        const rpayload = { threadId, body: String(rp.body), worldTime: times[i] };
+        if (rp.authorId) rpayload.authorId = String(rp.authorId); else rpayload.anon = rp.anon;
         { const z = cleanZh(rp.zh, rp.body, language); if (z) rpayload.zh = z; }
         { const rf = validReplyToFloor(rp.replyToFloor, thread.replies.length + i + 1); if (rf !== undefined) rpayload.replyToFloor = rf; }
         await store.addEntry({ worldKey, sourceFloor, app: 'forum', type: 'forum_reply', payload: rpayload });
+        addedCount++;
     }
-    return { ok: true, added: valid.length };
+    return { ok: true, added: addedCount };
 }
 
 // ── M2:SNS 主生成:独立水位、独立触发(app 内「刷新」),消化 newAccounts/newTweets/newReplies。──
@@ -1768,8 +1904,11 @@ async function runSnsSearchGeneration(ctx, store, { worldKey, word, floorWindow,
     logContextShape('SNS搜索', userContent, notes.keys);
     const systemPrompt = PROMPT_N.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('sns', language));
 
+    // 回滚纪元闸(M7a §1.4):同 runThreadContinue,补在任何 addEntry 之前。
+    const epoch = store.getRollbackEpoch();
     const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
 
     const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
     // 新账号 ≤2(同续写纪律);搜索绝不铸造主人的账号(ownerRole 一律剥除);isUserSide 硬闸照守
@@ -1834,8 +1973,11 @@ async function runBrowserPageGeneration(ctx, store, { worldKey, visitId, profile
     logContextShape('网页快照', userContent, notes.keys);
     const systemPrompt = PROMPT_M.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('webpage', language));
 
+    // 回滚纪元闸(M7a §1.4):同 runThreadContinue,补在任何 addEntry 之前。
+    const epoch = store.getRollbackEpoch();
     const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || typeof parsed !== 'object' || !parsed.html) return { ok: false, error: 'parse_failed' };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
 
     const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
     const payload = {
@@ -1867,8 +2009,11 @@ async function runSnsTweetContinue(ctx, store, { worldKey, tweetId, floorWindow,
     const userContent = `${castRef}${notes.text}${recent}${buildSnsTweetDigestText(world, tweet)}`;
     logContextShape('SNS回复续写', userContent, notes.keys);
 
+    // 回滚纪元闸(M7a §1.4):同 runThreadContinue,补在任何 addEntry 之前。
+    const epoch = store.getRollbackEpoch();
     const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || !Array.isArray(parsed.replies)) return { ok: false, error: 'parse_failed' };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
     if (!parsed.replies.length) return { ok: true, added: 0 };
 
     const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
@@ -1935,7 +2080,7 @@ async function runBrowserMainGeneration(ctx, store, { worldKey, floorWindow, pro
         : '';
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
     const notes = await buildInjectedNotes(ctx);
-    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}${communityLine}【浏览器当前状态】\n${buildBrowserDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
+    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}${communityLine}${buildOwnerInnerStateText(world)}【浏览器当前状态】\n${buildBrowserDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
     logContextShape('浏览器生成', userContent, notes.keys);
     const systemPrompt = PROMPT_J.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('browser', language));
 

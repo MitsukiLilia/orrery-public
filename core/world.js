@@ -58,12 +58,31 @@ export function shortIdFor(residentId) {
 }
 
 /**
+ * 匿名住民短 ID(M7a 次抛匿名):同一帖里同一个 key 永远同一个 ID(可以回来接话),
+ * 跨帖天然不同(key 混进了 threadId 一起哈希)——同 shortIdFor 的哈希哲学,只是取位更长、
+ * 输出 base36(匿名板文化里 6 位数字/字母混编的「ID:xxxxxx」更常见)。纯展示用,不是身份密钥。
+ */
+export function anonIdFor(threadId, key) {
+    // hashStr 是 djb2:相邻的 key(a1/a2)只差最后一次乘加,输出也只差一点,展示出来就是 dpt5lw/dpt5lx
+    // 这种连号——匿名板的 ID 该像随机串。补一段 murmur3 式的末端搅拌(移位异或+奇数乘)把低位差异
+    // 打散到整个 32 位,shortIdFor 不动(4 位十六进制的连号肉眼不明显,且改了会让旧住民 ID 全变)。
+    let h = hashStr(`${threadId}|${key}`) >>> 0;
+    h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b) >>> 0;
+    h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35) >>> 0;
+    h ^= h >>> 16;
+    return ((h >>> 0) % 36 ** 6).toString(36).padStart(6, '0'); // 异或会把值带回有符号,最后再转一次无符号
+}
+
+/**
  * 账本 fold 成世界状态:{ contacts, groups, threads, worldNow, boards, residents, forumThreads, forumNow,
  *   snsAccounts, tweets, snsNow, searches, visits, browserNow }。
  * threads: threadId -> { threadId, kind:'dm'|'group', contactId?, group?, messages:[], summaries:[], unread, lastMessage }
  * dm 的 threadId===contactId;群聊的 threadId===groupId,成员内联在 group.members(不必是通讯录好友)。
- * forumThreads: threadId -> { threadId, boardId, title, authorId, body, zh?, worldTime, replies:[](按 worldTime 升序),
- *   replyCount, lastActiveTs } —— 论坛自己的账,不碰 threads/worldNow(两个 app 的水互不相扰,水位重构的初衷)。
+ * forumThreads: threadId -> { threadId, boardId, title, authorId?, anon?, body, zh?, worldTime, replies:[](按
+ *   worldTime 升序,每条同样 authorId?/anon? 二选一), replyCount, lastActiveTs, myDraft? } —— 论坛自己的账,
+ *   不碰 threads/worldNow(两个 app 的水互不相扰,水位重构的初衷)。authorId=固定住民(residents 表里能查到);
+ *   anon={key,name}=次抛匿名(M7a §1.1),UI 用 anonIdFor(threadId, key) 现算展示 ID,不落表。myDraft 一旦
+ *   在 replies 里发现 fromDraftId 与之相符的一楼(草稿已发出),fold 收尾时置 null(见下方 forumNow 循环)。
  * snsAccounts: accountId -> sns_account payload(同 accountId 重发即覆盖——entries 已按 ts 升序 fold,Map.set
  *   天然「后写赢」,同 contacts 先例,不需要额外的"已存在就跳过"判断)。
  * tweets: tweetId -> { tweetId, accountId, body, zh?, worldTime, likes, retweets, retweetOf?, replies:[](按
@@ -229,6 +248,11 @@ export function foldWorld(entries) {
         const times = [t.worldTime, ...t.replies.map(r => r.worldTime)].filter(Number.isFinite);
         t.lastActiveTs = times.length ? Math.max(...times) : 0;
         if (t.title) forumNow = Math.max(forumNow, t.lastActiveTs); // 帖子壳(无 title)是悬空回复,不计入时钟
+        // 草稿发出(M7a §1.2):发出那一刻新写的 forum_reply 带 fromDraftId 指回被发出的草稿——
+        // 一旦这一楼真的出现在 replies 里,输入框里的「未发送草稿」就该消失。反悔删掉那一楼
+        // (deleteThreadFrom 按 ts)会让这个条件自然失效,草稿原样躺在账本里,下次 fold 自动回到输入框,
+        // 不需要专门的"恢复草稿"逻辑——同 memo_edit 回滚即还原的哲学。
+        if (t.myDraft && t.replies.some(r => r.fromDraftId === t.myDraft.draftId)) t.myDraft = null;
     }
     // 公告也是论坛活动(任务书-M5 §1.2):worldTime 参与 forumNow 推进,和帖子/回复同一条时钟。
     for (const n of notices.values()) if (Number.isFinite(n.worldTime)) forumNow = Math.max(forumNow, n.worldTime);

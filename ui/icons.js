@@ -67,3 +67,7 @@ export const ICON_STAR_FILL = '<svg viewBox="0 0 24 24"><path d="M12 3.6l2.47 5.
 
 // M5 论坛置顶公告小图标(图钉):胶囊形针头 + 扁平肩台 + 向下的针身,手绘写意「钉在板上」的意象。
 export const ICON_PIN = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="8" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 11h10l-2 3H9Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><line x1="12" y1="14" x2="12" y2="21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+
+// M7a 论坛输入框常驻(草案 3A):帖内页底部那条只读回复框上的发送图标——简洁纸飞机线稿,
+// 风格同 ICON_REPLY_SM/ICON_RT_SM(stroke currentColor,折线内芯表现"折过的纸")。
+export const ICON_SEND = '<svg viewBox="0 0 24 24"><path d="M4 12 19.5 4.5 15 19.5l-3.3-6.2L4 12Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M11.7 13.3 19.5 4.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
