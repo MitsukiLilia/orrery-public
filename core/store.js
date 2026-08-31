@@ -160,6 +160,7 @@ export async function deleteEntriesFromFloor(worldKey, floor) {
  */
 export async function deleteThreadFrom(worldKey, threadId, fromTs) {
     if (!worldKey) return;
+    rollbackEpoch++; // 手动反悔/删除同样代表用户更晚的意图:在飞的生成整批作废(2026-08-31 整体review P0-1 回填)
     const db = await openDB();
     await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_LEDGER, 'readwrite');
@@ -184,6 +185,7 @@ export async function deleteThreadFrom(worldKey, threadId, fromTs) {
  */
 export async function deleteContactCascade(worldKey, threadId) {
     if (!worldKey) return;
+    rollbackEpoch++; // 手动反悔/删除同样代表用户更晚的意图:在飞的生成整批作废(2026-08-31 整体review P0-1 回填)
     const db = await openDB();
     await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_LEDGER, 'readwrite');
@@ -210,6 +212,7 @@ export async function deleteContactCascade(worldKey, threadId) {
  */
 export async function deleteForumThreadCascade(worldKey, threadId) {
     if (!worldKey) return;
+    rollbackEpoch++; // 手动反悔/删除同样代表用户更晚的意图:在飞的生成整批作废(2026-08-31 整体review P0-1 回填)
     const db = await openDB();
     await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_LEDGER, 'readwrite');
@@ -234,6 +237,7 @@ export async function deleteForumThreadCascade(worldKey, threadId) {
  */
 export async function deleteTweetCascade(worldKey, tweetId) {
     if (!worldKey) return;
+    rollbackEpoch++; // 手动反悔/删除同样代表用户更晚的意图:在飞的生成整批作废(2026-08-31 整体review P0-1 回填)
     const db = await openDB();
     await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_LEDGER, 'readwrite');
@@ -258,6 +262,7 @@ export async function deleteTweetCascade(worldKey, tweetId) {
  */
 export async function deleteTweetRepliesFrom(worldKey, tweetId, fromTs) {
     if (!worldKey) return;
+    rollbackEpoch++; // 手动反悔/删除同样代表用户更晚的意图:在飞的生成整批作废(2026-08-31 整体review P0-1 回填)
     const db = await openDB();
     await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_LEDGER, 'readwrite');
@@ -285,6 +290,7 @@ export async function deleteTweetRepliesFrom(worldKey, tweetId, fromTs) {
  */
 export async function deleteBrowserFrom(worldKey, fromWorldTime) {
     if (!worldKey) return;
+    rollbackEpoch++; // 手动反悔/删除同样代表用户更晚的意图:在飞的生成整批作废(2026-08-31 整体review P0-1 回填)
     const db = await openDB();
     await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_LEDGER, 'readwrite');
@@ -310,6 +316,7 @@ export async function deleteBrowserFrom(worldKey, fromWorldTime) {
  */
 export async function deleteGalleryFrom(worldKey, fromWorldTime) {
     if (!worldKey) return;
+    rollbackEpoch++; // 手动反悔/删除同样代表用户更晚的意图:在飞的生成整批作废(2026-08-31 整体review P0-1 回填)
     const db = await openDB();
     await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_LEDGER, 'readwrite');
@@ -336,6 +343,7 @@ export async function deleteGalleryFrom(worldKey, fromWorldTime) {
  */
 export async function deleteMemoFrom(worldKey, fromWorldTime) {
     if (!worldKey) return;
+    rollbackEpoch++; // 手动反悔/删除同样代表用户更晚的意图:在飞的生成整批作废(2026-08-31 整体review P0-1 回填)
     const db = await openDB();
     await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_LEDGER, 'readwrite');

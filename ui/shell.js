@@ -1106,9 +1106,11 @@ export function createShell(ctx, onExternalChange) {
         const { world } = await currentWorld();
         const thread = world.threads.get(threadId);
         if (!thread) return;
+        // 名字是模型产物,而 callGenericPopup 对字符串 content 的渲染方式在 ST 侧不受我们控制——
+        // 全仓其余 innerHTML 拼装点都过 escapeHtml,这里是唯一例外,一并转义补齐(2026-08-31 整体review)。
         const label = thread.kind === 'group'
-            ? `群聊「${thread.group?.name || '?'}」`
-            : `联系人「${world.contacts.get(threadId)?.name || '?'}」`;
+            ? `群聊「${escapeHtml(thread.group?.name || '?')}」`
+            : `联系人「${escapeHtml(world.contacts.get(threadId)?.name || '?')}」`;
         const confirmed = await ctx.callGenericPopup(`删除${label}和这段聊天的全部记录?剧情推进后 TA 仍可能重新出现。`, ctx.POPUP_TYPE.CONFIRM);
         if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
         await store.deleteContactCascade(worldKey, threadId);

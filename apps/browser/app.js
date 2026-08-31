@@ -110,7 +110,7 @@ function sanitizeSnapshotHtml(html) {
         }
     }
     doc.querySelectorAll('style').forEach(st => {
-        st.textContent = String(st.textContent || '').replace(/url\s*\(/gi, 'noop(').replace(/@import/gi, '/*import*/');
+        st.textContent = String(st.textContent || '').replace(/url\s*\(|expression\s*\(/gi, 'noop(').replace(/@import/gi, '/*import*/');
     });
     return doc.body.innerHTML;
 }

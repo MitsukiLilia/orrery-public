@@ -194,7 +194,7 @@ export const PROMPT_M = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 输出
 只输出一个 JSON 对象:
-{"url":"https://…","html":"页面 HTML 片段"}
+{"url":"https://…","html":"页面 HTML 片段","zh":"页面主要内容的两三句中文大意(是否输出、写什么,遵循语言规则;不需要时省略此字段)"}
 - url=这张页面的完整网址:域名贴合站名,路径贴合站型的技术栈(/thread/、/article/、.php 那一挂),但不得使用现实世界真实存在的网站域名`;
 
 export const PROMPT_N = `你是 Orrery,叙事世界观测引擎。主人「{{char}}」在 SNS「Pulsar」的搜索栏搜了一个词,用户想看搜索结果——请推演这个世界里,这个词下**已经存在**的推文(都是过去发出的,不是此刻新发的)。
@@ -1183,13 +1183,23 @@ function pendingOrRegrow(watermark, tip, floorWindow) {
 // ── M5 所属コミュニティ推断:一世界只推一次,结果永久缓存(任务书-M5 §2)。──
 // 论坛/浏览器共用同一个所属;SNS 这版不接(任务书拍板)。失败返回 null,调用方各自决定阻不阻塞。
 
+// 所属推断的进行中去重(2026-08-31 整体review P2-3):论坛/SNS/浏览器各有独立 busy 锁,允许同时飞,
+// 首次触发时会各自发一次所属推断——按 worldKey 共享同一个进行中 Promise,只烧一次调用。
+const communityInFlight = new Map();
+
 async function ensureCommunity(ctx, store, { worldKey, profileId, customApi, owner, language, excludeTags, world = null }) {
     // 调用方手里通常已经有折好的 world,传进来省一次全量 fold;没传才自己折。
     const folded = world || foldWorld(await store.getEntriesForWorld(worldKey));
     // 已推断过就不花 token;缺 titles(v0.16.1 之前)或缺 worldBrief(M7b 之前)的都是旧条目,
     // 补推一次覆盖(后写覆盖语义,同 v0.16.1 补 titles 的路子),不用改組。
     if (folded.community && folded.community.titles && folded.community.worldBrief) return folded.community;
+    if (communityInFlight.has(worldKey)) return communityInFlight.get(worldKey);
+    const p = inferCommunity(ctx, store, { worldKey, profileId, customApi, owner, language, excludeTags });
+    communityInFlight.set(worldKey, p);
+    try { return await p; } finally { communityInFlight.delete(worldKey); }
+}
 
+async function inferCommunity(ctx, store, { worldKey, profileId, customApi, owner, language, excludeTags }) {
     const charName = owner || ctx.name2 || '主角';
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
     const notes = await buildInjectedNotes(ctx);
@@ -1199,8 +1209,12 @@ async function ensureCommunity(ctx, store, { worldKey, profileId, customApi, own
     logContextShape('所属推断', userContent, notes.keys);
     const systemPrompt = PROMPT_O.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('community', language));
 
+    // 回滚纪元闸(2026-08-31 整体review P1-1 回填):所属结果永久缓存、只能靠改組重推,
+    // 更不该把照着回滚前正文推出的所属冻结进去——九条落账路径里此前唯独它没有这道闸。
+    const epoch = store.getRollbackEpoch();
     const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
     if (!parsed || !parsed.name) return null;
+    if (store.getRollbackEpoch() !== epoch) return null;
 
     const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
     const payload = {
@@ -1331,7 +1345,7 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
                 // 私聊里非 me 一律归位成对面那位;群聊保留成员 id
                 threadId, sender: m.sender === 'me' ? 'me' : (isGroup ? String(m.sender) : threadId),
                 text: String(m.text),
-                delayMin: Number.isFinite(m.delayMin) ? m.delayMin : 0, read: m.read !== false,
+                delayMin: Number.isFinite(m.delayMin) ? m.delayMin : 0, read: !(m.read === false || m.read === 'false'),
                 worldTime: times[i],
             };
             { const z = cleanZh(m.zh, m.text, language); if (z) payload.zh = z; } // ja_zh 档才要求 LLM 给,zh 档天然缺失,渲染层容错
@@ -1399,7 +1413,7 @@ async function runThreadContinue(ctx, store, { worldKey, threadId, floorWindow, 
         const payload = {
             threadId, sender: m.sender === 'me' ? 'me' : (isGroup ? String(m.sender) : threadId),
             text: String(m.text),
-            delayMin: Number.isFinite(m.delayMin) ? m.delayMin : 0, read: m.read !== false,
+            delayMin: Number.isFinite(m.delayMin) ? m.delayMin : 0, read: !(m.read === false || m.read === 'false'),
             worldTime: times[i],
         };
         { const z = cleanZh(m.zh, m.text, language); if (z) payload.zh = z; }
@@ -1784,7 +1798,7 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
 
         const payload = {
             accountId, handle: String(a.handle), displayName: String(a.displayName || a.handle),
-            bio: a.bio || '', locked: !!a.locked,
+            bio: a.bio || '', locked: a.locked === true || a.locked === 'true', // 模型偶给字符串 "false",!! 会反着记
         };
         if (ownerRole) payload.ownerRole = ownerRole;
         else if (castName) payload.castName = castName;
