@@ -160,9 +160,13 @@
     padding: 30px; text-align: center; font-size: 13px; color: var(--or-cocoa-light); line-height: 1.6;
 }
 
+/* ── home 屏(任务书-M8):时钟组件 + app 网格 + 音乐组件共用的滚动容器。三者都可能不渲染——
+   空字符串不占位,.or-home 自己撑满屏幕区、内容不足时也不会露出奇怪的空白结构。 ── */
+.or-home { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+
 /* ── app 网格 ── */
 .or-grid {
-    flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, 1fr);
+    flex-shrink: 0; display: grid; grid-template-columns: repeat(3, 1fr);
     gap: 24px 14px; padding: 28px 22px; align-content: start;
 }
 .or-app {
@@ -204,6 +208,102 @@
     width: 11px; height: 11px; border-radius: 50%;
     background: var(--or-cocoa); border: 2px solid var(--or-cream); z-index: 3;
 }
+
+/* ── 任务书-M8 §2:桌面时钟组件。四主题共用同一份 HTML(.or-clock > .or-clock-box + .or-clock-date),
+   气质差异全部交给下面各 [data-theme] 覆写——不可点、无交互,纯展示。 ── */
+.or-clock { flex-shrink: 0; text-align: center; padding: 22px 20px 2px; }
+.or-clock-box { position: relative; display: inline-block; }
+.or-clock-time { font-size: 40px; font-weight: 600; color: var(--or-cocoa); line-height: 1; }
+.or-clock-date { margin-top: 7px; font-size: 11px; color: var(--or-cocoa-light); letter-spacing: .1em; }
+
+/* mono:Didone 味的衬线大数字(系统字体近似,不烧字体文件),日期加宽字距、纯黑白灰。 */
+.or-root[data-theme="mono"] .or-clock-time {
+    font-family: Georgia, "Times New Roman", serif; font-size: 54px; font-weight: 400; letter-spacing: -.01em;
+}
+.or-root[data-theme="mono"] .or-clock-date { letter-spacing: .34em; font-weight: 600; }
+
+/* seasalt:圆润棕色数字,盐蓝小圆点当点缀(纯色块,不用渐变)。 */
+.or-root[data-theme="seasalt"] .or-clock-time { font-weight: 800; }
+.or-root[data-theme="seasalt"] .or-clock-date { position: relative; padding-left: 12px; }
+.or-root[data-theme="seasalt"] .or-clock-date::before {
+    content: ''; position: absolute; left: 0; top: 50%; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--or-salt-deep); transform: translateY(-50%);
+}
+
+/* lunar:像素感数字(等宽字体 + 步进 text-shadow 描边近似像素锯齿),淡蓝主色;整体尺寸收敛些——
+   lunar 走 A 布局,时钟别抢下方音乐卡的戏。日期收进一枚小胶囊;粉色像素月亮缀在数字右上角。 */
+.or-root[data-theme="lunar"] .or-clock { padding: 16px 20px 2px; }
+.or-root[data-theme="lunar"] .or-clock-time {
+    font-family: "Courier New", monospace; font-size: 30px; font-weight: 700; color: var(--or-cocoa-light);
+    text-shadow: 1.5px 0 0 var(--or-salt), 0 1.5px 0 var(--or-salt);
+}
+/* display:table 而不是 inline-block:胶囊要像块级一样独占一行(inline-block 会在时钟数字不够宽时
+   跟它挤上同一行——mono/seasalt 只是"碰巧"被大数字顶下去的),又要像 inline 一样收缩到内容宽,
+   table + margin:auto 两者兼得。 */
+.or-root[data-theme="lunar"] .or-clock-date {
+    display: table; margin: 8px auto 0; padding: 3px 12px; border-radius: 999px;
+    background: var(--or-white); color: var(--or-salt-deep); font-family: "Courier New", monospace;
+}
+.or-root[data-theme="lunar"] .or-clock-moon { position: absolute; top: -8px; right: -16px; color: var(--or-salt-deep); }
+.or-root[data-theme="lunar"] .or-clock-moon svg { width: 14px; height: 14px; display: block; }
+
+/* magic:金棕衬线数字,细线纹饰框——border 圈住数字本体,两侧一枚菱形角饰(伪元素),简化版 magic-B。 */
+.or-root[data-theme="magic"] .or-clock-box {
+    padding: 8px 26px; border: 1.4px solid var(--or-salt-deep); border-radius: 3px;
+}
+.or-root[data-theme="magic"] .or-clock-box::before, .or-root[data-theme="magic"] .or-clock-box::after {
+    content: ''; position: absolute; top: 50%; width: 6px; height: 6px;
+    background: var(--or-salt-deep); transform: translateY(-50%) rotate(45deg);
+}
+.or-root[data-theme="magic"] .or-clock-box::before { left: -4px; }
+.or-root[data-theme="magic"] .or-clock-box::after { right: -4px; }
+.or-root[data-theme="magic"] .or-clock-time { font-family: Georgia, "Times New Roman", serif; font-size: 38px; color: var(--or-salt-deep); font-weight: 700; }
+.or-root[data-theme="magic"] .or-clock-date { letter-spacing: .2em; font-family: Georgia, serif; }
+
+/* ── 任务书-M8 §3:音乐组件——有 nowPlaying 才渲染,零交互(无播放键、进度线纯装饰不联动)。
+   mono/seasalt 用底部胶囊(margin-top:auto 把它顶到 .or-home 底部,紧贴 homebar 之上);
+   lunar/magic 用图标网格下方的通栏卡(就地跟在 .or-grid 后面,不强行顶到底部)。 ── */
+.or-music-capsule {
+    flex-shrink: 0; margin: 8px 22px 4px; margin-top: auto; padding: 8px 16px 8px 8px;
+    border-radius: 999px; display: flex; align-items: center; gap: 10px;
+    border: 1px solid var(--or-cocoa-light); background: var(--or-white);
+}
+.or-music-disc { position: relative; width: 24px; height: 24px; border-radius: 50%; background: var(--or-cocoa); flex-shrink: 0; }
+.or-music-disc::before { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: var(--or-cream); }
+.or-music-disc::after { content: ''; position: absolute; inset: 9.5px; border-radius: 50%; background: var(--or-salt-deep); }
+.or-music-capsule .or-music-title {
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 12.5px; color: var(--or-cocoa);
+}
+.or-music-loop { display: inline-flex; color: var(--or-cocoa-light); flex-shrink: 0; }
+.or-music-loop svg { width: 15px; height: 15px; }
+
+.or-music-card {
+    position: relative; flex-shrink: 0; margin: 4px 20px 20px; padding: 14px;
+    border-radius: 18px; display: flex; align-items: center; gap: 12px; background: var(--or-cream-2);
+}
+.or-music-cover {
+    flex-shrink: 0; width: 52px; height: 52px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+}
+.or-music-cover svg { width: 30px; height: 30px; }
+.or-music-info { flex: 1; min-width: 0; }
+.or-music-card .or-music-title {
+    font-size: 13px; color: var(--or-cocoa); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* 静态细进度线:纯装饰,不动画不联动——固定停在一个位置,不假装它在播放。 */
+.or-music-progress { position: relative; margin-top: 10px; height: 2px; border-radius: 1px; background: var(--or-cream); }
+.or-music-progress::after {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 38%; border-radius: 1px;
+    background: var(--or-salt-deep);
+}
+.or-music-card .or-music-loop { position: absolute; top: 12px; right: 14px; }
+
+.or-root[data-theme="mono"] .or-music-capsule { border-color: var(--or-cocoa); background: var(--or-white); }
+.or-root[data-theme="seasalt"] .or-music-capsule { background: var(--or-cream); border-color: var(--or-cocoa-light); }
+.or-root[data-theme="lunar"] .or-music-cover { background: var(--or-salt); color: var(--or-salt-deep); }
+.or-root[data-theme="magic"] .or-music-card { border: 1.4px solid var(--or-salt-deep); background: var(--or-cream); }
+.or-root[data-theme="magic"] .or-music-cover { background: var(--or-cream-2); color: var(--or-cocoa-light); border: 1px solid var(--or-salt-deep); }
 
 /* ── 通用药丸按钮(刷新 / 生成更多复用) ── */
 .or-pill-btn {

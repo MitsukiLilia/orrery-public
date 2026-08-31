@@ -159,6 +159,9 @@ export function anonIdFor(threadId, key) {
  *   edit 指向不存在的 noteId(理论上不该发生,防御性处理同下面「一条畸形记录」的哲学)→ 跳过 + console.warn。
  * 以上两者同样不碰 threads/forumThreads/tweets/searches/visits/worldNow/forumNow/snsNow/browserNow。
  * community: 所属对象或 null(app='world' type='community',一世界一条,后写覆盖=只留最新,同 snsSuggest)。
+ * nowPlaying: { title, ts } 或 null(app='world' type='now_playing',一世界一条,后写覆盖=只留最新一首——
+ *   同 community 的语义。心境没变时模型省略这个字段=不写入新条目,fold 出来的自然还是上一首,不需要
+ *   额外的"沿用"逻辑——这就是"省略=沿用上一首"在账本层面的全部实现,M8 桌面小组件的音乐组件用它。
  * notices: noticeId -> { noticeId, title, body, zh?, signedBy, worldTime },M5 论坛公告——worldTime 参与
  *   forumNow 推进(它是论坛活动),置顶(前 3 条)与折叠规则在渲染层算,fold 只原样收着不作取舍。
  * follows: { omote: Set<accountId>, ura: Set<accountId> }——M6 关注表,按账本顺序回放 sns_follow
@@ -182,6 +185,7 @@ export function foldWorld(entries) {
     const snapshots = new Map();  // v0.14 网页快照:visitId -> web_snapshot(一 visit 一张,后写覆盖)
     let snsSuggest = null;        // v0.14 搜索联想:整批一条,后写覆盖=只留最新一批
     let community = null;         // M5 所属:一世界一条,后写覆盖=只留最新(同 snsSuggest 的语义)
+    let nowPlaying = null;        // M8 单曲循环:一世界一条,后写覆盖=只留最新一首(同 community 的语义)
     const notices = new Map();    // M5 公告:noticeId -> notice,置顶规则在渲染层算,fold 只管原样收着
     const follows = { omote: new Set(), ura: new Set() }; // M6 关注表:by 分两套,follow/unfollow 按账本顺序回放
 
@@ -263,6 +267,8 @@ export function foldWorld(entries) {
             snsSuggest = { ...e.payload, ts: e.ts };
         } else if (e.type === 'community') {
             community = { ...e.payload, sourceFloor: e.sourceFloor, ts: e.ts }; // 后写覆盖=只留最新
+        } else if (e.type === 'now_playing') {
+            nowPlaying = { title: e.payload.title, ts: e.ts }; // 后写覆盖=只留最新一首,同 community 的语义
         } else if (e.type === 'notice') {
             notices.set(e.payload.noticeId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'photo') {
@@ -371,6 +377,7 @@ export function foldWorld(entries) {
         photos, galleryNow: galleryNow || null,
         memos, memoNow: memoNow || null,
         community, notices, // M5:所属(对象或 null)+ 公告表
+        nowPlaying, // M8:{ title, ts } 或 null,见上方长注
         follows, // M6:{ omote: Set, ura: Set } 关注表
         worldClock, // M7c:整部手机六个 app 共用的「现在」,见上方长注
     };

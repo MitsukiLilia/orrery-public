@@ -240,7 +240,7 @@
     function withZhBody(body) { return langIsJaZh() ? { body, zh: `（中译）${body}` } : { body }; }
 
     function buildFixtureA() {
-        return { worldTime: '2026-08-10 22:15', threads: [
+        return { worldTime: '2026-08-10 22:15', nowPlaying: { title: '夜行バス' }, threads: [
             { threadId: 'c_aiko', newContact: { contactId: 'c_aiko', name: '愛子', relation: '高中同班同学' },
               messages: [
                   { sender: 'me', ...withZh('到家了'), delayMin: 0, read: true },

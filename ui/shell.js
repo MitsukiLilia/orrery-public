@@ -17,12 +17,13 @@ import {
 } from '../core/generator.js';
 import { manualRevert } from '../core/rollback.js';
 import { escapeHtml } from '../core/escape.js';
-import { formatClock } from '../core/worldtime.js';
+import { formatClock, formatClockDate } from '../core/worldtime.js';
 import {
     ICON_BACK, ICON_CHEVRON_RIGHT, ICON_CHECK, ICON_MINUS, ICON_PLUS, ICON_CLOSE,
     ICON_APP_MESSENGER, ICON_APP_SETTINGS, ICON_APP_FORUM, ICON_APP_MEMO, ICON_APP_SNS, ICON_APP_GALLERY,
     ICON_APP_BROWSER,
     ICON_HUD_STARS, ICON_HUD_RING, ICON_STAR, ICON_STAR_FILL, dotPatternDataUri, scallopWaveDataUri,
+    ICON_LOOP, ICON_PIXEL_MOON,
 } from './icons.js';
 import { renderThreadListHtml, renderThreadHtml, MESSENGER_SKIN_URL } from '../apps/messenger/app.js';
 import { renderForumListHtml, renderForumThreadHtml, FORUM_SKIN_URL } from '../apps/forum/app.js';
@@ -85,6 +86,44 @@ function renderGridHtml(dots, theme) {
             <div class="or-app-icon">${a.icon}<img class="or-app-img" src="${iconAssetUrl(theme, a.id)}" alt="" onerror="this.remove()"></div>${dots[a.id] ? '<span class="or-app-badge"></span>' : ''}
             <span class="or-app-label">${a.label}</span>
         </button>`).join('')}</div>`;
+}
+
+// 任务书-M8 §2:桌面时钟组件,四主题都有、常驻在图标网格上方——纯展示,不可点、无跳转。
+// worldClock 为 null(空世界/未认主)时整个组件不渲染,桌面保持现状,不留空位。HH:MM 与日期都来自
+// core/worldtime.js 的共用格式化,四主题的气质差异全部交给 CSS([data-theme] 分主题写),这里只在
+// lunar 主题下多缀一枚像素月亮(纯装饰,任务书要求的"旁缀一枚粉色像素月亮")。
+function renderClockHtml(worldClock, theme) {
+    if (!worldClock) return '';
+    const moon = theme === 'lunar' ? `<span class="or-clock-moon">${ICON_PIXEL_MOON}</span>` : '';
+    return `<div class="or-clock">
+        <div class="or-clock-box">${moon}<span class="or-clock-time">${escapeHtml(formatClock(worldClock))}</span></div>
+        <div class="or-clock-date">${escapeHtml(formatClockDate(worldClock))}</div>
+    </div>`;
+}
+
+// 任务书-M8 §3:音乐组件——有 nowPlaying 才渲染,没有则整个不出现(桌面=时钟+图标)。纯展示,
+// 无播放键、无进度联动、不进 seen/星标体系。mono/seasalt 用底部胶囊(B 式);lunar/magic 用图标网格
+// 下方的通栏卡(A 式)。封面块与进度线全是 CSS/SVG 近似,不烧图;循环图标复用同一份 ICON_LOOP。
+// magic 的封面直接借用 ICON_APP_BROWSER(手绘星盘)——它本来就是"星盘感圆环星形"的现成图形。
+function renderNowPlayingHtml(nowPlaying, theme) {
+    if (!nowPlaying?.title) return '';
+    const title = escapeHtml(nowPlaying.title);
+    if (theme === 'mono' || theme === 'seasalt') {
+        return `<div class="or-music-capsule">
+            <span class="or-music-disc"></span>
+            <span class="or-music-title">${title}</span>
+            <span class="or-music-loop">${ICON_LOOP}</span>
+        </div>`;
+    }
+    const cover = theme === 'lunar' ? ICON_PIXEL_MOON : ICON_APP_BROWSER;
+    return `<div class="or-music-card">
+        <div class="or-music-cover">${cover}</div>
+        <div class="or-music-info">
+            <div class="or-music-title">${title}</div>
+            <div class="or-music-progress"></div>
+        </div>
+        <span class="or-music-loop">${ICON_LOOP}</span>
+    </div>`;
 }
 
 function renderSettingsHtml(s, profileLabel, owner) {
@@ -309,7 +348,7 @@ export function createShell(ctx, onExternalChange) {
     // ── 滚动位置:整屏 innerHTML 重建会把 scrollTop 抹成 0。不接管的话,酒馆来个事件、
     // 长按删一条、调一下条数,她正在读的位置就被弹回顶部(她 2026-08-14 报的第 2 点)。
     // 规则:同一块屏幕重渲染 → 原地保持;刚进屋 / 刚生成完 → 跳到新内容分界线。 ──
-    const SCROLLERS = '.or-chat-scroll, .or-forum-scroll, .or-thread-list, .or-forum-list, .or-browser-list, .or-list, .or-grid, '
+    const SCROLLERS = '.or-chat-scroll, .or-forum-scroll, .or-thread-list, .or-forum-list, .or-browser-list, .or-list, .or-home, '
         + '.or-gallery-list, .or-memo-list, .or-gallery-detail-scroll, .or-memo-detail-scroll, .or-sns-list, .or-sns-scroll, .or-aster-list, '
         + '.or-sns-suggest-list, .or-webpage-body';
     function screenKey(top) {
@@ -388,7 +427,10 @@ export function createShell(ctx, onExternalChange) {
                 gallery: watermarks.gallery < tip || hasUnseenInApp('gallery', world, seen),
                 memo: watermarks.memo < tip || hasUnseenInApp('memo', world, seen),
             };
-            screenEl.innerHTML = renderGridHtml(dots, settings().theme || 'seasalt');
+            // M8:时钟(顶)+ 图标网格 + 音乐组件(底)一起装进 .or-home 这个滚动容器——
+            // 三者都可能不渲染(空世界的时钟、没有 nowPlaying 的音乐),空字符串不占位,桌面保持现状。
+            const homeTheme = settings().theme || 'seasalt';
+            screenEl.innerHTML = `<div class="or-home">${renderClockHtml(world.worldClock, homeTheme)}${renderGridHtml(dots, homeTheme)}${renderNowPlayingHtml(world.nowPlaying, homeTheme)}</div>`;
         } else if (top.type === 'messenger-list') {
             screenEl.innerHTML = renderThreadListHtml({ world, busy: busy.messenger, seen, justUpdated, worldNow: world.worldClock });
         } else if (top.type === 'messenger-thread') {

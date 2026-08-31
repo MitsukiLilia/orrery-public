@@ -43,3 +43,14 @@ export function formatFullTime(ts) {
     const d = new Date(ts);
     return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
+
+// M8 桌面小组件收编:大钟下方那行日期,四主题共用同一份文字(WEEKDAY M.D,如「MON 7.22」)——
+// 主题气质的差异全部交给 CSS(mono 加宽字距、lunar 收进像素胶囊、magic 套纹饰框),不在这里
+// 分叉出六份格式,同 M7c 收编 formatClock 时的道理。
+const WEEKDAY_ABBR = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+/** WEEKDAY M.D,如「MON 7.22」——ui/shell.js 的时钟组件用,四主题共用同一份文字。 */
+export function formatClockDate(ts) {
+    const d = new Date(ts);
+    return `${WEEKDAY_ABBR[d.getDay()]} ${d.getMonth() + 1}.${d.getDate()}`;
+}
