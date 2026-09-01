@@ -76,6 +76,10 @@ export const ICON_SEND = '<svg viewBox="0 0 24 24"><path d="M4 12 19.5 4.5 15 19
 // 就是全部语义,不需要真的会转。一份 SVG 四主题共用,着色交给 CSS currentColor(任务书 §3)。
 export const ICON_LOOP = '<svg viewBox="0 0 24 24"><path d="M6 8h9.5a3 3 0 0 1 3 3v1.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="m15.8 6.3 2.7 1.7-2.7 1.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 16h-9.5a3 3 0 0 1-3-3v-1.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="m8.2 17.7-2.7-1.7 2.7-1.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
+// M10 导出图片:下载箭头——竖线+向下箭头指向底部横杠(托盘),手绘写意"存到本地"的通用意象,
+// 论坛/消息线程头 + 网页快照头三处导出入口共用同一份(ui/exporter.js 消费不到图标,纯 UI 层)。
+export const ICON_EXPORT = '<svg viewBox="0 0 24 24"><path d="M12 4v10.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m8 11 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 16.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 // M8 桌面小组件(月夜专属):像素感弯月——方角描边围出一弯缺口,呼应「像素感数字」的月夜气质,
 // 不追求真实月相,只取"方块拼出的月牙"这一眼印象。时钟旁的小缀饰与音乐卡封面块共用同一份。
 export const ICON_PIXEL_MOON = '<svg viewBox="0 0 16 16"><rect x="6" y="2" width="2" height="2" fill="currentColor"/><rect x="8" y="2" width="2" height="2" fill="currentColor"/><rect x="4" y="4" width="2" height="2" fill="currentColor"/><rect x="4" y="6" width="2" height="4" fill="currentColor"/><rect x="4" y="10" width="2" height="2" fill="currentColor"/><rect x="6" y="12" width="2" height="2" fill="currentColor"/><rect x="8" y="12" width="2" height="2" fill="currentColor"/></svg>';

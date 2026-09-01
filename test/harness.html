@@ -139,6 +139,21 @@
         </fieldset>
 
         <fieldset>
+            <legend>5. M10 导出断言:三个模板构建器(照任务书-M10 §6 的四条对应,纯函数、不碰 DOM——node --input-type=module 也能跑同一份逻辑,这里在浏览器里再跑一遍)</legend>
+            <button class="mock-btn" id="runM10AssertBtn">运行全部断言</button>
+            <div id="m10AssertResult">(未运行)</div>
+        </fieldset>
+
+        <fieldset>
+            <legend>M10 导出:手动触发完整管线(vendor 懒加载注入 → domToPng → 出图,供真机/CDP 验收用;三个按钮各走一条 fixture,后两个都带"跳选一条"验证「⋯」分隔与楼号/时间戳重算)</legend>
+            <button class="mock-btn" id="m10ExportWebBtn">导出网页快照</button>
+            <button class="mock-btn" id="m10ExportForumBtn">导出论坛选楼(跳选中间一楼)</button>
+            <button class="mock-btn" id="m10ExportMessengerBtn">导出消息选段(跳选中间一条)</button>
+            <div id="m10ExportStatus" class="note" style="margin:6px 0 0;">(未触发)</div>
+            <div id="m10ExportPreview" style="margin-top:8px;"></div>
+        </fieldset>
+
+        <fieldset>
             <legend>当前状态</legend>
             <button class="mock-btn" id="refreshStateBtn">刷新状态 + 账本(手机内点了刷新/生成更多/反悔之后手动点一下)</button>
             <div id="state">(加载中)</div>
@@ -179,6 +194,10 @@
     import { computeWorldKey, inheritedWorldKey, isIntraVisit, foldWorld } from '../core/world.js';
     import { composeSnapshotHtml, sanitizeSnapshotHtml } from '../apps/browser/app.js';
     import { escapeHtml } from '../core/escape.js';
+    import {
+        buildForumExportHtml, buildMessengerExportHtml, buildWebExportHtml,
+        exportWebSnapshot, exportForumThread, exportMessengerThread,
+    } from '../ui/exporter.js';
 
     function log(msg) {
         const el = document.getElementById('log');
@@ -865,6 +884,188 @@
             document.getElementById('m9AssertResult').textContent = `断言运行出错:${err?.message || err}`;
             console.error('[M9 断言]', err);
         });
+    });
+
+    // ── M10 §6:三个模板构建器的断言(不碰 DOM 的纯函数,node --input-type=module 也能跑同一份
+    // 逻辑;这里在浏览器里再跑一遍主要是③——buildWebExportHtml 里的 sanitizeSnapshotHtml 靠真实
+    // DOMParser 才会真的执行消毒,node 环境下 DOMParser 不存在,sanitizeSnapshotHtml 会直接退回
+    // 空字符串,那条断言在 node 侧是"平凡为真",在这里才是真正跑到消毒逻辑本身)。──
+
+    function assertM10Forum() {
+        const world = {
+            boards: new Map([['b1', { boardId: 'b1', name: '杂谈' }]]),
+            residents: new Map([['r1', { residentId: 'r1', handle: '住民甲' }]]),
+            community: { name: '测试所属' },
+        };
+        const thread = {
+            threadId: 't1', boardId: 'b1', title: '测试帖', body: '正文', worldTime: Date.now(), authorId: 'r1',
+            replies: [
+                { ts: 100, worldTime: 1000, body: '一楼', authorId: 'r1' },
+                { ts: 200, worldTime: 2000, body: '二楼(应被跳过)', authorId: 'r1' },
+                { ts: 300, worldTime: 3000, body: '三楼', authorId: 'r1' },
+                { ts: 400, worldTime: 4000, body: '四楼(应被跳过)', authorId: 'r1' },
+            ],
+        };
+        const html = buildForumExportHtml({ thread, world, selectedSeqs: new Set(['op', 100, 300]), forumNow: Date.now() });
+        return [
+            ['①跳选间隙插入「⋯(略)⋯」', html.includes('⋯(略)⋯')],
+            ['①楼号保持原始序号(1F/3F,不重排成1F/2F)', html.includes('1F') && html.includes('3F') && !html.includes('2F') && !html.includes('4F')],
+        ];
+    }
+
+    function assertM10Messenger() {
+        const world = { contacts: new Map([['c1', { contactId: 'c1', name: '小满', color: '#C7D7E1', monogram: '小' }]]) };
+        const thread = {
+            threadId: 'c1', kind: 'dm', contactId: 'c1',
+            messages: [
+                { ts: 1, displayTs: 1000, sender: 'c1', text: '第一条' },
+                { ts: 2, displayTs: 2000, sender: 'c1', text: '第二条(应被跳过)' },
+                { ts: 3, displayTs: 3000, sender: 'c1', text: '第三条' },
+            ],
+        };
+        // 三条同一分钟、同一发送者:全选时会正确折叠成只显示最后一条时间(负控制),
+        // 但第二条被跳选之后,第一条与第三条已经不再"紧挨着连发",必须都显示时间——
+        // 在选中子集上重算,不是照抄全量渲染算好的显隐状态(任务书 §3.3)。
+        const htmlSkip = buildMessengerExportHtml({ thread, world, selectedSeqs: new Set([1, 3]), worldNow: Date.now() });
+        const htmlFull = buildMessengerExportHtml({ thread, world, selectedSeqs: null, worldNow: Date.now() });
+        const metaSkip = (htmlSkip.match(/class="or-msg-meta"/g) || []).length;
+        const metaFull = (htmlFull.match(/class="or-msg-meta"/g) || []).length;
+        return [
+            ['②跳选间隙插入「⋯」', htmlSkip.includes('>⋯<')],
+            ['②在选中子集上重算(跳选后 2 条时间行都出现)', metaSkip === 2],
+            ['②负控制:真正连续的连发仍正确折叠(全选时只 1 条时间行)', metaFull === 1],
+        ];
+    }
+
+    function assertM10Web() {
+        const visit = { visitId: 'v1', title: '测试页', worldTime: Date.now() };
+        const snapshot = {
+            visitId: 'v1', url: 'https://intra.example.local/x', worldTime: Date.now(),
+            // 危险标签拆开写(同上面 assertComposeAndSanitize 的注释:完整闭合写法连着出现会截断这个内联 script 标签本体)。
+            html: '<div>正常内容</div><scr' + 'ipt>alert(1)' + '<' + '/script>',
+        };
+        const html = buildWebExportHtml({ visit, snapshot, appends: [] });
+        return [
+            ['③消毒生效后输出不含 <script', !html.includes('<script')],
+        ];
+    }
+
+    function assertM10Xss() {
+        const world = { boards: new Map(), residents: new Map(), community: null };
+        const thread = {
+            threadId: 't2', boardId: null, title: '恶意楼层测试', body: '正文', worldTime: Date.now(),
+            replies: [{ ts: 1, worldTime: 1000, body: '<img src=x onerror="alert(1)">正常文字', authorId: 'r1' }],
+        };
+        const html = buildForumExportHtml({ thread, world, selectedSeqs: new Set(['op', 1]), forumNow: Date.now() });
+        return [
+            ['④楼层 body 的 <img 未被当真标签解析(escapeHtml 转义)', !html.includes('<img ')],
+            ['④转义后的 &lt;img 确实出现', html.includes('&lt;img')],
+        ];
+    }
+
+    async function runM10Assertions() {
+        const out = document.getElementById('m10AssertResult');
+        out.textContent = '运行中…';
+        const sections = [
+            ['①论坛跳选插「(略)」+ 原始楼号', assertM10Forum()],
+            ['②消息在选中子集上重算 meta', assertM10Messenger()],
+            ['③网页模板消毒(<script>)', assertM10Web()],
+            ['④XSS:楼层 <img onerror> 转义/拔除', assertM10Xss()],
+        ];
+        let allPass = true;
+        const lines = [];
+        for (const [title, checks] of sections) {
+            lines.push(`<b>${escapeHtml(title)}</b>`);
+            for (const [label, pass] of checks) {
+                if (!pass) allPass = false;
+                lines.push(`  <span class="${pass ? 'pass' : 'fail'}">${pass ? 'PASS' : 'FAIL'}</span> ${escapeHtml(label)}`);
+            }
+        }
+        out.innerHTML = lines.join('\n');
+        log(`M10 导出断言跑完:${allPass ? '全绿' : '有未过项,见断言面板'}`);
+    }
+
+    document.getElementById('runM10AssertBtn').addEventListener('click', () => {
+        runM10Assertions().catch(err => {
+            document.getElementById('m10AssertResult').textContent = `断言运行出错:${err?.message || err}`;
+            console.error('[M10 断言]', err);
+        });
+    });
+
+    // ── M10:手动触发完整导出管线(vendor 懒加载注入 → domToPng → 出图)——供真机/CDP 验收用,
+    // 走的是真实的 exportXxx 入口(不是纯函数那三个构建器),会真的往 document.body 挂离屏容器、
+    // 真的注入 ui/vendor/modern-screenshot.umd.js、真的截一张图出来。 ──
+    function m10ShowResult(result) {
+        const status = document.getElementById('m10ExportStatus');
+        const preview = document.getElementById('m10ExportPreview');
+        if (result === null) { status.textContent = '上一张还在生成(exporter 内部 busy 闸拦下了这次重入)'; return; }
+        if (!result.ok) { status.textContent = `导出失败:${result.error}`; preview.innerHTML = ''; return; }
+        status.textContent = `导出成功,dataUrl 长度 ${result.dataUrl.length}`;
+        preview.innerHTML = `<img src="${result.dataUrl}" style="max-width:320px;max-height:420px;border:1px solid #ccc;display:block;">`;
+    }
+
+    document.getElementById('m10ExportWebBtn').addEventListener('click', async () => {
+        document.getElementById('m10ExportStatus').textContent = '生成中…';
+        const visit = { visitId: 'v1', title: '测试页', worldTime: Date.now() };
+        const snapshot = {
+            visitId: 'v1', url: 'https://intra.example-office.local/keihi/detail?id=014', worldTime: Date.now(),
+            html: '<div style="padding:10px;font-family:sans-serif;"><h3 style="margin:0 0 8px;">M10 导出管线冒烟</h3>'
+                + '<p>这段网页正文用来验证整页长图导出:懒加载 vendor → 离屏容器 → domToPng → 出图预览。</p></div>',
+        };
+        try {
+            const result = await exportWebSnapshot({ visit, snapshot, appends: [], language: 'ja' });
+            m10ShowResult(result);
+        } catch (err) {
+            document.getElementById('m10ExportStatus').textContent = `抛出异常:${err?.message || err}`;
+            console.error('[M10 导出] 网页', err);
+        }
+    });
+
+    document.getElementById('m10ExportForumBtn').addEventListener('click', async () => {
+        document.getElementById('m10ExportStatus').textContent = '生成中…';
+        const world = {
+            boards: new Map([['b1', { boardId: 'b1', name: '杂谈' }]]),
+            residents: new Map([['r1', { residentId: 'r1', handle: '住民甲' }]]),
+            community: { name: '测试所属' },
+        };
+        const now = Date.now();
+        const thread = {
+            threadId: 't1', boardId: 'b1', title: 'M10 导出管线冒烟帖', body: '这是楼主正文,验证导出管线是否完整跑通。',
+            worldTime: now, authorId: 'r1',
+            replies: [
+                { ts: 100, worldTime: now - 30000, body: '一楼回复', authorId: 'r1' },
+                { ts: 200, worldTime: now - 20000, body: '二楼(将被跳选,验证「⋯(略)⋯」)', authorId: 'r1' },
+                { ts: 300, worldTime: now - 10000, body: '三楼回复', authorId: 'r1' },
+            ],
+        };
+        try {
+            const result = await exportForumThread({ thread, world, selectedSeqs: new Set(['op', 100, 300]), forumNow: now });
+            m10ShowResult(result);
+        } catch (err) {
+            document.getElementById('m10ExportStatus').textContent = `抛出异常:${err?.message || err}`;
+            console.error('[M10 导出] 论坛', err);
+        }
+    });
+
+    document.getElementById('m10ExportMessengerBtn').addEventListener('click', async () => {
+        document.getElementById('m10ExportStatus').textContent = '生成中…';
+        const world = { contacts: new Map([['c1', { contactId: 'c1', name: '小满', color: '#C7D7E1', monogram: '小' }]]) };
+        const now = Date.now();
+        const thread = {
+            threadId: 'c1', kind: 'dm', contactId: 'c1',
+            messages: [
+                { ts: 1, displayTs: now - 30000, sender: 'c1', text: '在吗' },
+                { ts: 2, displayTs: now - 20000, sender: 'c1', text: '(将被跳选,验证「⋯」与时间戳重算)' },
+                { ts: 3, displayTs: now - 10000, sender: 'me', text: '在的' },
+            ],
+        };
+        try {
+            const result = await exportMessengerThread({ thread, world, selectedSeqs: new Set([1, 3]), worldNow: now });
+            m10ShowResult(result);
+        } catch (err) {
+            document.getElementById('m10ExportStatus').textContent = `抛出异常:${err?.message || err}`;
+            console.error('[M10 导出] 消息', err);
+        }
     });
 
     document.querySelector('.panel').addEventListener('click', async (e) => {

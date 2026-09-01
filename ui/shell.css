@@ -490,3 +490,49 @@
 .or-aster-title { font-size: 13.5px; font-weight: 600; color: var(--or-cocoa); line-height: 1.45; }
 .or-aster-body { font-size: 12px; color: var(--or-cocoa-light); line-height: 1.55; margin-top: 3px; word-break: break-word; }
 .or-aster-gone { font-size: 12px; color: var(--or-cocoa-light); font-style: italic; }
+
+/* ── M10 导出图片:header 入口钮(同 or-back-btn 尺寸族,放线程/帖内/网页快照头) ── */
+.or-export-entry-btn {
+    width: 30px; height: 30px; border: none; background: none; color: var(--or-cocoa);
+    display: flex; align-items: center; justify-content: center; border-radius: 50%;
+    padding: 0; cursor: pointer; flex-shrink: 0;
+}
+.or-export-entry-btn:active { background: rgba(110, 90, 80, .08); }
+.or-export-entry-btn svg { width: 17px; height: 17px; }
+
+/* 导出选择模式:楼层/消息行套一层横排(圈在最前,原内容整块让到 -row-body 里)——
+   两处都复用同一对类名(论坛楼层/OP、消息行),不各写一份。 */
+.or-export-row { display: flex; align-items: flex-start; gap: 8px; }
+.or-forum-floor-row.or-export-row, .or-forum-op.or-export-row { padding-left: 4px; }
+.or-export-row-body { flex: 1; min-width: 0; }
+.or-export-check {
+    flex-shrink: 0; width: 20px; height: 20px; margin-top: 2px; border-radius: 50%;
+    border: 1.5px solid var(--or-cocoa-light); background: var(--or-white); color: var(--or-white);
+    display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
+}
+.or-export-check.on { background: var(--or-cocoa); border-color: var(--or-cocoa); }
+.or-export-check svg { width: 12px; height: 12px; }
+/* 消息行进入导出模式:.or-msg-row 平时是纵向堆叠(名字/气泡行/时间),这里横向铺开
+   (复选圈 + 内容整块),.me 侧也不镜像——复选圈永远在行首,方便自上而下扫视勾选。 */
+.or-msg-row.or-export-row { flex-direction: row; align-items: center; }
+
+/* ── M10 导出预览弹层:Shadow 内弹层(不是 ctx.callGenericPopup,那个在 shadow 外)。 ── */
+.or-export-preview {
+    position: absolute; inset: 0; z-index: 90;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.or-export-preview-backdrop { position: absolute; inset: 0; background: rgba(60, 50, 45, .55); }
+.or-export-preview-card {
+    position: relative; max-width: 100%; max-height: 100%; display: flex; flex-direction: column;
+    align-items: center; gap: 12px; background: var(--or-white); border-radius: 16px;
+    padding: 16px; box-shadow: 0 12px 40px var(--or-shadow);
+}
+/* 长图(整页快照/长对话)可能远比 60vh 高——外层滚动、img 自身按容器宽度等比缩放,
+   不能把 max-height 直接怼在 img 上(那样只会整张等比缩小塞进 60vh,而不是"可滚")。 */
+.or-export-preview-imgwrap {
+    max-width: 100%; max-height: 60vh; overflow-y: auto;
+    border-radius: 8px; border: 1px solid var(--or-cream-2);
+}
+.or-export-preview-img { display: block; width: 100%; height: auto; }
+.or-export-preview-actions { display: flex; gap: 10px; }
+.or-export-preview-hint { font-size: 11px; color: var(--or-cocoa-light); text-align: center; }

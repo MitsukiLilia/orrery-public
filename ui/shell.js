@@ -32,6 +32,7 @@ import { renderSnsTlHtml, renderSnsTweetHtml, renderSnsProfileHtml, renderSnsMyP
 import { renderBrowserHtml, renderWebPageHtml, BROWSER_SKIN_URL } from '../apps/browser/app.js';
 import { renderGalleryListHtml, renderGalleryPhotoHtml, GALLERY_SKIN_URL } from '../apps/gallery/app.js';
 import { renderMemoListHtml, renderMemoNoteHtml, MEMO_SKIN_URL } from '../apps/memo/app.js';
+import { exportWebSnapshot, exportForumThread, exportMessengerThread } from './exporter.js';
 
 const SHELL_CSS_URL = new URL('./shell.css', import.meta.url).href;
 
@@ -234,6 +235,12 @@ export function createShell(ctx, onExternalChange) {
     // 六个 app 的账、水位、prompt 本来就各走各的,锁也该各管各的
     // (M2 补 sns、M3 补 browser、M4 补 gallery/memo,照 forum 的接法)。
     const busy = { messenger: false, forum: false, sns: false, browser: false, gallery: false, memo: false };
+    // M10 导出:与上面的 LLM 生成锁完全独立(她 2026-09-01 点单「导出与生成互不相扰」)——
+    // 三把各管各,导出中不锁生成,生成中也不挡导出。exporter.js 内部另有自己的「一次只跑一张图」
+    // 闸(跨这三把之上的全局闸),这里只管"哪个按钮该转 spinner"这层 UI 状态。
+    const exportBusy = { web: false, forum: false, messenger: false };
+    let exportPreviewEl = null;     // 导出预览弹层(Shadow 内直接 append,不进 navStack/render 管线)
+    let exportPreviewData = null;   // { dataUrl, kind }——kind 用于「保存图片」时拼文件名
     let autoQueued = false;         // 生成锁占用期间被挡下的自动刷新,解锁后补跑一次(见 autoGenerate)
     let longPressTimer = null;
     let toastTimer = null;
@@ -446,6 +453,7 @@ export function createShell(ctx, onExternalChange) {
             screenEl.innerHTML = renderThreadHtml({
                 thread, world, busy: busy.messenger, worldNow: world.worldClock,
                 seenAt: top.seenAt, replyBatch: settings().threadReplyBatch,
+                exportMode: !!top.exportMode, exportSel: top.exportSel ?? null, exportBusy: exportBusy.messenger,
             });
             markSeenAfter = [seenKey, latestTsOfThread(thread)];
         } else if (top.type === 'forum-list') {
@@ -464,6 +472,7 @@ export function createShell(ctx, onExternalChange) {
             screenEl.innerHTML = renderForumThreadHtml({
                 thread, world, busy: busy.forum, forumNow: world.worldClock,
                 seenAt: top.seenAt, starred, replyBatch: settings().forumReplyBatch,
+                exportMode: !!top.exportMode, exportSel: top.exportSel ?? null, exportBusy: exportBusy.forum,
             });
             markSeenAfter = [seenKey, latestTsOfForumThread(thread)];
         } else if (top.type === 'sns-tl') {
@@ -544,7 +553,7 @@ export function createShell(ctx, onExternalChange) {
             if (!visit) { navStack = [{ type: 'grid' }]; return render(); } // 已被倒带清空
             screenEl.innerHTML = renderWebPageHtml({
                 visit, snapshot: world.snapshots.get(top.visitId), appends: world.snapshotAppends.get(top.visitId) || [],
-                community: world.community, busy: busy.browser, starred,
+                community: world.community, busy: busy.browser, starred, exportBusy: exportBusy.web,
             });
         } else if (top.type === 'asterism') {
             screenEl.innerHTML = renderAsterismHtml({ world, starred });
@@ -987,6 +996,214 @@ export function createShell(ctx, onExternalChange) {
         }
     }
 
+    // ── M10 导出图片(任务书-M10):网页整页长图 / 论坛选楼 / 消息选段。全程只读 world,
+    //    不往世界账本写任何东西——同星标先例,观测者侧操作合法(§0 的铁律边界)。 ──
+
+    const EXPORT_FAIL_TEXT = {
+        too_long: '内容太长,少选一些再导',
+        vendor_failed: '导出组件加载失败',
+        render_failed: '导出出错了,请再试一次',
+    };
+
+    // exporter.js 内部有自己的「一次只跑一张图」闸,重入直接 return null——这里统一翻译成她
+    // 能看懂的提示,失败/中止都不弹预览(§4:中止/失败留在选择模式里,不像成功那样自动退出)。
+    function handleExportResult(result) {
+        if (result === null) { showToast('上一张还在生成'); return null; }
+        if (!result.ok) { showToast(EXPORT_FAIL_TEXT[result.error] || '导出失败,请再试一次'); return null; }
+        return result.dataUrl;
+    }
+
+    async function doExportWebPage(visitId) {
+        if (!visitId || exportBusy.web) return;
+        const { world } = await currentWorld();
+        const visit = world.visits.get(visitId);
+        const snapshot = world.snapshots.get(visitId);
+        if (!visit || !snapshot) return; // 没内容导不出图(header 按钮本就只在有 snapshot 时才出现)
+        const appends = world.snapshotAppends.get(visitId) || [];
+        exportBusy.web = true;
+        await render();
+        try {
+            const result = await exportWebSnapshot({ visit, snapshot, appends });
+            const dataUrl = handleExportResult(result);
+            if (dataUrl) showExportPreview(dataUrl, 'web');
+        } finally {
+            exportBusy.web = false;
+            await render();
+        }
+    }
+
+    // 论坛/消息共用的 key 归一化:'op' 保持字符串,其余(楼层/消息的 ts)转成 number——
+    // 来源是 el.dataset.key(DOM 属性永远是字符串),不转型的话 Set.has() 会因为类型不等永远判假。
+    function normalizeExportKey(raw) {
+        return raw === 'op' ? 'op' : Number(raw);
+    }
+
+    function doForumExportToggle() {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'forum-thread') return;
+        top.exportMode = !top.exportMode;
+        top.exportSel = null; // 每次进/出都复位:再次进入永远从"默认全选"重新开始(任务书 §4)
+        render();
+    }
+
+    async function doForumExportPick(rawKey) {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'forum-thread' || !top.exportMode) return;
+        const key = normalizeExportKey(rawKey);
+        if (top.exportSel === null) {
+            const { world } = await currentWorld();
+            const thread = world.forumThreads.get(top.threadId);
+            if (!thread) return;
+            top.exportSel = new Set(['op', ...thread.replies.map(r => r.ts)]); // 材质化全集,再点掉这一个
+        }
+        if (top.exportSel.has(key)) top.exportSel.delete(key); else top.exportSel.add(key);
+        render();
+    }
+
+    async function doForumExportAll() {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'forum-thread' || !top.exportMode) return;
+        const { world } = await currentWorld();
+        const thread = world.forumThreads.get(top.threadId);
+        if (!thread) return;
+        const all = new Set(['op', ...thread.replies.map(r => r.ts)]);
+        const curSize = top.exportSel === null ? all.size : top.exportSel.size;
+        top.exportSel = curSize >= all.size ? new Set() : all; // 已全选→清空;否则→全选(简单的二态切换)
+        render();
+    }
+
+    async function doForumExportRun() {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'forum-thread' || !top.exportMode || exportBusy.forum) return;
+        const { world } = await currentWorld();
+        const thread = world.forumThreads.get(top.threadId);
+        if (!thread) return;
+        exportBusy.forum = true;
+        await render();
+        try {
+            const result = await exportForumThread({ thread, world, selectedSeqs: top.exportSel });
+            const dataUrl = handleExportResult(result);
+            if (dataUrl) {
+                top.exportMode = false; top.exportSel = null; // 成功弹预览后自动退出导出模式(任务书 §4)
+                showExportPreview(dataUrl, 'forum');
+            } // 中止/失败留在选择模式里,不动 exportMode/exportSel
+        } finally {
+            exportBusy.forum = false;
+            await render();
+        }
+    }
+
+    function doThreadExportToggle() {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'messenger-thread') return;
+        top.exportMode = !top.exportMode;
+        top.exportSel = null;
+        render();
+    }
+
+    async function doThreadExportPick(rawKey) {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'messenger-thread' || !top.exportMode) return;
+        const key = Number(rawKey);
+        if (top.exportSel === null) {
+            const { world } = await currentWorld();
+            const thread = world.threads.get(top.threadId);
+            if (!thread) return;
+            top.exportSel = new Set(thread.messages.map(m => m.ts));
+        }
+        if (top.exportSel.has(key)) top.exportSel.delete(key); else top.exportSel.add(key);
+        render();
+    }
+
+    async function doThreadExportAll() {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'messenger-thread' || !top.exportMode) return;
+        const { world } = await currentWorld();
+        const thread = world.threads.get(top.threadId);
+        if (!thread) return;
+        const all = new Set(thread.messages.map(m => m.ts));
+        const curSize = top.exportSel === null ? all.size : top.exportSel.size;
+        top.exportSel = curSize >= all.size ? new Set() : all;
+        render();
+    }
+
+    async function doThreadExportRun() {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'messenger-thread' || !top.exportMode || exportBusy.messenger) return;
+        const { world } = await currentWorld();
+        const thread = world.threads.get(top.threadId);
+        if (!thread) return;
+        exportBusy.messenger = true;
+        await render();
+        try {
+            const result = await exportMessengerThread({ thread, world, selectedSeqs: top.exportSel });
+            const dataUrl = handleExportResult(result);
+            if (dataUrl) {
+                top.exportMode = false; top.exportSel = null;
+                showExportPreview(dataUrl, 'messenger');
+            }
+        } finally {
+            exportBusy.messenger = false;
+            await render();
+        }
+    }
+
+    // 预览弹层直接挂进 root(Shadow 内,不是 ctx.callGenericPopup 那种 shadow 外的原生弹窗)——
+    // 不走 navStack/render() 管线,原地插入/移除,避免整屏重渲染把她刚看的图冲掉。
+    function showExportPreview(dataUrl, kind) {
+        closeExportPreview();
+        exportPreviewData = { dataUrl, kind };
+        const el = document.createElement('div');
+        el.className = 'or-export-preview';
+        el.innerHTML = `
+            <div class="or-export-preview-backdrop" data-action="export-preview-close"></div>
+            <div class="or-export-preview-card">
+                <div class="or-export-preview-imgwrap"><img class="or-export-preview-img" src="${dataUrl}" alt="导出预览"></div>
+                <div class="or-export-preview-actions">
+                    <button class="or-pill-btn" data-action="export-preview-save">保存图片</button>
+                    <button class="or-pill-btn small" data-action="export-preview-close">关闭</button>
+                </div>
+                <div class="or-export-preview-hint">也可以长按图片直接保存</div>
+            </div>`;
+        root.appendChild(el);
+        exportPreviewEl = el;
+    }
+    function closeExportPreview() {
+        exportPreviewEl?.remove();
+        exportPreviewEl = null;
+        exportPreviewData = null;
+    }
+
+    // dataURL → blob → a[download] 点击(任务书 §5):比直接给 <a href="data:...">更可靠,
+    // 部分移动端浏览器对超长 data: URL 的直接下载支持不稳定。文件名用真实时间——
+    // 这是观测者的文件系统,不是世界内的时间。kind 里 messenger 对应文件名前缀 chat(拟真:
+    // 手机相册导出的截图不会叫"messenger",这个映射只在存文件这一步生效)。
+    function dataUrlToBlob(dataUrl) {
+        const [header, base64] = dataUrl.split(',');
+        const mime = /data:(.*?);base64/.exec(header)?.[1] || 'image/png';
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return new Blob([bytes], { type: mime });
+    }
+    function doSaveExportPreview() {
+        if (!exportPreviewData) return;
+        const { dataUrl, kind } = exportPreviewData;
+        const filenameKind = kind === 'messenger' ? 'chat' : kind;
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+        const blob = dataUrlToBlob(dataUrl);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `orrery-${filenameKind}-${stamp}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
     // ── Asterism 星图(task-007 P0):观测者的收藏,点亮/熄灭——纯用户侧数据,世界毫无感知。──
     async function doToggleStar(key) {
         const worldKey = currentWorldKey();
@@ -1282,6 +1499,17 @@ export function createShell(ctx, onExternalChange) {
             case 'sns-search-word': doOpenSnsSearch(el.dataset.word); break;
             case 'open-web-page': doOpenWebPage(el.dataset.visitId); break;
             case 'webpage-refresh': doWebPageRefresh(el.dataset.visitId); break;
+            case 'export-web-page': doExportWebPage(el.dataset.visitId); break;
+            case 'forum-export-toggle': doForumExportToggle(); break;
+            case 'forum-export-pick': doForumExportPick(el.dataset.key); break;
+            case 'forum-export-all': doForumExportAll(); break;
+            case 'forum-export-run': doForumExportRun(); break;
+            case 'thread-export-toggle': doThreadExportToggle(); break;
+            case 'thread-export-pick': doThreadExportPick(el.dataset.key); break;
+            case 'thread-export-all': doThreadExportAll(); break;
+            case 'thread-export-run': doThreadExportRun(); break;
+            case 'export-preview-close': closeExportPreview(); break;
+            case 'export-preview-save': doSaveExportPreview(); break;
             case 'open-asterism': navPush({ type: 'asterism' }); break;
             case 'browser-refresh': doGenerateMoreBrowser(); break;
             case 'browser-select-tab': doBrowserSelectTab(el.dataset.tab); break;
@@ -1313,6 +1541,12 @@ export function createShell(ctx, onExternalChange) {
         saveSettings();
     }
 
+    // M10:导出选择模式下,消息行/论坛楼行的长按不该唤出反悔按钮或直接删除——那两个按钮此刻
+    // 本就没渲染(让位给复选圈),但长按计时器不认 DOM 有没有画那个按钮,不 guard 的话长按依旧会
+    // 弹出"删除这条/这楼"的确认框,跟她正在做的"选图"这件事完全无关。只读这一屏的顶层导航帧即可
+    // ——导出模式只存在于 messenger-thread/forum-thread 这两屏,判断用同一个字段。
+    function inExportMode() { return !!navStack[navStack.length - 1]?.exportMode; }
+
     // 长按 / 桌面右键:消息行=唤出反悔按钮;线程行=删除联系人/群;论坛帖行=删整帖;论坛楼行=删本楼及之后
     // (后两者跟线程行一样直接弹确认,不走"唤出按钮再点一次"那一步——反悔工法相同,UI 更省一步)。
     function onPointerDown(e) {
@@ -1329,6 +1563,7 @@ export function createShell(ctx, onExternalChange) {
         }
         const msgRow = e.target.closest('.or-msg-row');
         if (msgRow) {
+            if (inExportMode()) return; // 导出模式下长按不唤出反悔钮,点复选圈选/取消选就够了
             longPressTimer = setTimeout(() => msgRow.classList.add('show-revert'), 480);
             return;
         }
@@ -1350,6 +1585,7 @@ export function createShell(ctx, onExternalChange) {
         }
         const floorRow = e.target.closest('.or-forum-floor-row');
         if (floorRow) {
+            if (inExportMode()) return; // 同上:导出选楼时长按不该弹出"删除这楼"的确认框
             longPressTimer = setTimeout(() => {
                 suppressNextClick = true;
                 doForumRevertFloor(Number(floorRow.dataset.seq));
@@ -1418,6 +1654,7 @@ export function createShell(ctx, onExternalChange) {
         }
         const floorRow = e.target.closest('.or-forum-floor-row');
         if (floorRow) {
+            if (inExportMode()) return; // 导出选楼时右键不该弹出"删除这楼"的确认框
             e.preventDefault();
             doForumRevertFloor(Number(floorRow.dataset.seq));
             return;
@@ -1453,7 +1690,7 @@ export function createShell(ctx, onExternalChange) {
             return;
         }
         const row = e.target.closest('.or-msg-row');
-        if (!row) return;
+        if (!row || inExportMode()) return; // 导出选段时右键不唤出反悔钮
         e.preventDefault();
         root.querySelectorAll('.or-msg-row.show-revert').forEach(r => { if (r !== row) r.classList.remove('show-revert'); });
         row.classList.toggle('show-revert');
@@ -1527,6 +1764,7 @@ export function createShell(ctx, onExternalChange) {
         render();
     }
     function close() {
+        closeExportPreview(); // 手机收起时顺手清掉预览弹层,不留到下次开机还挂在那儿
         root?.classList.remove('open');
         setTimeout(() => { if (host) host.style.display = 'none'; }, 200);
     }

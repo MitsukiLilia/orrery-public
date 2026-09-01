@@ -1,7 +1,7 @@
 // 浏览器「Astrolabe」:纯渲染,不碰 ctx、不挂事件监听——事件委托统一在 ui/shell.js(同 forum/sns/messenger 的模式)。
 // 用户只读:零输入框,唯二操作走 shell 的 data-action(刷新/切 tab)+ 长按/右键反悔(两 tab 一起倒带)。
 // v1 没有详情页——搜索记录/浏览历史都是终点,没有 open-xxx 的事,行本身不可点击,只能长按。
-import { ICON_BACK, ICON_LOCK, ICON_SEARCH_SM, ICON_STAR, ICON_STAR_FILL } from '../../ui/icons.js';
+import { ICON_BACK, ICON_LOCK, ICON_SEARCH_SM, ICON_STAR, ICON_STAR_FILL, ICON_EXPORT } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
 import { starKeyForVisit, isIntraVisit } from '../../core/world.js';
 import { isSameDay, formatDateSep, formatClock } from '../../core/worldtime.js';
@@ -156,10 +156,16 @@ export function composeSnapshotHtml(html, appends) {
  * M9:appends 依次拼进正文(合成见 composeSnapshotHtml)后再消毒;内网页(isIntraVisit)在星标旁
  * 多一颗刷新钮——公共页没有「追記」这回事,不出现。
  */
-export function renderWebPageHtml({ visit, snapshot, appends = [], community, busy, starred = {} }) {
+export function renderWebPageHtml({ visit, snapshot, appends = [], community, busy, starred = {}, exportBusy = false }) {
     const starKey = starKeyForVisit(visit.visitId);
     const on = !!starred[starKey];
     const starBtn = snapshot ? `<button class="or-star ${on ? 'on' : ''}" data-action="toggle-star" data-star-key="${escapeHtml(starKey)}" title="${on ? '从星图移除' : '加入星图'}">${on ? ICON_STAR_FILL : ICON_STAR}</button>` : '';
+    // M10 导出:快照页不走选择模式(整页长图,没有"选一部分"这回事),星标旁直接一枚导出钮,
+    // 有快照才出现(没内容导不出图)。生成中把这枚按钮本身换成 spinner(任务书 §5),
+    // 不锁 refreshBtn/starBtn——导出与内网追記刷新互不相扰。
+    const exportBtn = snapshot
+        ? `<button class="or-export-entry-btn" data-action="export-web-page" data-visit-id="${escapeHtml(visit.visitId)}" title="导出图片" ${exportBusy ? 'disabled' : ''}>${exportBusy ? genSpinnerHtml() : ICON_EXPORT}</button>`
+        : '';
     const refreshBtn = (snapshot && isIntraVisit(visit, community))
         ? `<button class="or-pill-btn small" data-action="webpage-refresh" data-visit-id="${escapeHtml(visit.visitId)}" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : '刷新'}</button>`
         : '';
@@ -186,6 +192,7 @@ export function renderWebPageHtml({ visit, snapshot, appends = [], community, bu
             <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
             <span class="or-header-title">${escapeHtml(visit.title)}</span>
             ${refreshBtn}
+            ${exportBtn}
             ${starBtn}
         </div>
         <div class="or-browser-brand"><div class="or-browser-omnibox">

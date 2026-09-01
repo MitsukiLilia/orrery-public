@@ -1,6 +1,6 @@
 // 聊天软件:纯渲染,不碰 ctx、不挂事件监听——事件委托统一在 ui/shell.js(避免每次重渲染都叠加监听器)。
 // 既読渲染只认 payload.read,不做"最后一条 AI 消息之前都算已读"那套推导(与 Perigee 的差异点)。
-import { ICON_BACK, ICON_UNDO, ICON_MINUS, ICON_PLUS } from '../../ui/icons.js';
+import { ICON_BACK, ICON_UNDO, ICON_MINUS, ICON_PLUS, ICON_EXPORT, ICON_CHECK } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
 import {
     resolveSender, monogramFor, colorForContact,
@@ -14,7 +14,8 @@ export const MESSENGER_SKIN_URL = new URL('./skin.css', import.meta.url).href;
 // isSameDay/formatDateSep/formatClock 收进 core/worldtime.js(M7c §2)——六个 app 此前各揣一份
 // 一模一样的副本,现在都从那里 import。isSameMinute 是消息线程自己独有的判据(同一分钟内连发
 // 的气泡省略中间的时间戳),不在收编范围内,留在本地。
-function isSameMinute(ts1, ts2) {
+// M10 导出:ui/exporter.js 的消息模板在选中子集上重算这同一条折叠判据,故导出——两处不能各揣一份。
+export function isSameMinute(ts1, ts2) {
     return Math.floor(ts1 / 60000) === Math.floor(ts2 / 60000);
 }
 
@@ -82,18 +83,33 @@ export function renderThreadListHtml({ world, busy, seen = {}, justUpdated = nul
         ${body}`;
 }
 
+// M10 导出:消息行首的复选圈——与论坛楼层同款(见 apps/forum/app.js 的 exportCheckHtml),
+// 只是 key 永远是消息的 m.ts(消息没有 forum 那种固定 'op' 键)。
+function exportCheckHtml(key, selected) {
+    return `<button class="or-export-check ${selected ? 'on' : ''}" data-action="thread-export-pick" data-key="${key}">${selected ? ICON_CHECK : ''}</button>`;
+}
+
 /**
  * 单个线程的对话视图(私聊/群聊通用;群聊显示发送者名,既読只在私聊有意义)。
  * @param seenAt 进这条线程那一刻的 seen 水位——分界线画在它之后的第一条来信上,
  *   全程用这个**快照**而不是实时水位:进屋就把水位推到最新了,拿实时值分界线会当场消失。
  * @param replyBatch 「生成」按钮这一次要点单几条
+ * @param exportMode M10:导出选段模式——开着时每条消息行首挂一枚复选圈,反悔钮让位隐藏,
+ *   header 换成选择工具条,帖底生成按钮隐藏(避免误触发生成)。
+ * @param exportSel M10:null=默认全选;否则 Set(元素是消息的 m.ts)。
+ * @param exportBusy M10:导出图片正在生成(与 busy 的 LLM 生成锁互不相扰)。
  */
-export function renderThreadHtml({ thread, world, busy, worldNow, seenAt = 0, replyBatch = 3 }) {
+export function renderThreadHtml({
+    thread, world, busy, worldNow, seenAt = 0, replyBatch = 3,
+    exportMode = false, exportSel = null, exportBusy = false,
+}) {
     const isGroup = thread.kind === 'group';
     const title = isGroup
         ? `${thread.group.name}(${(thread.group.members || []).length})`
         : world.contacts.get(thread.threadId)?.name || '?';
     const msgs = thread.messages; // 全量渲染——summary 只影响 LLM 上下文,UI 不隐藏任何消息
+    const isSelected = (key) => exportSel === null || exportSel.has(key);
+    const selectedCount = exportSel === null ? msgs.length : exportSel.size;
     let body = '';
     let sepDone = false;
 
@@ -137,28 +153,39 @@ export function renderThreadHtml({ thread, world, busy, worldNow, seenAt = 0, re
             : '';
         const senderName = (isGroup && showAvatar && sender) ? `<div class="or-sender-name">${escapeHtml(sender.name)}</div>` : '';
         const zhLine = m.zh && m.zh !== m.text ? `<div class="or-zh">${escapeHtml(m.zh)}</div>` : '';
-        body += `<div class="or-msg-row ${isMe ? 'me' : ''}" data-seq="${m.ts}">`;
-        body += senderName;
-        body += `<div class="or-msg-line">${avatar}<div class="or-msg-col"><div class="or-bubble">${escapeHtml(m.text)}${zhLine}</div></div>`;
-        body += `<button class="or-msg-revert" data-action="revert" data-seq="${m.ts}" title="从这条起删除本线程之后的所有消息">${ICON_UNDO}</button></div>`;
-        body += meta;
-        body += `</div>`;
+        // 反悔钮在导出模式下让位给复选圈(任务书-M10 §4):同一行不能既能删又能选,
+        // 且导出全程只读 world,行内压根不该留一个会改账本的按钮。
+        const revertBtn = exportMode ? '' : `<button class="or-msg-revert" data-action="revert" data-seq="${m.ts}" title="从这条起删除本线程之后的所有消息">${ICON_UNDO}</button>`;
+        const rowInner = `${senderName}<div class="or-msg-line">${avatar}<div class="or-msg-col"><div class="or-bubble">${escapeHtml(m.text)}${zhLine}</div></div>${revertBtn}</div>${meta}`;
+        body += exportMode
+            ? `<div class="or-msg-row or-export-row ${isMe ? 'me' : ''}" data-seq="${m.ts}">${exportCheckHtml(m.ts, isSelected(m.ts))}<div class="or-export-row-body">${rowInner}</div></div>`
+            : `<div class="or-msg-row ${isMe ? 'me' : ''}" data-seq="${m.ts}">${rowInner}</div>`;
     }
 
     if (!msgs.length) body = `<div class="or-empty">这段聊天还是空的。</div>`;
 
-    return `
-        <div class="or-header">
+    // M10:导出模式的 header 换成三件套(取消/全选或清空/导出(N)),同论坛帖内页的做法。
+    const headerHtml = exportMode
+        ? `<div class="or-header">
+            <button class="or-pill-btn small" data-action="thread-export-toggle">取消</button>
+            <button class="or-pill-btn small" data-action="thread-export-all">${selectedCount >= msgs.length ? '清空' : '全选'}</button>
+            <button class="or-pill-btn" data-action="thread-export-run" ${selectedCount === 0 ? 'disabled' : ''}>${exportBusy ? genSpinnerHtml() : `导出(${selectedCount})`}</button>
+        </div>`
+        : `<div class="or-header">
             <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
             <span class="or-header-title">${escapeHtml(title)}</span>
-        </div>
+            <button class="or-export-entry-btn" data-action="thread-export-toggle" title="导出图片">${ICON_EXPORT}</button>
+        </div>`;
+
+    return `
+        ${headerHtml}
         <div class="or-chat-scroll">${body}</div>
-        <div class="or-chat-footer">
+        ${exportMode ? '' : `<div class="or-chat-footer">
             <div class="or-batch">
                 <button data-action="stepper" data-field="threadReplyBatch" data-delta="-1" ${busy ? 'disabled' : ''}>${ICON_MINUS}</button>
                 <span class="or-batch-value">${replyBatch}</span>
                 <button data-action="stepper" data-field="threadReplyBatch" data-delta="1" ${busy ? 'disabled' : ''}>${ICON_PLUS}</button>
             </div>
             <button class="or-pill-btn" data-action="generate-more" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : '生成消息'}</button>
-        </div>`;
+        </div>`}`;
 }

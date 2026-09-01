@@ -1,7 +1,7 @@
 // 论坛:纯渲染,不碰 ctx、不挂事件监听——事件委托统一在 ui/shell.js(同 apps/messenger/app.js 的模式)。
 // 用户只读:帖底的回复框是主人屏幕上的那一格(只读、不可点),观测者唯二操作走 shell 的 data-action(刷新/生成更多)+ 长按/右键反悔。
 // castName 只活在 core/世界数据层,这个文件从不读它——住民短 ID 用 world.shortIdFor,不暴露真名。
-import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_STAR, ICON_STAR_FILL, ICON_PIN, ICON_SEND } from '../../ui/icons.js';
+import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_STAR, ICON_STAR_FILL, ICON_PIN, ICON_SEND, ICON_EXPORT, ICON_CHECK } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
 import { shortIdFor, seenKeyForForumThread, newReplyCountOfForumThread, starKeyForForumThread, anonIdFor } from '../../core/world.js';
 import { formatRelativeTime } from '../../core/worldtime.js';
@@ -19,7 +19,9 @@ function genSpinnerHtml() {
 
 // M7a §4:作者标签——item 是折好的帖子或楼层(authorId/anon 二选一)。次抛匿名现算展示 ID
 // (anonIdFor 按 threadId+key 哈希,同一帖同一 key 永远同一个 ID);固定住民沿用旧的 handle #短ID。
-function authorLabel(world, item, threadId) {
+// M10 导出:ui/exporter.js 的论坛模板复用这份逻辑(离屏渲染的楼层作者名与 app 内必须完全一致),
+// 故导出——两处哈希算法不能各揣一份、悄悄漂开。
+export function authorLabel(world, item, threadId) {
     if (item.anon) return `${item.anon.name} ID:${anonIdFor(threadId, item.anon.key)}`;
     const r = world.residents.get(item.authorId);
     return r ? `${r.handle} #${shortIdFor(item.authorId)}` : String(item.authorId);
@@ -125,16 +127,34 @@ export function renderForumListHtml({
         ${pager}`;
 }
 
+// M10 导出:楼层/OP 复选圈,与 or-forum-floor-row/or-forum-op 组合成一枚横排(圈在最前,
+// 原内容整块让到旁边的 body-wrap 里)——只在 exportMode 时才套这层,平时的结构原样不动。
+function exportCheckHtml(action, key, selected) {
+    return `<button class="or-export-check ${selected ? 'on' : ''}" data-action="${action}" data-key="${escapeHtml(String(key))}">${selected ? ICON_CHECK : ''}</button>`;
+}
+
 /**
  * 帖内视图:楼主块 + 分隔 + 回复楼(细分隔线,不用气泡——论坛不是聊天)。
  * @param seenAt 进这个帖那一刻的 seen 快照(同消息线程,用快照而非实时水位,否则分界线当场消失)
  * @param replyBatch 「生成回复」这一次要点单几楼
+ * @param exportMode M10:导出选楼模式——开着时楼层/OP 各挂一枚复选圈,header 换成选择工具条,
+ *   帖底生成按钮隐藏(避免误触发生成)。
+ * @param exportSel M10:null=默认全选;否则 Set(元素是楼层 r.ts 或固定字符串 'op')。
+ * @param exportBusy M10:导出图片正在生成(与 busy 的 LLM 生成锁互不相扰,各自的按钮各自转 spinner)。
  */
-export function renderForumThreadHtml({ thread, world, busy, forumNow, seenAt = 0, starred = {}, replyBatch = 3 }) {
+export function renderForumThreadHtml({
+    thread, world, busy, forumNow, seenAt = 0, starred = {}, replyBatch = 3,
+    exportMode = false, exportSel = null, exportBusy = false,
+}) {
     // Asterism 星标(task-007):整帖收藏,挂在楼主块作者行右端(观测者的标记,住民看不见)
     const starKey = starKeyForForumThread(thread.threadId);
     const starOn = !!starred[starKey];
     const starBtn = `<button class="or-star ${starOn ? 'on' : ''}" data-action="toggle-star" data-star-key="${escapeHtml(starKey)}" title="${starOn ? '从星图移除' : '加入星图'}">${starOn ? ICON_STAR_FILL : ICON_STAR}</button>`;
+
+    const allKeys = ['op', ...thread.replies.map(r => r.ts)];
+    const isSelected = (key) => exportSel === null || exportSel.has(key);
+    const selectedCount = exportSel === null ? allKeys.length : exportSel.size;
+
     let repliesHtml = '';
     let sepDone = false;
     thread.replies.forEach((r, i) => {
@@ -142,15 +162,16 @@ export function renderForumThreadHtml({ thread, world, busy, forumNow, seenAt = 
             repliesHtml += `<div class="or-new-sep" data-new-anchor><span>以下是新回复</span></div>`;
             sepDone = true;
         }
-        repliesHtml += `<div class="or-forum-floor-row" data-seq="${r.ts}">
-            <div class="or-forum-floor-head">
+        const floorBody = `<div class="or-forum-floor-head">
                 <span class="or-forum-floor-num">${i + 1}F</span>
                 <span class="or-forum-floor-author">${escapeHtml(authorLabel(world, r, thread.threadId))}</span>
                 <span class="or-forum-floor-time">${formatRelativeTime(r.worldTime, forumNow)}</span>
             </div>
             ${Number.isFinite(r.replyToFloor) && r.replyToFloor > 0 ? `<div class="or-forum-quote">&gt;&gt;${r.replyToFloor}</div>` : ''}
-            <div class="or-forum-floor-body">${escapeHtml(r.body)}${r.zh && r.zh !== r.body ? `<div class="or-zh">${escapeHtml(r.zh)}</div>` : ''}</div>
-        </div>`;
+            <div class="or-forum-floor-body">${escapeHtml(r.body)}${r.zh && r.zh !== r.body ? `<div class="or-zh">${escapeHtml(r.zh)}</div>` : ''}</div>`;
+        repliesHtml += exportMode
+            ? `<div class="or-forum-floor-row or-export-row" data-seq="${r.ts}">${exportCheckHtml('forum-export-pick', r.ts, isSelected(r.ts))}<div class="or-export-row-body">${floorBody}</div></div>`
+            : `<div class="or-forum-floor-row" data-seq="${r.ts}">${floorBody}</div>`;
     });
     if (!thread.replies.length) repliesHtml = `<div class="or-empty">还没有人回复。</div>`;
 
@@ -168,26 +189,40 @@ export function renderForumThreadHtml({ thread, world, busy, forumNow, seenAt = 
         </div>
         ${hasDraft && d.zh && d.zh !== d.text ? `<div class="or-forum-composer-zh">${escapeHtml(d.zh)}</div>` : ''}`;
 
-    return `
-        <div class="or-header">
+    const opBody = `<div class="or-forum-op-title">${escapeHtml(thread.title)}</div>
+                <div class="or-forum-op-author">${escapeHtml(authorLabel(world, thread, thread.threadId))} · ${formatRelativeTime(thread.worldTime, forumNow)}${exportMode ? '' : starBtn}</div>
+                <div class="or-forum-op-body">${escapeHtml(thread.body)}${thread.zh && thread.zh !== thread.body ? `<div class="or-zh">${escapeHtml(thread.zh)}</div>` : ''}</div>`;
+    const opHtml = exportMode
+        ? `<div class="or-forum-op or-export-row">${exportCheckHtml('forum-export-pick', 'op', isSelected('op'))}<div class="or-export-row-body">${opBody}</div></div>`
+        : `<div class="or-forum-op">${opBody}</div>`;
+
+    // M10:导出选楼模式的 header 换成三件套(取消/全选或清空/导出(N)),不出现回到列表的返回箭头——
+    // 取消本身就是回到普通帖内视图,同一个按钮身兼两用没有歧义。
+    const headerHtml = exportMode
+        ? `<div class="or-header">
+            <button class="or-pill-btn small" data-action="forum-export-toggle">取消</button>
+            <button class="or-pill-btn small" data-action="forum-export-all">${selectedCount >= allKeys.length ? '清空' : '全选'}</button>
+            <button class="or-pill-btn" data-action="forum-export-run" ${selectedCount === 0 ? 'disabled' : ''}>${exportBusy ? genSpinnerHtml() : `导出(${selectedCount})`}</button>
+        </div>`
+        : `<div class="or-header">
             <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
             <span class="or-header-title">${escapeHtml(thread.title)}</span>
-        </div>
+            <button class="or-export-entry-btn" data-action="forum-export-toggle" title="导出图片">${ICON_EXPORT}</button>
+        </div>`;
+
+    return `
+        ${headerHtml}
         <div class="or-forum-scroll">
-            <div class="or-forum-op">
-                <div class="or-forum-op-title">${escapeHtml(thread.title)}</div>
-                <div class="or-forum-op-author">${escapeHtml(authorLabel(world, thread, thread.threadId))} · ${formatRelativeTime(thread.worldTime, forumNow)}${starBtn}</div>
-                <div class="or-forum-op-body">${escapeHtml(thread.body)}${thread.zh && thread.zh !== thread.body ? `<div class="or-zh">${escapeHtml(thread.zh)}</div>` : ''}</div>
-            </div>
+            ${opHtml}
             <div class="or-forum-replies">${repliesHtml}</div>
         </div>
-        ${composerHtml}
-        <div class="or-chat-footer">
+        ${exportMode ? '' : composerHtml}
+        ${exportMode ? '' : `<div class="or-chat-footer">
             <div class="or-batch">
                 <button data-action="stepper" data-field="forumReplyBatch" data-delta="-1" ${busy ? 'disabled' : ''}>${ICON_MINUS}</button>
                 <span class="or-batch-value">${replyBatch}</span>
                 <button data-action="stepper" data-field="forumReplyBatch" data-delta="1" ${busy ? 'disabled' : ''}>${ICON_PLUS}</button>
             </div>
             <button class="or-pill-btn" data-action="forum-generate-more" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : (hasDraft ? '发出并生成回复' : '生成回复')}</button>
-        </div>`;
+        </div>`}`;
 }
