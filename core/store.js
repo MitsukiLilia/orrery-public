@@ -282,11 +282,13 @@ export async function deleteTweetRepliesFrom(worldKey, tweetId, fromTs) {
 }
 
 /**
- * 浏览器专用倒带:search_query/browse_visit 两型一起,payload.worldTime >= fromWorldTime 的全删
- * (任务书 §2)。工法同 deleteTweetRepliesFrom(游标扫世界、条件命中就删),但比对字段是 worldTime
- * 不是 ts——两 tab 按世界时间混排展示,长按定位到的是"这一条在时间轴上的位置",反悔边界也该按
- * 这条线切,而不是两型各自的入账序号(检索与它带出的浏览往往同一批入账、ts 挨得很近但 worldTime
- * 才是她在屏幕上认出来的那条时间线)。缺 worldTime 的畸形条目保守地一并删掉(同 deleteThreadFrom 的先例)。
+ * 浏览器专用倒带:search_query/browse_visit/web_snapshot/web_snapshot_append 四型一起,
+ * payload.worldTime >= fromWorldTime 的全删(任务书 §2,M9 补 web_snapshot_append)。工法同
+ * deleteTweetRepliesFrom(游标扫世界、条件命中就删),但比对字段是 worldTime 不是 ts——两 tab
+ * 按世界时间混排展示,长按定位到的是"这一条在时间轴上的位置",反悔边界也该按这条线切,而不是
+ * 各型各自的入账序号(检索与它带出的浏览往往同一批入账、ts 挨得很近但 worldTime 才是她在屏幕上
+ * 认出来的那条时间线)。缺 worldTime 的畸形条目保守地一并删掉(同 deleteThreadFrom 的先例)——
+ * 唯一的例外是 M9 常驻卡(pinned browse_visit),见下方游标回调里的特判。
  */
 export async function deleteBrowserFrom(worldKey, fromWorldTime) {
     if (!worldKey) return;
@@ -300,7 +302,11 @@ export async function deleteBrowserFrom(worldKey, fromWorldTime) {
             const cursor = req.result;
             if (!cursor) return;
             const v = cursor.value;
-            const isBrowserType = v.type === 'search_query' || v.type === 'browse_visit' || v.type === 'web_snapshot';
+            // M9 常驻卡(pinned browse_visit)不是时间轴事件——它没有 worldTime,「缺 worldTime 保守删」
+            // 那条不适用于它,书签本身该留下;挂在它身上的 snapshot/append 仍按 worldTime 正常倒带,
+            // 内容跟着世界倒带,只是入口不会跟着消失。
+            if (v.type === 'browse_visit' && v.payload?.pinned) { cursor.continue(); return; }
+            const isBrowserType = v.type === 'search_query' || v.type === 'browse_visit' || v.type === 'web_snapshot' || v.type === 'web_snapshot_append';
             if (isBrowserType && (!Number.isFinite(v.payload?.worldTime) || v.payload.worldTime >= fromWorldTime)) cursor.delete();
             cursor.continue();
         };

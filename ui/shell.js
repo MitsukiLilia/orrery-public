@@ -14,6 +14,7 @@ import {
     generateMore, continueThread, generateMoreForum, continueForumThread,
     generateMoreSns, continueTweetReplies, generateMoreBrowser,
     generateMoreGallery, generateMoreMemo, generateSnsSearch, generateWebSnapshot,
+    generateWebSnapshotAppend, PIN_SLOTS,
 } from '../core/generator.js';
 import { manualRevert } from '../core/rollback.js';
 import { escapeHtml } from '../core/escape.js';
@@ -286,7 +287,7 @@ export function createShell(ctx, onExternalChange) {
                 worldKey: null,
                 world: {
                     contacts: new Map(), threads: new Map(), boards: new Map(), residents: new Map(), forumThreads: new Map(),
-                    snsAccounts: new Map(), tweets: new Map(), searches: new Map(), visits: new Map(),
+                    snsAccounts: new Map(), tweets: new Map(), searches: new Map(), visits: new Map(), snapshotAppends: new Map(),
                     photos: [], memos: new Map(),
                 },
                 tip: -1, watermarks: { messenger: -1, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1 }, seen: {}, starred: {},
@@ -541,7 +542,10 @@ export function createShell(ctx, onExternalChange) {
         } else if (top.type === 'webPage') {
             const visit = world.visits.get(top.visitId);
             if (!visit) { navStack = [{ type: 'grid' }]; return render(); } // 已被倒带清空
-            screenEl.innerHTML = renderWebPageHtml({ visit, snapshot: world.snapshots.get(top.visitId), busy: busy.browser, starred });
+            screenEl.innerHTML = renderWebPageHtml({
+                visit, snapshot: world.snapshots.get(top.visitId), appends: world.snapshotAppends.get(top.visitId) || [],
+                community: world.community, busy: busy.browser, starred,
+            });
         } else if (top.type === 'asterism') {
             screenEl.innerHTML = renderAsterismHtml({ world, starred });
         } else if (top.type === 'settings') {
@@ -587,9 +591,19 @@ export function createShell(ctx, onExternalChange) {
         else if (appId === 'settings') navPush({ type: 'settings' });
         else if (appId === 'forum') navPush({ type: 'forum-list', boardId: null });
         else if (appId === 'sns') navPush({ type: 'sns-tl', tab: 'tl', myRole: 'omote' });
-        else if (appId === 'browser') navPush({ type: 'browser', tab: 'search' });
+        else if (appId === 'browser') openBrowserApp();
         else if (appId === 'gallery') navPush({ type: 'gallery' });
         else if (appId === 'memo') navPush({ type: 'memo' });
+    }
+
+    // M9 §4.2 触发点①:进浏览器屏之后补建常驻卡——已认主的世界才有 worldKey/community 可查,
+    // 未认主(setup 门还没过)或没有所属都静默跳过,不打扰空世界的首屏。
+    async function openBrowserApp() {
+        navPush({ type: 'browser', tab: 'search' });
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        const { world } = await currentWorld();
+        if (await ensurePinnedVisits(worldKey, world)) render();
     }
 
     // 失败措辞分档:此前四个入口一律「生成失败,请重试」,把「模型没吐出能用的结果」「配置/网络出错」
@@ -937,9 +951,40 @@ export function createShell(ctx, onExternalChange) {
         if (!world.visits.get(visitId) || world.snapshots.get(visitId)) return; // 无此记录/缓存命中
         await runGeneration('browser', async ({ worldKey, owner, s }) => {
             return await generateWebSnapshot(ctx, store, {
-                worldKey, visitId, profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                worldKey, visitId, floorWindow: s.floorWindow, excludeTags: s.excludeTags || '',
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
             });
         });
+    }
+
+    // M9 §7.1:内网页追記——独立于「打开」的手动刷新,复用 browser 生成锁(内网页仍是浏览器 app
+    // 的一张快照,没必要另开一把锁),但成功提示照任务书定制,不走 runGeneration 那句共用的
+    // 「浏览器里多了 N 道痕迹」(那句是给主刷新的,追記要说清「有没有长出新东西」这件更具体的事)。
+    async function doWebPageRefresh(visitId) {
+        if (!visitId || busy.browser) return;
+        busy.browser = true;
+        try {
+            const worldKey = currentWorldKey();
+            if (!worldKey) return;
+            const owner = await store.getOwner(worldKey);
+            if (!owner) return;
+            await render();
+            const s = settings();
+            const result = await generateWebSnapshotAppend(ctx, store, {
+                worldKey, visitId, floorWindow: s.floorWindow, excludeTags: s.excludeTags || '',
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+            });
+            if (!result?.ok) showToast(FAIL_TEXT[result?.error] || '观测中断了,请再试一次');
+            else if (result.changed && result.added) showToast('页面长出了一条追記');
+            else showToast('没有新的动静——组织照常运转');
+            onExternalChange?.();
+        } catch (err) {
+            console.error('[Orrery] 内网追記生成出错', err);
+            showToast(`生成出错:${err?.message || '未知错误'}`);
+        } finally {
+            busy.browser = false;
+            await render();
+        }
     }
 
     // ── Asterism 星图(task-007 P0):观测者的收藏,点亮/熄灭——纯用户侧数据,世界毫无感知。──
@@ -1010,6 +1055,26 @@ export function createShell(ctx, onExternalChange) {
     // ── M3:浏览器「Astrolabe」:独立水位的「刷新」(唯一入口,没有续写)+ tab 切换(纯本地渲染)
     //    + 反悔(两 tab 一起倒带,按世界时间——见 store.deleteBrowserFrom 的长注)。 ──
 
+    // M9 §4.2:常驻三卡「よく見るページ」——零 LLM 调用,按所属 kind 兜底建三个固定槽位;
+    // 已存在的槽位跳过(幂等,重复调用无害)。community 不存在时不建(没有所属就没有可挂的内网入口)。
+    // @returns {Promise<boolean>} 是否真的创建了新卡——调用方靠它决定要不要补一次 render()
+    async function ensurePinnedVisits(worldKey, world) {
+        if (!world.community) return false;
+        const slots = PIN_SLOTS[world.community.kind] || PIN_SLOTS.org;
+        const sourceFloor = Math.max(0, (ctx.chat?.length ?? 1) - 1);
+        let created = false;
+        for (const slot of slots) {
+            const visitId = 'bvpin_' + slot.slot;
+            if (world.visits.has(visitId)) continue;
+            await store.addEntry({
+                worldKey, sourceFloor, app: 'browser', type: 'browse_visit',
+                payload: { visitId, title: slot.title, site: slot.sub, slot: slot.slot, pinned: true, intra: true, worldTime: null },
+            });
+            created = true;
+        }
+        return created;
+    }
+
     async function doGenerateMoreBrowser() {
         // 浏览器是单屏 app,「刷新」本身就是从这个带 seen 快照的屏里发起的(不像消息/论坛/SNS的主生成
         // 是从不追踪 seen 的列表页发起)——所以要照 doContinueThread 的工法,把水位先挪到这批新内容
@@ -1026,6 +1091,9 @@ export function createShell(ctx, onExternalChange) {
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
                 excludeTags: s.excludeTags || '',
             });
+            // M9 §4.2 触发点②:所属可能是这一批才推断出来的(ensureCommunity 挂在浏览器主生成里),
+            // 常驻卡因此要在这里补建一次——用生成后的最新账本查,不能用调用前那份陈旧的 world。
+            if (result?.ok) await ensurePinnedVisits(worldKey, foldWorld(await store.getEntriesForWorld(worldKey)));
             if (result?.ok && result.added > 0 && top.type === 'browser') top.seenAt = before;
             onExternalChange?.();
             return result;
@@ -1213,6 +1281,7 @@ export function createShell(ctx, onExternalChange) {
             case 'sns-search-open': navPush({ type: 'sns-search' }); break;
             case 'sns-search-word': doOpenSnsSearch(el.dataset.word); break;
             case 'open-web-page': doOpenWebPage(el.dataset.visitId); break;
+            case 'webpage-refresh': doWebPageRefresh(el.dataset.visitId); break;
             case 'open-asterism': navPush({ type: 'asterism' }); break;
             case 'browser-refresh': doGenerateMoreBrowser(); break;
             case 'browser-select-tab': doBrowserSelectTab(el.dataset.tab); break;

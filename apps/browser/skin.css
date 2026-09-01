@@ -74,6 +74,31 @@
 .or-omnibox-scheme { color: var(--or-cocoa-light); }
 .or-omnibox-glass { display: inline-flex; color: var(--or-cocoa-light); }
 
+/* ── M9 §4.3:「よく見るページ」常驻三卡——brand 条与 tabs 之间,横排三张;title+sub 两行,
+   新内容小圆点复用 .or-browser-dot 同款脉冲(见上方 @keyframes or-browser-dot-pulse)。 ── */
+.or-browser-pins { flex-shrink: 0; display: flex; gap: 8px; padding: 0 14px 10px; background: var(--or-cream-2); }
+.or-browser-pin {
+    flex: 1; min-width: 0; position: relative; text-align: left; cursor: pointer;
+    border: none; background: var(--or-white); border-radius: 12px; padding: 9px 10px;
+    box-shadow: 0 1px 3px var(--or-shadow); font-family: inherit;
+}
+.or-browser-pin:active { transform: scale(.97); }
+.or-browser-pin-title {
+    font-size: 12px; font-weight: 600; color: var(--or-cocoa); line-height: 1.3;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.or-browser-pin-sub {
+    font-size: 10.5px; color: var(--or-cocoa-light); margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.or-browser-pin-dot {
+    position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--or-salt-deep); animation: or-browser-dot-pulse 2.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+    .or-browser-pin-dot { animation: none; }
+}
+
 /* ── v0.14 网页快照:可点行 + sandbox iframe 页面 + 中文大意小字 ── */
 .or-browser-row.clickable { cursor: pointer; }
 .or-browser-row.clickable:active { background: rgba(110, 90, 80, .05); }
@@ -83,3 +108,4 @@
     flex-shrink: 0; font-size: 11.5px; color: var(--or-cocoa-light); line-height: 1.55;
     padding: 8px 14px 10px; border-top: 1px solid var(--or-cream-2); background: var(--or-cream);
 }
+.or-webpage-zh div + div { margin-top: 4px; } /* M9:snapshot.zh 与各 append.zh 依次各成一行 */

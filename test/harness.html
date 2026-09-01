@@ -20,6 +20,9 @@
     label.mock-label { font-size: 12px; display: inline-flex; align-items: center; gap: 5px; margin: 3px 10px 3px 0; }
     input[type="number"] { width: 52px; font-size: 12px; padding: 3px; }
     #state { font-size: 11.5px; background: #f4f4f4; border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; word-break: break-all; }
+    #m9AssertResult { font-size: 11.5px; background: #f4f4f4; border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; }
+    #m9AssertResult .pass { color: #2a7a2a; }
+    #m9AssertResult .fail { color: #b3261e; font-weight: 600; }
     #log { font-size: 11px; background: #222; color: #b6f7b6; border-radius: 6px; padding: 8px 10px; height: 160px; overflow-y: auto; white-space: pre-wrap; }
     #chatlog { font-size: 11.5px; background: #f4f4f4; border-radius: 6px; padding: 8px 10px; max-height: 140px; overflow-y: auto; }
     #chatlog div { padding: 2px 0; border-bottom: 1px dashed #ddd; }
@@ -107,9 +110,11 @@
             <label class="mock-label"><input type="checkbox" id="fxFence"> 主生成用「```json 围栏+前后杂文」包裹(测试宽容解析)</label><br>
             <label class="mock-label"><input type="checkbox" id="fxBroken"> 模拟解析失败(两次都返回垃圾文本)</label><br>
             <label class="mock-label"><input type="checkbox" id="fxEmptyB"> 续聊/盖楼返回空 messages/replies(测试「暂无新动静」)</label><br>
+            <label class="mock-label"><input type="checkbox" id="fxEmptyAppend"> 内网追記返回空 html(测试「没有新的动静——组织照常运转」)</label><br>
             <p class="note" style="margin:8px 0 0;">
                 fixture 按 systemPrompt 内容自动路由(SNS/论坛的续写档都排在「续写」检查之前,因为 PROMPT_G/I
-                本身也含「续写」二字):
+                本身也含「续写」二字;M9 内网页追記排在内网页首次生成之前,因为 PROMPT_M3 的文本本身也含
+                PROMPT_M2 那句路由词的子串):
                 含「压缩成 5 行以内」→摘要(C)/含「登录中的 SNS」→SNS 主生成(H,首刷/二刷两版按账本是否已有账号自动切换)/
                 含「围观这条推文」→SNS 回复续写(I)/含「判断主角」→所属コミュニティ推断(O,论坛/浏览器
                 生成前都会先调它一次,一世界只推一次、结果永久缓存)/含「手机里的内部掲示板」→论坛主生成(F)/
@@ -118,11 +123,19 @@
                 含「手机里的相册」→相册主生成(K,没有续写入口,只有这一条)/
                 含「手机里的备忘录」→备忘录主生成(L,首刷/二刷两版按账本是否已有备忘自动切换,二刷会对首刷第一条清单做一次改写)/
                 含「静态快照」→网页快照(M,点开浏览器历史里的条目触发,返回整页 HTML)/
+                含「距离上次看」→内网页追記(M3,点内网快照页的「刷新」触发)/
+                含「打开了所属共同体的内部页面」→内网页首次生成(M2,点开常驻卡/内网 visit 触发)/
                 含「续写」→消息续聊(B/B_GROUP)/否则→消息主生成(A)。
                 SNS/论坛/消息/浏览器/相册/备忘录这套流程都从手机内点「刷新」「生成更多」/「生成回复」触发,不用额外按钮。<br>
                 语言开关(日本語/English/日中双语)直接在手机「设置」页切——fixture 会读同一份 extensionSettings,
                 切到日中双语后返回的消息/帖子/推文会带 zh 字段。
             </p>
+        </fieldset>
+
+        <fieldset>
+            <legend>4. M9 断言:内网 lane(照任务书-M9 §8 逐条对应,纯逻辑用真实模块函数、涉账本的用真实 IndexedDB 加临时 worldKey 跑完即清)</legend>
+            <button class="mock-btn" id="runM9AssertBtn">运行全部断言</button>
+            <div id="m9AssertResult">(未运行)</div>
         </fieldset>
 
         <fieldset>
@@ -162,7 +175,10 @@
 <script type="module">
     // ── mock 最小酒馆环境:先于 index.js 执行(同为 module script,按文档顺序保证)。 ──
     import * as store from '../core/store.js';
-    import { computeWorldKey, inheritedWorldKey } from '../core/world.js';
+    import * as generator from '../core/generator.js';
+    import { computeWorldKey, inheritedWorldKey, isIntraVisit, foldWorld } from '../core/world.js';
+    import { composeSnapshotHtml, sanitizeSnapshotHtml } from '../apps/browser/app.js';
+    import { escapeHtml } from '../core/escape.js';
 
     function log(msg) {
         const el = document.getElementById('log');
@@ -414,6 +430,12 @@
             newVisits: [
                 { ...withZhTitle('明日の天気ー東京'), site: 'そら模様', delayMin: 5 },
                 { ...withZhTitle('通販サイトのタイムセール一覧'), site: 'カイモノ市場', delayMin: 20 },
+                // M9 §8-6:PROMPT_J 消化「intra===true 才落 payload,字符串 "true" 不落」的真实路径练习——
+                // 第 1 条 intra 是布尔 true(该落)、第 2 条故意给字符串 "true"(不该落,防字符串教训)。
+                // 「M9 断言」面板的 assertPromptJIntra() 单独跑一份隔离的 worldKey,不依赖这里的账本状态;
+                // 这两条留给她手动点「刷新」时肉眼在账本 dump 里核对。
+                { ...withZhTitle('経費精算システム トップ'), site: '内部システム', delayMin: 8, intra: true },
+                { ...withZhTitle('本当は雑談だったはずの申請'), site: '内部システム', delayMin: 3, intra: 'true' },
             ],
         };
     }
@@ -446,6 +468,45 @@
 <div class="m7b-sign">総務部 経理課</div>
 </div>`;
         return { url: 'https://intra.example-office.local/keihi/detail?id=014', html };
+    }
+
+    // ── M9 §2.1/§2.2:内网 lane fixture(M2 首次生成/M3 追記)。M2 样本按「感情穿公文的衣服」
+    // 拍板落地:件名与備考欄让正文事件的手续影子看得见,承認欄留一句本音吐槽;页脚前留空的
+    // data-orrery-append 容器(PROMPT_M2 原则 10 的硬约束,harness 里也照做才能练到合成插入)。
+    function buildFixtureM2() {
+        const html = `<div style="max-width:480px;margin:0 auto;font-family:'MS PGothic',sans-serif;background:#f2f2f2;color:#222;">
+<style>
+.m9-topbar{background:#ffe9a8;color:#5a4200;font-size:11px;padding:4px 8px;text-align:center;border-bottom:1px solid #d8c07a;}
+.m9-topbar a{color:#3b6bd6;margin-left:6px;}
+.m9-header{background:#2f5fa8;color:#fff;padding:8px 10px;font-size:13px;}
+.m9-crumb{padding:6px 10px;font-size:11px;color:#666;background:#e6e6e6;}
+.m9-row{display:flex;flex-direction:column;border-bottom:1px solid #ddd;padding:6px 10px;background:#fff;}
+.m9-row b{font-size:11px;color:#555;}
+.m9-row span{font-size:13px;margin-top:2px;}
+.orrery-tsuiki{border-top:1px dashed #c0392b;padding:6px 10px;font-size:11px;color:#c0392b;}
+</style>
+<div class="m9-topbar">スマホ簡易表示(β)<a href="#">PC版はこちら</a></div>
+<div class="m9-header">経費精算システム<br>ログイン中:総務部</div>
+<div class="m9-crumb">トップ &gt; 申請一覧 &gt; 詳細</div>
+<div class="m9-row"><b>申請番号</b><span>EX-20260901-014</span></div>
+<div class="m9-row"><b>件名</b><span>菓子折り購入費</span></div>
+<div class="m9-row"><b>金額</b><span>¥3,200</span></div>
+<div class="m9-row"><b>備考</b><span>先方へのご挨拶用。担当者コメント:随分気合入ってますね(笑)</span></div>
+<div class="m9-row"><b>承認状況</b><span>係長承認済</span></div>
+<div data-orrery-append></div>
+</div>`;
+        return { url: 'https://intra.example-office.local/keihi/detail?id=014', html };
+    }
+
+    // 内网追記:checkbox 勾选时返回空字符串(练「组织没有动静」这条合法路径),否则给一条真实追記——
+    // 用 orrery-tsuiki class 包裹(PROMPT_M3 原则 5 的硬约束)。
+    function buildFixtureM3() {
+        const empty = document.getElementById('fxEmptyAppend')?.checked;
+        if (empty) return { worldTime: '2026-09-01 12:00', html: '' };
+        return {
+            worldTime: '2026-09-01 12:00',
+            html: '<div class="orrery-tsuiki">追記(09/01):係長より「経理には内緒にしとくから」とのコメントが追加されました。</div>',
+        };
     }
 
     // ── M4 相册「无声的日记」fixture(K,没有续写入口,只有一个主生成)──
@@ -544,6 +605,17 @@
         // html 字段),generateWebSnapshot 恒 parse_failed。"静态快照"是 PROMPT_M 独有的措辞。
         if (systemPrompt.includes('静态快照')) {
             const body = buildFixtureM();
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        // M9:内网页追記(M3)必须排在内网页首次生成(M2)之前——PROMPT_M3 开头「重新打开了所属
+        // 共同体的内部页面」本身就包含 PROMPT_M2 那句路由词「打开了所属共同体的内部页面」的子串,
+        // 先查窄的("距离上次看"只在 M3 出现)才不会把追記请求错分给 M2。
+        if (systemPrompt.includes('距离上次看')) {
+            const body = buildFixtureM3();
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        if (systemPrompt.includes('打开了所属共同体的内部页面')) {
+            const body = buildFixtureM2();
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
         if (systemPrompt.includes('手机里的相册')) {
@@ -671,6 +743,129 @@
         const entries = await store.getEntriesForWorld(worldKey);
         document.getElementById('ledgerDump').textContent = JSON.stringify(entries, null, 1);
     }
+
+    // ── M9 §8:断言面板。纯逻辑(1/2/3/5)直接调真实模块函数;涉账本的(4/6)开一个只在这次
+    // 点击里存活的临时 worldKey,跑完立刻 store.wipeWorld 清掉——不留渣,也不碰上面「当前状态」
+    // 面板正在看的那个真实聊天世界。六节顺序对应任务书-M9 §8 的六条,一节内多条各自判定。──
+
+    function assertIsIntraVisit() {
+        return [
+            ['pinned 标志命中', isIntraVisit({ pinned: true }, null) === true],
+            ['intra 标志命中', isIntraVisit({ intra: true }, null) === true],
+            ['community 为 null 时关键词不兜底', isIntraVisit({ site: '', title: '社内システムのお知らせ' }, null) === false],
+            ['community 存在时「稟議」命中', isIntraVisit({ site: '', title: '稟議書一覧' }, { kind: 'org' }) === true],
+        ];
+    }
+
+    function assertPinSlots() {
+        const kinds = ['org', 'school', 'local'];
+        return [
+            ['三 kind 各三槽', kinds.every(k => generator.PIN_SLOTS[k]?.length === 3)],
+            ['slot 键在每个 kind 内唯一', kinds.every(k => new Set(generator.PIN_SLOTS[k].map(s => s.slot)).size === 3)],
+            ['kind 不认识时 org 兜底', (generator.PIN_SLOTS.nonexistent || generator.PIN_SLOTS.org) === generator.PIN_SLOTS.org],
+        ];
+    }
+
+    function assertFold() {
+        const entries = [
+            { id: 'e1', worldKey: 'x', sourceFloor: 0, ts: 100, app: 'browser', type: 'browse_visit', payload: { visitId: 'v1', title: 'X', site: 'Y', worldTime: 1000 } },
+            { id: 'e2', worldKey: 'x', sourceFloor: 0, ts: 300, app: 'browser', type: 'web_snapshot_append', payload: { appendId: 'a2', visitId: 'v1', html: '<div>2</div>', worldTime: 2000 } },
+            { id: 'e3', worldKey: 'x', sourceFloor: 0, ts: 200, app: 'browser', type: 'web_snapshot_append', payload: { appendId: 'a1', visitId: 'v1', html: '<div>1</div>', worldTime: 1500 } },
+        ];
+        const folded = foldWorld(entries);
+        const list = folded.snapshotAppends.get('v1') || [];
+        return [
+            ['web_snapshot_append 进 snapshotAppends', list.length === 2],
+            ['组内按 ts 升序', list.length === 2 && list[0].ts === 200 && list[1].ts === 300],
+            ['browserNow 吃 append 的 worldTime', folded.browserNow === 2000],
+        ];
+    }
+
+    async function assertDeleteBrowserFrom() {
+        const wk = `__m9_assert_delete_${Date.now()}`;
+        await store.addEntry({ worldKey: wk, sourceFloor: 0, app: 'browser', type: 'browse_visit', payload: { visitId: 'bvpin_a', title: 'T', site: 'S', slot: 'a', pinned: true, intra: true, worldTime: null } });
+        await store.addEntry({ worldKey: wk, sourceFloor: 0, app: 'browser', type: 'browse_visit', payload: { visitId: 'v_bare', title: 'NoWT', site: 'S' } }); // 非 pinned、无 worldTime
+        await store.addEntry({ worldKey: wk, sourceFloor: 0, app: 'browser', type: 'web_snapshot_append', payload: { appendId: 'ap1', visitId: 'bvpin_a', html: 'x', worldTime: 5000 } });
+        await store.deleteBrowserFrom(wk, 1000);
+        const remaining = await store.getEntriesForWorld(wk);
+        const result = [
+            ['pinned browse_visit 幸存', remaining.some(e => e.type === 'browse_visit' && e.payload.visitId === 'bvpin_a')],
+            ['非 pinned 无 worldTime 条目仍被保守删', !remaining.some(e => e.payload?.visitId === 'v_bare')],
+            ['append 按 worldTime 删', !remaining.some(e => e.type === 'web_snapshot_append')],
+        ];
+        await store.wipeWorld(wk);
+        return result;
+    }
+
+    function assertComposeAndSanitize() {
+        const withMarker = composeSnapshotHtml('<div>头<div data-orrery-append></div>尾</div>', [{ html: '<div class="orrery-tsuiki">追記A</div>' }]);
+        const noMarker = composeSnapshotHtml('<div>头</div>', [{ html: '<div class="orrery-tsuiki">追記B</div>' }]);
+        // ⚠️危险标签的完整闭合写法不能整段连着出现在这里——这段本身躺在一个内联 module 脚本里,
+        // HTML 解析器按原始字节扫描结束标签,不理会它出现在注释或 JS 字符串内部,写全了会把这个
+        // 脚本标签整个截断在这里(试衣间本体从此半身不遂),所以拆成字符串拼接。
+        const dirty = composeSnapshotHtml('<div data-orrery-append></div>', [{ html: '<div onclick="alert(1)">危险</div><scr' + 'ipt>alert(2)' + '<' + '/script>' }]);
+        const clean = sanitizeSnapshotHtml(dirty);
+        return [
+            ['有标记时追記插入标记 div 内', withMarker.includes('<div data-orrery-append><div class="orrery-tsuiki">追記A</div></div>')],
+            ['无标记时拼尾部(兜 orrery-tsuiki 容器)', noMarker.endsWith('<div class="orrery-tsuiki"><div class="orrery-tsuiki">追記B</div></div>')],
+            ['合成后消毒:data-orrery-append 属性幸存', clean.includes('data-orrery-append')],
+            ['合成后消毒:onclick 被拔', !clean.includes('onclick')],
+            ['合成后消毒:<script> 被拔', !clean.includes('<script')],
+        ];
+    }
+
+    async function assertPromptJIntraConsumption() {
+        const wk = `__m9_assert_intra_${Date.now()}`;
+        await store.setOwner(wk, 'テスト主人');
+        const result = await generator.generateMoreBrowser(ctx, store, {
+            worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '',
+        });
+        const entries = await store.getEntriesForWorld(wk);
+        const trueVisit = entries.find(e => e.type === 'browse_visit' && e.payload.title === '経費精算システム トップ');
+        const stringVisit = entries.find(e => e.type === 'browse_visit' && e.payload.title === '本当は雑談だったはずの申請');
+        const out = [
+            ['生成成功(前置条件)', !!result?.ok],
+            ['intra===true 才落 payload', trueVisit?.payload.intra === true],
+            ['字符串 "true" 不落', !!stringVisit && stringVisit.payload.intra === undefined],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
+    async function runM9Assertions() {
+        const out = document.getElementById('m9AssertResult');
+        out.textContent = '运行中…';
+        const sections = [
+            ['1. isIntraVisit', assertIsIntraVisit()],
+            ['2. PIN_SLOTS', assertPinSlots()],
+            ['3. fold(snapshotAppends / browserNow)', assertFold()],
+            ['4. deleteBrowserFrom', await assertDeleteBrowserFrom()],
+            ['5. 合成 + 消毒', assertComposeAndSanitize()],
+            ['6. PROMPT_J 消化(intra)', await assertPromptJIntraConsumption()],
+        ];
+        let allPass = true;
+        const lines = [];
+        for (const [title, checks] of sections) {
+            lines.push(`<b>${escapeHtml(title)}</b>`);
+            for (const [label, pass] of checks) {
+                if (!pass) allPass = false;
+                // label 里可能含 <script>/<div> 这类字面量(如「合成后消毒:<script> 被拔」)——
+                // 结果面板用 innerHTML 渲染,不转义的话浏览器会把它当成真标签解析,吞掉后面的内容
+                // (试衣间本体踩过一次同款坑,见上面 assertComposeAndSanitize 里的字符串拼接注释)。
+                lines.push(`  <span class="${pass ? 'pass' : 'fail'}">${pass ? 'PASS' : 'FAIL'}</span> ${escapeHtml(label)}`);
+            }
+        }
+        out.innerHTML = lines.join('\n');
+        log(`M9 断言跑完:${allPass ? '全绿' : '有未过项,见断言面板'}`);
+    }
+
+    document.getElementById('runM9AssertBtn').addEventListener('click', () => {
+        runM9Assertions().catch(err => {
+            document.getElementById('m9AssertResult').textContent = `断言运行出错:${err?.message || err}`;
+            console.error('[M9 断言]', err);
+        });
+    });
 
     document.querySelector('.panel').addEventListener('click', async (e) => {
         const btn = e.target.closest('[data-act]');

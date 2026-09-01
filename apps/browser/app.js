@@ -3,7 +3,7 @@
 // v1 没有详情页——搜索记录/浏览历史都是终点,没有 open-xxx 的事,行本身不可点击,只能长按。
 import { ICON_BACK, ICON_LOCK, ICON_SEARCH_SM, ICON_STAR, ICON_STAR_FILL } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
-import { starKeyForVisit } from '../../core/world.js';
+import { starKeyForVisit, isIntraVisit } from '../../core/world.js';
 import { isSameDay, formatDateSep, formatClock } from '../../core/worldtime.js';
 
 export const BROWSER_APP_ID = 'browser';
@@ -38,9 +38,10 @@ function withDateSeps(items, refNow) {
  */
 export function renderBrowserHtml({ world, busy, tab = 'search', seenAt = 0, browserNow }) {
     const isSearch = tab !== 'visits';
+    // M9 §4.3:常驻卡不是「浏览记录」——浏览历史 tab 过滤掉它们,搜索 tab 本来就不含 visit 型条目、不受影响。
     const items = isSearch
         ? [...world.searches.values()].sort((a, b) => (b.worldTime || 0) - (a.worldTime || 0))
-        : [...world.visits.values()].sort((a, b) => (b.worldTime || 0) - (a.worldTime || 0));
+        : [...world.visits.values()].filter(v => !v.pinned).sort((a, b) => (b.worldTime || 0) - (a.worldTime || 0));
 
     const rows = withDateSeps(items, browserNow);
     const body = items.length
@@ -84,6 +85,7 @@ export function renderBrowserHtml({ world, busy, tab = 'search', seenAt = 0, bro
             <span class="or-omnibox-url"><span class="or-omnibox-scheme">astrolabe://</span>observatory</span>
             <span class="or-omnibox-glass">${ICON_SEARCH_SM}</span>
         </div></div>
+        ${renderPinsHtml(world, seenAt)}
         <div class="or-browser-tabs">
             <button class="${isSearch ? 'on' : ''}" data-action="browser-select-tab" data-tab="search">搜索记录</button>
             <button class="${!isSearch ? 'on' : ''}" data-action="browser-select-tab" data-tab="visits">浏览历史</button>
@@ -91,10 +93,30 @@ export function renderBrowserHtml({ world, busy, tab = 'search', seenAt = 0, bro
         ${body}`;
 }
 
+// M9 §4.3:「よく見るページ」常驻三卡——brand 条与 tabs 之间,有 pinned visit 才渲染。新内容小圆点
+// 与列表行 dot 同一分工(ts 判新旧,不是 worldTime):snapshot 或任一追記的入账 ts 晚于 seenAt 就亮。
+function pinHasNew(world, visit, seenAt) {
+    if (seenAt <= 0) return false; // 整屏都是新的没必要逐张点(同列表行 dot 的判据)
+    const snap = world.snapshots.get(visit.visitId);
+    if (snap && snap.ts > seenAt) return true;
+    return (world.snapshotAppends.get(visit.visitId) || []).some(a => a.ts > seenAt);
+}
+
+function renderPinsHtml(world, seenAt) {
+    const pinned = [...world.visits.values()].filter(v => v.pinned).sort((a, b) => (a.slot || '').localeCompare(b.slot || ''));
+    if (!pinned.length) return '';
+    return `<div class="or-browser-pins">${pinned.map(v => `
+        <button class="or-browser-pin" data-action="open-web-page" data-visit-id="${escapeHtml(v.visitId)}">
+            ${pinHasNew(world, v, seenAt) ? '<span class="or-browser-pin-dot"></span>' : ''}
+            <div class="or-browser-pin-title">${escapeHtml(v.title)}</div>
+            <div class="or-browser-pin-sub">${escapeHtml(v.site || '')}</div>
+        </button>`).join('')}</div>`;
+}
+
 // ── v0.14 网页快照(task-007 她拍板:AI 直出整页 HTML)。渲染前两道闸:①这里的白名单式消毒
 // (拔脚本/外链/事件属性,href 全改死链)②iframe sandbox=""(空值=全禁,脚本层保险)。
 // 她要的趣味在 <style> 排版自由——消毒只拔危险面,不动样式创意。──
-function sanitizeSnapshotHtml(html) {
+export function sanitizeSnapshotHtml(html) {
     if (typeof DOMParser === 'undefined') return ''; // 非浏览器环境(冒烟测试)不渲染
     const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
     // ⚠️HTML 解析器会把裸 <style> 收进 <head>,而最终只取 body.innerHTML——不搬回去,页面的
@@ -115,24 +137,44 @@ function sanitizeSnapshotHtml(html) {
     return doc.body.innerHTML;
 }
 
+// M9 §7.2:合成——纯字符串操作,不碰 DOM,消毒(sanitizeSnapshotHtml)永远在它之后单独跑一次。
+// 有标记(PROMPT_M2 原则 10 要求页面必须留的那个空位)就把追記依次拼进标记 div 内部;找不到标记
+// (理论上不该发生)就整段拼到末尾,外面兜一层 orrery-tsuiki 容器不让追記连样式钩子都没有。
+export function composeSnapshotHtml(html, appends) {
+    const base = String(html || '');
+    if (!Array.isArray(appends) || !appends.length) return base;
+    const appendHtml = appends.map(a => String(a?.html || '')).join('');
+    const marker = '<div data-orrery-append></div>';
+    // 替换值走函数形式:字符串形式的 replace 会把追記里碰巧出现的 $&/$' 当特殊替换模式吃掉
+    if (base.includes(marker)) return base.replace(marker, () => `<div data-orrery-append>${appendHtml}</div>`);
+    return `${base}<div class="orrery-tsuiki">${appendHtml}</div>`;
+}
+
 /**
  * 快照页:omnibox 显示世界自己报的 URL(壳拟真闭环)+ sandbox iframe 装页面 + 星标(可收进星图)。
  * 无快照时:busy=接收骨架(点开触发的生成正在跑);非 busy=信号中断+重试。
+ * M9:appends 依次拼进正文(合成见 composeSnapshotHtml)后再消毒;内网页(isIntraVisit)在星标旁
+ * 多一颗刷新钮——公共页没有「追記」这回事,不出现。
  */
-export function renderWebPageHtml({ visit, snapshot, busy, starred = {} }) {
+export function renderWebPageHtml({ visit, snapshot, appends = [], community, busy, starred = {} }) {
     const starKey = starKeyForVisit(visit.visitId);
     const on = !!starred[starKey];
     const starBtn = snapshot ? `<button class="or-star ${on ? 'on' : ''}" data-action="toggle-star" data-star-key="${escapeHtml(starKey)}" title="${on ? '从星图移除' : '加入星图'}">${on ? ICON_STAR_FILL : ICON_STAR}</button>` : '';
+    const refreshBtn = (snapshot && isIntraVisit(visit, community))
+        ? `<button class="or-pill-btn small" data-action="webpage-refresh" data-visit-id="${escapeHtml(visit.visitId)}" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : '刷新'}</button>`
+        : '';
     let body;
     if (snapshot) {
         // 兜底只加两条,不掺会压扁排版的全局规则:html{overflow-x:auto} 让提示词层刻意保留桌面版式的
         // 社内系统能整页横向滚动而不是被挤压;img/video max-width 防止图片撑破窄屏容器。桌面版式本身
         // 靠模型给最外层容器写 min-width 来横向滚动——这是提示词层的约定,这里不重复兜底也不越权覆盖。
-        const clean = sanitizeSnapshotHtml(snapshot.html);
+        const composed = composeSnapshotHtml(snapshot.html, appends);
+        const clean = sanitizeSnapshotHtml(composed);
         const srcdoc = `<style>a{cursor:not-allowed !important}body{margin:0;padding:14px;box-sizing:border-box;overflow-wrap:break-word}html{overflow-x:auto}img,video{max-width:100%;height:auto}</style>${clean}`;
+        const zhLines = [snapshot.zh, ...appends.map(a => a.zh)].filter(Boolean);
         body = `<div class="or-webpage-body">
             <iframe class="or-webpage-frame" sandbox="" srcdoc="${escapeHtml(srcdoc)}"></iframe>
-            ${snapshot.zh ? `<div class="or-webpage-zh">${escapeHtml(snapshot.zh)}</div>` : ''}
+            ${zhLines.length ? `<div class="or-webpage-zh">${zhLines.map(z => `<div>${escapeHtml(z)}</div>`).join('')}</div>` : ''}
         </div>`;
     } else if (busy) {
         body = `<div class="or-empty">${genSpinnerHtml()}<br>接收信号中…页面正在跨越次元抵达。</div>`;
@@ -143,6 +185,7 @@ export function renderWebPageHtml({ visit, snapshot, busy, starred = {} }) {
         <div class="or-header">
             <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
             <span class="or-header-title">${escapeHtml(visit.title)}</span>
+            ${refreshBtn}
             ${starBtn}
         </div>
         <div class="or-browser-brand"><div class="or-browser-omnibox">

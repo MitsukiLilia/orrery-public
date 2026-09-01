@@ -135,6 +135,17 @@ export function anonIdFor(threadId, key) {
     return ((h >>> 0) % 36 ** 6).toString(36).padStart(6, '0'); // 异或会把值带回有符号,最后再转一次无符号
 }
 
+// ── M9 内网判定:单一定义,generator/shell/app 三处共用,谁也不许自己重写一遍这条正则。──
+// pinned/intra 标志优先(常驻卡与 PROMPT_J 消化层已经把判断做完的条目);关键词兜底只在有所属时生效——
+// 没有所属就没有内网这回事,不能靠站名/标题里偶然出现的词把一张公共页错判成内网页(公共 lane 零风险
+// 是任务书的红线,兜底必须保守)。
+export function isIntraVisit(visit, community) {
+    if (!visit) return false;
+    if (visit.pinned || visit.intra) return true;
+    if (!community) return false;
+    return /(intra\.|イントラ|社内システム|稟議|勤怠|経費精算)/.test(`${visit.site || ''} ${visit.title || ''}`);
+}
+
 /**
  * 账本 fold 成世界状态:{ contacts, groups, threads, worldNow, boards, residents, forumThreads, forumNow,
  *   snsAccounts, tweets, snsNow, searches, visits, browserNow, worldClock }。
@@ -183,6 +194,7 @@ export function foldWorld(entries) {
     const photosById = new Map(); // 内部工作表,最终按 worldTime 排序输出为 photos 数组(见 return)
     const memos = new Map();
     const snapshots = new Map();  // v0.14 网页快照:visitId -> web_snapshot(一 visit 一张,后写覆盖)
+    const snapshotAppends = new Map(); // M9:visitId -> web_snapshot_append[](一 visit 可多条追記,组内按 ts 升序,见下方排序)
     let snsSuggest = null;        // v0.14 搜索联想:整批一条,后写覆盖=只留最新一批
     let community = null;         // M5 所属:一世界一条,后写覆盖=只留最新(同 snsSuggest 的语义)
     let nowPlaying = null;        // M8 单曲循环:一世界一条,后写覆盖=只留最新一首(同 community 的语义)
@@ -263,6 +275,10 @@ export function foldWorld(entries) {
             visits.set(e.payload.visitId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'web_snapshot') {
             snapshots.set(e.payload.visitId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'web_snapshot_append') {
+            const list = snapshotAppends.get(e.payload.visitId) || [];
+            list.push({ ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+            snapshotAppends.set(e.payload.visitId, list);
         } else if (e.type === 'sns_suggest') {
             snsSuggest = { ...e.payload, ts: e.ts };
         } else if (e.type === 'community') {
@@ -340,6 +356,12 @@ export function foldWorld(entries) {
     let browserNow = 0;
     for (const s of searches.values()) if (Number.isFinite(s.worldTime)) browserNow = Math.max(browserNow, s.worldTime);
     for (const v of visits.values()) if (Number.isFinite(v.worldTime)) browserNow = Math.max(browserNow, v.worldTime);
+    // M9:追記也是浏览器的动静(同 M7c「worldClock=max 六 Now」的哲学),组内顺带排好 ts 升序——
+    // fold 只做一次,UI/生成层都直接消费排好的顺序,不必各自再排一遍。
+    for (const list of snapshotAppends.values()) {
+        list.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+        for (const a of list) if (Number.isFinite(a.worldTime)) browserNow = Math.max(browserNow, a.worldTime);
+    }
 
     // M4 相册时钟:photos 按 worldTime 升序输出(任务书 §2 明写的契约),UI 需要倒序时自己再排一遍
     // (同 browser 的习惯,app.js 不借 foldWorld 排好的方向,各自按自己的展示需求排)。
@@ -373,7 +395,7 @@ export function foldWorld(entries) {
         contacts, groups, threads, worldNow: worldNow || null,
         boards, residents, forumThreads, forumNow: forumNow || null,
         snsAccounts, tweets, snsNow: snsNow || null,
-        searches, visits, browserNow: browserNow || null, snapshots, snsSuggest,
+        searches, visits, browserNow: browserNow || null, snapshots, snapshotAppends, snsSuggest,
         photos, galleryNow: galleryNow || null,
         memos, memoNow: memoNow || null,
         community, notices, // M5:所属(对象或 null)+ 公告表
@@ -451,6 +473,7 @@ export function latestTsOfBrowser(world) {
     let max = 0;
     for (const s of world.searches.values()) if (s.ts > max) max = s.ts;
     for (const v of world.visits.values()) if (v.ts > max) max = v.ts;
+    for (const list of world.snapshotAppends.values()) for (const a of list) if (a.ts > max) max = a.ts;
     return max;
 }
 
