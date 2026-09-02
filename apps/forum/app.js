@@ -156,11 +156,15 @@ export function renderForumThreadHtml({
     // 没有草稿就是空占位符;生成按钮的文案由它决定(有草稿=先发出再续写)。
     const d = thread.myDraft;
     const hasDraft = !!d?.text;
+    // M12.1(她 2026-09-03 拍板):裏帖的草稿永远发不出去——回复框里照样显示「写了又删」的那句话
+    // 与光标(余波本体),但发送图标不点亮、按钮只剩「生成回复」;领导在裏一开口,打工人的嗅觉会把
+    // 这块地也毁掉,里版从此听不到实话。
+    const canSend = hasDraft && thread.side !== 'ura';
     const composerHtml = `<div class="or-forum-composer ${hasDraft ? 'has-draft' : ''}">
             <div class="or-forum-composer-box">${hasDraft
         ? `<span class="or-forum-composer-text">${escapeHtml(d.text)}</span><span class="or-forum-caret"></span>`
         : `<span class="or-forum-composer-placeholder">回复这个帖子…</span>`}</div>
-            <span class="or-forum-composer-send ${hasDraft ? 'on' : ''}">${ICON_SEND}</span>
+            <span class="or-forum-composer-send ${canSend ? 'on' : ''}">${ICON_SEND}</span>
         </div>
         ${hasDraft && d.zh && d.zh !== d.text ? `<div class="or-forum-composer-zh">${escapeHtml(d.zh)}</div>` : ''}`;
 
@@ -201,6 +205,6 @@ export function renderForumThreadHtml({
                 <span class="or-batch-value">${replyBatch}</span>
                 <button data-action="stepper" data-field="forumReplyBatch" data-delta="1" ${busy ? 'disabled' : ''}>${ICON_PLUS}</button>
             </div>
-            <button class="or-pill-btn" data-action="forum-generate-more" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : (hasDraft ? '发出并生成回复' : '生成回复')}</button>
+            <button class="or-pill-btn" data-action="forum-generate-more" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : (canSend ? '发出并生成回复' : '生成回复')}</button>
         </div>`}`;
 }

@@ -1229,8 +1229,9 @@
         ];
     }
 
-    // ③ 裏盖楼:走 G2 路由;草稿发出后新楼 anon.key==='me' 且带 fromDraftId,residents 数量
-    //    不变(裏没有固定住民这回事);模型回复里混入的 authorId 被剥离成纯 anon。
+    // ③ 裏盖楼:走 G2 路由;M12.1 起裏帖的草稿永远发不出去——盖楼后不许出现任何带 fromDraftId
+    //    的楼、myDraft 仍停在回复框里、residents 数量不变(裏没有固定住民这回事);模型回复里
+    //    混入的 authorId 被剥离成纯 anon。
     async function assertForumUraThreadContinue() {
         const wk = `__m12_assert_ura_g2_${Date.now()}`;
         await store.setOwner(wk, 'テスト主人');
@@ -1255,8 +1256,8 @@
         const strippedReply = thread.replies.find(r => r.body === 'これは草');
         const out = [
             ['生成成功', !!result?.ok],
-            ['草稿发出楼 anon.key===me', draftReply?.anon?.key === 'me'],
-            ['草稿发出楼带 fromDraftId', draftReply?.fromDraftId === 'fd_seed'],
+            ['裏帖草稿永远不发出:没有任何带 fromDraftId 的楼', !draftReply && !thread.replies.some(r => r.fromDraftId)],
+            ['myDraft 仍停在回复框里(写了又删的余波保留)', thread.myDraft?.draftId === 'fd_seed'],
             ['residents 数量不变', folded.residents.size === residentsBefore],
             ['模型回复里混入的 authorId 被剥离成纯 anon', !!strippedReply && !!strippedReply.anon && !strippedReply.authorId],
         ];

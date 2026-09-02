@@ -105,7 +105,7 @@ export const PROMPT_F2 = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - worldTime 从正文推断,只许向后走`;
 
 export const PROMPT_G2 = `你是 Orrery,叙事世界观测引擎。用户想继续围观「{{community}}」的裏サイト上这个帖子的后续——这里是成员们背着上面的人说真话的匿名场所,没有固定住民,人人都是一次性的名無し。基于帖子走向,自然地续写{{COUNT_RULE}}
-遵守:像日系匿名掲示板般跟风、歪楼、带「w/草」与颜文字,绝不像小说;发言者一律用 anon(同帖同 key=同一人,可沿用材料里[本帖的名無し]已出现的 key 让某人回来接话,新人就起新 key),没有 authorId 这回事;大前提是「ここは上に見られていない」——本音不过滤,对上司与制度的抱怨、隐语绰号、粗口与自嘲都可以,但匿名是铁律(真名与役職+姓永不出现,役職本身可以叫);察し在这里反转:没有翼賛,偶尔有人疑神疑鬼「ここ見られてないよね?」引发一小阵自我审查再照旧吐槽,没有人写出是谁在看;主线人物及其身边人若在本帖说话也同样匿名,只靠口癖透出「像但不明说」,绝不自曝、言行不得 OOC(以【人物设定参考】为准);每人只知道自己知道的,无关住民不得把与主线雷同的经历当成自己的亲历;旁观者接话按吃瓜的天性歪出错误、夸张的推论(不许借「猜错」夹带正文没有的事实),歪的只许是事实与因果,不许是感情的重量——已确立的关系温度只许围观不许降格;自演(同帖换 key 自问自答,口吻相似不点破)与安価(>>N に従う,只决定鸡毛蒜皮)是这里的调味;材料里若有【主人刚刚发出的回复】,它就是本帖最新的一楼,以匿名身份发出——对本帖的其他人来说只是又一个名無し,续写必须以它为前提、不得复述它;若那一楼的措辞透出上位者的气质,这里的反应不是翼賛而是慌乱——「え、まさか本人?」式的疑神疑鬼、楼里骤然安静、有人喊「消せ」,然后要么散去要么有人硬着头皮继续;🚨剧情冻结——正文是这个世界唯一的剧情作者,盖楼只是余波:世界的「现在」停在正文最新一幕落笔的那一瞬,住民只能围绕已发生、公开可见的事继续跟风追问,绝不许爆出正文尚未发生的新事件或关系进展,也不许替剧情预告下一步;楼歪到没得聊时,转向翻旧账或共同体的鸡毛蒜皮;不复述正文。
+遵守:像日系匿名掲示板般跟风、歪楼、带「w/草」与颜文字,绝不像小说;发言者一律用 anon(同帖同 key=同一人,可沿用材料里[本帖的名無し]已出现的 key 让某人回来接话,新人就起新 key),没有 authorId 这回事;大前提是「ここは上に見られていない」——本音不过滤,对上司与制度的抱怨、隐语绰号、粗口与自嘲都可以,但匿名是铁律(真名与役職+姓永不出现,役職本身可以叫);察し在这里反转:没有翼賛,偶尔有人疑神疑鬼「ここ見られてないよね?」引发一小阵自我审查再照旧吐槽,没有人写出是谁在看;主线人物及其身边人若在本帖说话也同样匿名,只靠口癖透出「像但不明说」,绝不自曝、言行不得 OOC(以【人物设定参考】为准);每人只知道自己知道的,无关住民不得把与主线雷同的经历当成自己的亲历;旁观者接话按吃瓜的天性歪出错误、夸张的推论(不许借「猜错」夹带正文没有的事实),歪的只许是事实与因果,不许是感情的重量——已确立的关系温度只许围观不许降格;自演(同帖换 key 自问自答,口吻相似不点破)与安価(>>N に従う,只决定鸡毛蒜皮)是这里的调味;主人在这里只潜水,永远不会开口——TA 写了又删的话住民看不见,🚫绝不许有任何一楼回应它;🚨剧情冻结——正文是这个世界唯一的剧情作者,盖楼只是余波:世界的「现在」停在正文最新一幕落笔的那一瞬,住民只能围绕已发生、公开可见的事继续跟风追问,绝不许爆出正文尚未发生的新事件或关系进展,也不许替剧情预告下一步;楼歪到没得聊时,转向翻旧账或共同体的鸡毛蒜皮;不复述正文。
 {{LANG_RULE}}
 只输出 JSON:{"replies":[{"anon":{"key":"帖内短标记","name":"名無し系默认名"},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}
 - 每一楼都必须带 anon;缺 anon 的楼作废`;
@@ -1942,10 +1942,11 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWin
     // 草稿本身不进 buildForumThreadDigestText(住民看不见未发送的东西),只在这里额外告诉模型
     // 「主人马上要发出这一楼」,让续写的住民能对它自然产生反应——放在 digest 末尾,同 regrowHint
     // 的位置哲学(临时指令贴着输出更有效,不挤占前面稳定材料的缓存)。
-    const draftNote = draft?.text
-        ? (isUra
-            ? `\n\n【主人刚刚发出的回复】(主人=「${charName}」,以匿名身份发出——对本帖的其他人来说只是又一个名無し,无人知道是 TA)\n${draft.text}`
-            : `\n\n【主人刚刚发出的回复】(主人=「${charName}」;${ownerRes ? `作者=固定住民 ${ownerRes.handle}` : '主人尚无固定住民,请用 ownerResident 为主人的小号起一个固定网名'})\n${draft.text}`)
+    // M12.1(她 2026-09-03 拍板):裏帖的草稿永远发不出去——领导在裏一开口,打工人的嗅觉马上把这块地
+    // 也毁了,里版就再也听不到实话。草稿本身留着当「写了又删」的余波(buildOwnerInnerStateText 已把草稿
+    // 喂进感情棘轮),但不再作为「刚刚发出的回复」告诉模型,住民也就永远看不见它。
+    const draftNote = (draft?.text && !isUra)
+        ? `\n\n【主人刚刚发出的回复】(主人=「${charName}」;${ownerRes ? `作者=固定住民 ${ownerRes.handle}` : '主人尚无固定住民,请用 ownerResident 为主人的小号起一个固定网名'})\n${draft.text}`
         : '';
     const userContent = `${castRef}${notes.text}${recent}${buildOwnerInnerStateText(world)}${buildForumThreadDigestText(world, thread)}${draftNote}`;
     logContextShape('论坛盖楼', userContent, notes.keys);
@@ -1963,18 +1964,9 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWin
 
     // 草稿发出:不管模型这次给不给续写,先把主人这一楼落进账本——它是真实论坛活动,worldTime
     // 排在现有楼层之后、模型续写的楼层之前,anchor 随之前移,后续消化与 replyToFloor 校验都以它为基。
-    if (draft?.text && isUra) {
-        // 主人在裏板发出=又一个名無し:name 取本帖 OP 的 anon.name,OP 不是 anon(理论上不该
-        // 发生,防御性兜底)就取本帖第一条 anon 回复的 name,都没有则'名無し'——展示 ID 由
-        // anonIdFor(threadId,'me') 现算,与其他名無し同款,没有专属标记。
-        const meName = thread.anon?.name || thread.replies.find(r => r.anon)?.anon?.name || '名無し';
-        anchor += 60000;
-        const rpayload = { threadId, anon: { key: 'me', name: meName }, body: String(draft.text), worldTime: anchor, fromDraftId: draft.draftId };
-        { const z = cleanZh(draft.zh, draft.text, language); if (z) rpayload.zh = z; }
-        await store.addEntry({ worldKey, sourceFloor, app: 'forum', type: 'forum_reply', payload: rpayload });
-        thread.replies.push(rpayload);
-        addedCount++;
-    } else if (draft?.text) {
+    // 草稿发出只走表帖(M12.1):裏帖的 draft 在上面的 draftNote 里已被排除,这里同样跳过——
+    // 主人在裏永远只潜水,草稿停在回复框里当「写了又删」。
+    if (draft?.text && !isUra) {
         let resolvedOwner = ownerRes;
         if (!resolvedOwner) {
             const or = parsed.ownerResident;
