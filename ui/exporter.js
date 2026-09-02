@@ -66,7 +66,9 @@ ${footer ? `<div class="or-export-footer">${escapeHtml(footer)}</div>` : ''}
 // 楼号用原始 iF 序号(遍历完整 thread.replies,只在选中时才拼进输出),跳选也不重排。
 export function buildForumExportHtml({ thread, world, selectedSeqs }) {
     const board = world.boards?.get(thread.boardId);
-    const boardName = board?.name || '';
+    // M12:裏サイト的帖子没有板块——boardName 为空时用「裏サイト」替代,boardHead/footer 两处
+    // 板名位天然一起换上(下面都是读 boardName 这一个变量,不必分两处判断 thread.side)。
+    const boardName = board?.name || (thread.side === 'ura' ? '裏サイト' : '');
     const includeOp = selectedSeqs === null || selectedSeqs.has('op');
 
     const boardHead = boardName ? `<div class="or-export-forum-board">${escapeHtml(boardName)}</div>` : '';

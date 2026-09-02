@@ -140,11 +140,14 @@ export function anonIdFor(threadId, key) {
  *   snsAccounts, tweets, snsNow, searches, visits, browserNow, worldClock }。
  * threads: threadId -> { threadId, kind:'dm'|'group', contactId?, group?, messages:[], summaries:[], unread, lastMessage }
  * dm 的 threadId===contactId;群聊的 threadId===groupId,成员内联在 group.members(不必是通讯录好友)。
- * forumThreads: threadId -> { threadId, boardId, title, authorId?, anon?, body, zh?, worldTime, replies:[](按
- *   worldTime 升序,每条同样 authorId?/anon? 二选一), replyCount, lastActiveTs, myDraft? } —— 论坛自己的账,
- *   不碰 threads/worldNow(两个 app 的水互不相扰,水位重构的初衷)。authorId=固定住民(residents 表里能查到);
- *   anon={key,name}=次抛匿名(M7a §1.1),UI 用 anonIdFor(threadId, key) 现算展示 ID,不落表。myDraft 一旦
- *   在 replies 里发现 fromDraftId 与之相符的一楼(草稿已发出),fold 收尾时置 null(见下方 forumNow 循环)。
+ * forumThreads: threadId -> { threadId, side:'omote'|'ura', boardId?, title, authorId?, anon?, body, zh?,
+ *   worldTime, replies:[](按 worldTime 升序,每条同样 authorId?/anon? 二选一), replyCount, lastActiveTs,
+ *   myDraft? } —— 论坛自己的账,不碰 threads/worldNow(两个 app 的水互不相扰,水位重构的初衷)。
+ *   authorId=固定住民(residents 表里能查到);anon={key,name}=次抛匿名(M7a §1.1),UI 用
+ *   anonIdFor(threadId, key) 现算展示 ID,不落表。side(M12):payload 带 side:'ura' 才是裏サイト帖,
+ *   没有 boardId、也没有固定住民(anon 恒真);其余(缺省)就是表板帖,fold 收尾统一归一成
+ *   'omote'(见下方 forumNow 循环),UI/生成层从此不必再判 undefined。myDraft 一旦在 replies 里
+ *   发现 fromDraftId 与之相符的一楼(草稿已发出),fold 收尾时置 null(见下方 forumNow 循环)。
  * snsAccounts: accountId -> sns_account payload(同 accountId 重发即覆盖——entries 已按 ts 升序 fold,Map.set
  *   天然「后写赢」,同 contacts 先例,不需要额外的"已存在就跳过"判断)。
  * tweets: tweetId -> { tweetId, accountId, body, zh?, worldTime, likes, retweets, retweetOf?, replies:[](按
@@ -332,6 +335,10 @@ export function foldWorld(entries) {
 
     let forumNow = 0;
     for (const t of forumThreads.values()) {
+        // M12:裏サイト(side:'ura')与表板——forum_thread 的 payload 带 side 就已经在上面的
+        // Object.assign(e.payload)里写上了 t.side;这里补一次归一,把「没有 side」(表板旧世界、
+        // 或帖壳还没等到 forum_thread 到达)一律钳成 'omote',UI/生成层从此不必再判 undefined。
+        t.side = t.side === 'ura' ? 'ura' : 'omote';
         t.replies.sort((a, b) => (a.worldTime || a.ts) - (b.worldTime || b.ts));
         t.replyCount = t.replies.length;
         const times = [t.worldTime, ...t.replies.map(r => r.worldTime)].filter(Number.isFinite);

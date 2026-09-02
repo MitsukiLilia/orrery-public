@@ -111,11 +111,13 @@
             <label class="mock-label"><input type="checkbox" id="fxBroken"> 模拟解析失败(两次都返回垃圾文本)</label><br>
             <label class="mock-label"><input type="checkbox" id="fxEmptyB"> 续聊/盖楼返回空 messages/replies(测试「暂无新动静」)</label><br>
             <p class="note" style="margin:8px 0 0;">
-                fixture 按 systemPrompt 内容自动路由(SNS/论坛的续写档都排在「续写」检查之前,因为 PROMPT_G/I
-                本身也含「续写」二字;M11 门户条目页面排在门户主生成之前,因为两条门户提示词都含「门户」):
+                fixture 按 systemPrompt 内容自动路由(SNS/论坛/裏サイト的续写档都排在「续写」检查之前,因为
+                PROMPT_G/G2/I 本身也含「续写」二字;M11 门户条目页面排在门户主生成之前,因为两条门户提示词都含「门户」):
                 含「压缩成 5 行以内」→摘要(C)/含「登录中的 SNS」→SNS 主生成(H,首刷/二刷两版按账本是否已有账号自动切换)/
                 含「围观这条推文」→SNS 回复续写(I)/含「判断主角」→所属コミュニティ推断(O,论坛/浏览器/门户
                 生成前都会先调它一次,一世界只推一次、结果永久缓存)/含「手机里的内部掲示板」→论坛主生成(F)/
+                含「请推演裏サイト上自然会出现的新动静」→裏サイト主生成(F2,M12)/
+                含「裏サイト上这个帖子的后续」→裏サイト盖楼(G2,M12,必须排在下面 G 与「续写」之前)/
                 含「内部掲示板上这个帖子的后续」→论坛盖楼(G)/
                 含「浏览器「Astrolabe」」→浏览器主生成(J,没有续写入口,只有这一条)/
                 含「手机里的相册」→相册主生成(K,没有续写入口,只有这一条)/
@@ -140,6 +142,12 @@
             <legend>5. M11 断言:门户(照任务书-M11 §11 的七条对应,纯逻辑用真实模块函数、涉账本的用真实 IndexedDB 加临时 worldKey 跑完即清)</legend>
             <button class="mock-btn" id="runM11AssertBtn">运行全部断言</button>
             <div id="m11AssertResult">(未运行)</div>
+        </fieldset>
+
+        <fieldset>
+            <legend>6. M12 断言:裏サイト(照任务书-M12 §7 的六条对应,纯渲染用真实模块函数、涉生成/账本的用真实 IndexedDB 加临时 worldKey 跑完即清)</legend>
+            <button class="mock-btn" id="runM12AssertBtn">运行全部断言</button>
+            <div id="m12AssertResult">(未运行)</div>
         </fieldset>
 
         <fieldset>
@@ -191,6 +199,7 @@
     import * as generator from '../core/generator.js';
     import { computeWorldKey, inheritedWorldKey, foldWorld, hasUnseenInApp, seenKeyForAlmanac, latestTsOfAlmanac } from '../core/world.js';
     import { sanitizeSnapshotHtml } from '../apps/browser/app.js';
+    import { renderForumListHtml } from '../apps/forum/app.js';
     import { escapeHtml } from '../core/escape.js';
     import {
         buildForumExportHtml, buildMessengerExportHtml, buildWebExportHtml, buildAlmanacExportHtml,
@@ -362,6 +371,47 @@
             body.ownerResident = { residentId: 'r_owner_fx', handle: '名無しの主', persona: '', castName: '' };
         }
         return body;
+    }
+
+    // ── M12 裏サイト fixture(F2/G2)──
+    // 2 个 newThreads 全 anon,其中一帖带 myDraft;1 楼故意混 authorId:'r_shadow' 且无 anon
+    // ——裏没有固定住民这回事,消化时应被剥离+丢弃;newReplies 一条指向 t_seed_omote(assertion
+    // 里手工种下的表帖真实 id)——验证「指向表帖」这条丢弃路径。
+    function buildFixtureF2() {
+        return {
+            worldTime: '2026-08-10 23:50',
+            newThreads: [
+                {
+                    anon: { key: 'u1', name: '名無しの社畜' }, title: '今日も詰められた',
+                    ...withZhBody('もう無理かもしれない(小声)'),
+                    replies: [
+                        { anon: { key: 'u2', name: '通りすがり' }, ...withZhBody('分かる、それな'), delayMin: 1 },
+                        { authorId: 'r_shadow', ...withZhBody('この発言は破棄されるはず'), delayMin: 2 },
+                    ],
+                    myDraft: withZh('本当は今すぐ辞めたい'),
+                },
+                {
+                    anon: { key: 'u3', name: '匿名希望' }, title: 'さっき見た変な光景',
+                    ...withZhBody('あれは一体なんだったんだろう'),
+                    replies: [],
+                },
+            ],
+            newReplies: [
+                { threadId: 't_seed_omote', replies: [
+                    { anon: { key: 'u9', name: '名無し' }, ...withZhBody('这条也不该被消化'), delayMin: 0 },
+                ] },
+            ],
+        };
+    }
+    // M12 裏サイト盖楼:3 楼全 anon,一条沿用材料里[本帖的名無し]已出现的 key;末尾一条故意混一个
+    // authorId(裏没有固定住民这回事)——验证消化时被剥离成纯 anon,不会误走 newResident 那条分支。
+    function buildFixtureG2(userContent) {
+        const reusedKey = extractExistingAnonKey(userContent) || 'u1';
+        return { replies: [
+            { anon: { key: reusedKey, name: '名無しの社畜' }, ...withZhBody('それな、まじで'), delayMin: 1 },
+            { anon: { key: 'u8', name: '通りすがり' }, ...withZhBody('初めて見た、こわ'), delayMin: 2 },
+            { authorId: 'r_shadow', anon: { key: 'u9', name: '匿名希望' }, ...withZhBody('これは草'), delayMin: 1 },
+        ] };
     }
 
     // ── M2 SNS「Pulsar」fixture(H/I) ──
@@ -604,6 +654,10 @@
 
     // M11 断言④用:数一数 PROMPT_Q 那条路由真的被调用了几次(缓存命中时不该再涨)。
     let qCallCount = 0;
+    // M12 断言⑥用:裏サイト主生成这一路每次都把 userContent 原样存一份——省心版的「digest 断言」,
+    // 不必专门为 buildForumUraDigestText 开一个导出口子(照 M11 用真实模块函数/mock 捕获两选一的
+    // 惯例,这里选后者:qCallCount 已经是同一个"从 mockGenerate 侧信道回传信息给断言"的先例)。
+    let capturedUraUserContent = null;
 
     function mockGenerate(systemPrompt, userContent) {
         if (document.getElementById('fxBroken').checked) return '(不知道你在说什么，我拒绝回答。)';
@@ -628,6 +682,13 @@
         // ——旧词从没命中过,论坛主生成 fixture 一直悄悄落到最后的默认档(buildFixtureA),这次顺手修。
         if (systemPrompt.includes('手机里的内部掲示板')) {
             const body = buildFixtureF();
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        // M12:裏サイト主生成(F2)。"请推演裏サイト上自然会出现的新动静"是 PROMPT_F2 独有的措辞,
+        // 放在「手机里的内部掲示板」前后都行(两条互不重叠)——顺手把 userContent 存一份供断言⑥用。
+        if (systemPrompt.includes('请推演裏サイト上自然会出现的新动静')) {
+            capturedUraUserContent = userContent;
+            const body = buildFixtureF2();
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
         if (systemPrompt.includes('浏览器「Astrolabe」')) {
@@ -663,6 +724,13 @@
         if (systemPrompt.includes('手机里的备忘录')) {
             const isFirstTime = (userContent || '').includes('备忘录是空的');
             const body = isFirstTime ? buildFixtureLFirst() : buildFixtureLRegrow(extractExistingMemoId(userContent));
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        // M12:裏サイト盖楼(G2)。⚠️必须排在「内部掲示板上这个帖子的后续」与下面通用「续写」两条
+        // 之前——PROMPT_G2 自己的措辞也含「续写」二字,且「裏サイト上这个帖子的后续」与 PROMPT_G
+        // 的「内部掲示板上这个帖子的后续」不撞,但顺序仍按任务书纪律靠前放,不留隐患。
+        if (systemPrompt.includes('裏サイト上这个帖子的后续')) {
+            const body = emptyMore ? { replies: [] } : buildFixtureG2(userContent);
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
         // 同上:PROMPT_G 的措辞是「内部掲示板上这个帖子的后续」,不是「围观这个帖子」——旧词碰巧
@@ -1096,6 +1164,213 @@
         runM11Assertions().catch(err => {
             document.getElementById('m11AssertResult').textContent = `断言运行出错:${err?.message || err}`;
             console.error('[M11 断言]', err);
+        });
+    });
+
+    // ── M12 §7:断言面板。①③⑤⑥涉生成/账本,开临时 worldKey 跑完即清(同 M11 的工法);
+    // ②是纯内存 world + renderForumListHtml 的纯渲染断言,不碰 IndexedDB;④用既有的
+    // buildFixtureF/buildFixtureG(不是 M12 新增的 F2/G2)专门验证表 lane 没被 isUra 分道带偏。──
+
+    // ① 真路径裏首刷:2 帖全 anon 落账且无 boardId;缺 anon 的楼(authorId 无 anon)被丢弃;
+    //    newReplies 指向表帖被丢弃;forum_draft 落账;forumUra 水位推进而 forum 水位不动。
+    async function assertForumUraMainFlow() {
+        const wk = `__m12_assert_ura_main_${Date.now()}`;
+        await store.setOwner(wk, 'テスト主人');
+        // 表帖种子:专供下面「newReplies 指向表帖」这条丢弃路径使用的真实 threadId
+        // (buildFixtureF2 的 newReplies 硬编码指向它)。
+        await store.addEntry({
+            worldKey: wk, sourceFloor: 0, app: 'forum', type: 'forum_thread',
+            payload: { threadId: 't_seed_omote', boardId: 'b_seed', title: '表帖种子', body: '', worldTime: 1000 },
+        });
+        const wmForumBefore = await store.getWatermark(wk, 'forum');
+        const wmForumUraBefore = await store.getWatermark(wk, 'forumUra');
+        const result = await generator.generateMoreForumUra(ctx, store, {
+            worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '',
+        });
+        const folded = foldWorld(await store.getEntriesForWorld(wk));
+        const uraThreads = [...folded.forumThreads.values()].filter(t => t.side === 'ura');
+        const seedThread = folded.forumThreads.get('t_seed_omote');
+        const draftEntry = (await store.getEntriesForWorld(wk)).find(e => e.type === 'forum_draft');
+        const wmForumUraAfter = await store.getWatermark(wk, 'forumUra');
+        const wmForumAfter = await store.getWatermark(wk, 'forum');
+        const out = [
+            ['生成成功', !!result?.ok],
+            ['落账 2 个裏帖,side===ura 且无 boardId', uraThreads.length === 2 && uraThreads.every(t => t.side === 'ura' && !t.boardId)],
+            ['缺 anon 的楼(authorId:r_shadow 无 anon)被丢弃', !uraThreads.some(t => t.replies.some(r => r.body === 'この発言は破棄されるはず'))],
+            ['newReplies 指向表帖被丢弃(表帖没多出那条回复)', !!seedThread && !seedThread.replies.some(r => r.body === '这条也不该被消化')],
+            ['forum_draft 落账', !!draftEntry && draftEntry.payload.text === '本当は今すぐ辞めたい'],
+            ['watermark forumUra 推进', wmForumUraAfter > wmForumUraBefore],
+            ['watermark forum 不受影响', wmForumAfter === wmForumBefore],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
+    // ② fold:表/裏各自过滤正确——纯内存 world,不碰账本。renderForumListHtml 是纯函数,
+    // 直接喂一份手工折好的 world 即可,不必真跑一次生成。
+    function assertForumSideFilterAndTag() {
+        const world = {
+            community: { name: 'テスト組織' },
+            boards: new Map([['b1', { boardId: 'b1', name: '雑談' }]]),
+            residents: new Map(),
+            worldClock: 5000,
+            forumThreads: new Map([
+                ['t_o', { threadId: 't_o', side: 'omote', boardId: 'b1', title: '表帖标题', anon: { key: 'a', name: '名無し' }, body: '', replyCount: 0, lastActiveTs: 1000, replies: [] }],
+                ['t_u', { threadId: 't_u', side: 'ura', title: '裏帖标题', anon: { key: 'b', name: '名無し' }, body: '', replyCount: 0, lastActiveTs: 2000, replies: [] }],
+            ]),
+        };
+        const omoteHtml = renderForumListHtml({ world, busy: false, side: 'omote' });
+        const uraHtml = renderForumListHtml({ world, busy: false, side: 'ura' });
+        return [
+            ['side=omote 的 HTML 含表帖标题、不含裏帖标题', omoteHtml.includes('表帖标题') && !omoteHtml.includes('裏帖标题')],
+            ['side=ura 的 HTML 含裏帖标题、不含表帖标题', uraHtml.includes('裏帖标题') && !uraHtml.includes('表帖标题')],
+            ['裏行含 or-forum-tag ura', uraHtml.includes('or-forum-tag ura')],
+        ];
+    }
+
+    // ③ 裏盖楼:走 G2 路由;草稿发出后新楼 anon.key==='me' 且带 fromDraftId,residents 数量
+    //    不变(裏没有固定住民这回事);模型回复里混入的 authorId 被剥离成纯 anon。
+    async function assertForumUraThreadContinue() {
+        const wk = `__m12_assert_ura_g2_${Date.now()}`;
+        await store.setOwner(wk, 'テスト主人');
+        // 手工种一颗裏帖(带 myDraft)——跳过完整主生成,续写不依赖主生成规模,同 M11
+        // assertAlmanacPage 手工种条目的思路,更省心。
+        await store.addEntry({
+            worldKey: wk, sourceFloor: 0, app: 'forum', type: 'forum_thread',
+            payload: { threadId: 't_ura_seed', title: '種のスレ', body: '本文', worldTime: 1000, side: 'ura', anon: { key: 'op1', name: '名無しのOP' } },
+        });
+        await store.addEntry({
+            worldKey: wk, sourceFloor: 0, app: 'forum', type: 'forum_draft',
+            payload: { draftId: 'fd_seed', threadId: 't_ura_seed', text: '本当は言いたいことがある', worldTime: 1100 },
+        });
+        const residentsBefore = foldWorld(await store.getEntriesForWorld(wk)).residents.size;
+        const result = await generator.continueForumThread(ctx, store, {
+            worldKey: wk, threadId: 't_ura_seed', floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', count: 3,
+        });
+        const folded = foldWorld(await store.getEntriesForWorld(wk));
+        const thread = folded.forumThreads.get('t_ura_seed');
+        const draftReply = thread.replies.find(r => r.fromDraftId === 'fd_seed');
+        const strippedReply = thread.replies.find(r => r.body === 'これは草');
+        const out = [
+            ['生成成功', !!result?.ok],
+            ['草稿发出楼 anon.key===me', draftReply?.anon?.key === 'me'],
+            ['草稿发出楼带 fromDraftId', draftReply?.fromDraftId === 'fd_seed'],
+            ['residents 数量不变', folded.residents.size === residentsBefore],
+            ['模型回复里混入的 authorId 被剥离成纯 anon', !!strippedReply && !!strippedReply.anon && !strippedReply.authorId],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
+    // ④ 表帖盖楼路径零变化:用既有(非 M12 新增)的 buildFixtureF/buildFixtureG 走一遍真实
+    //    生成 + 盖楼,确认 §4.3 的 isUra 分道没有动到表 lane 一根汗毛——草稿发出仍走固定住民
+    //    (authorId),ownerResident 起名机制照旧。
+    async function assertForumOmoteThreadContinueUnaffected() {
+        const wk = `__m12_assert_omote_g_${Date.now()}`;
+        await store.setOwner(wk, 'テスト主人');
+        const rMain = await generator.generateMoreForum(ctx, store, {
+            worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '',
+        });
+        const folded1 = foldWorld(await store.getEntriesForWorld(wk));
+        const targetThread = [...folded1.forumThreads.values()].find(t => t.title === '刚刚在便利店看到不熟的两个人');
+        const result = await generator.continueForumThread(ctx, store, {
+            worldKey: wk, threadId: targetThread.threadId, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', count: 3,
+        });
+        const folded2 = foldWorld(await store.getEntriesForWorld(wk));
+        const thread2 = folded2.forumThreads.get(targetThread.threadId);
+        const ownerReply = thread2.replies.find(r => r.fromDraftId);
+        const out = [
+            ['主生成成功', !!rMain?.ok],
+            ['盖楼生成成功', !!result?.ok],
+            ['thread.side 归一为 omote', thread2.side === 'omote'],
+            ['草稿发出仍走固定住民路径(authorId 而非 anon)', !!ownerReply && !!ownerReply.authorId && !ownerReply.anon],
+            ['主人的固定住民已注册(castName===owner)', [...folded2.residents.values()].some(r => r.castName === 'テスト主人')],
+            ['模型续写的 anon 楼仍然带 anon(表 lane 零变化)', thread2.replies.some(r => r.anon)],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
+    // ⑤ deleteForumAll 后 forumUra 水位复位为 -1,与 forum 同步复位。
+    async function assertDeleteForumAllResetsUraWatermark() {
+        const wk = `__m12_assert_delete_ura_wm_${Date.now()}`;
+        await store.setWatermark(wk, 'forum', 42);
+        await store.setWatermark(wk, 'forumUra', 42);
+        await store.deleteForumAll(wk);
+        const out = [
+            ['forum 水位复位为 -1', await store.getWatermark(wk, 'forum') === -1],
+            ['forumUra 水位同步复位为 -1', await store.getWatermark(wk, 'forumUra') === -1],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
+    // ⑥ digest:有表帖时 buildForumUraDigestText 含 [表板最近的话题] 与表帖标题;有 almanac
+    //    条目时含 [最近的通達/公示] 与该条目 title。省心版做法(照 M11 的两选一惯例,这里选
+    //    mock 捕获):不额外导出 buildForumUraDigestText,靠 F2 路由把 userContent 原样存一份
+    //    (capturedUraUserContent,见 mockGenerate)再断言——同 qCallCount 的"侧信道"先例。
+    async function assertForumUraDigestRespondsToOmoteAndAlmanac() {
+        const wk = `__m12_assert_ura_digest_${Date.now()}`;
+        await store.setOwner(wk, 'テスト主人');
+        await store.addEntry({
+            worldKey: wk, sourceFloor: 0, app: 'forum', type: 'forum_thread',
+            payload: { threadId: 't_omote_for_digest', boardId: 'b_seed', title: '表帖回响测试标题', body: '', worldTime: 1000 },
+        });
+        await store.addEntry({
+            worldKey: wk, sourceFloor: 0, app: 'almanac', type: 'almanac_section',
+            payload: { sectionId: 'sec_x', name: '通達', desc: '' },
+        });
+        await store.addEntry({
+            worldKey: wk, sourceFloor: 0, app: 'almanac', type: 'almanac_item',
+            payload: { itemId: 'ai_seed', sectionId: 'sec_x', title: '残業規制強化のお知らせ', summary: '', signedBy: '総務部', worldTime: 1000 },
+        });
+        capturedUraUserContent = null;
+        const result = await generator.generateMoreForumUra(ctx, store, {
+            worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '',
+        });
+        const out = [
+            ['生成成功', !!result?.ok],
+            ['userContent 被捕获', !!capturedUraUserContent],
+            ['含 [表板最近的话题] 与表帖标题', !!capturedUraUserContent && capturedUraUserContent.includes('[表板最近的话题') && capturedUraUserContent.includes('表帖回响测试标题')],
+            ['含 [最近的通達/公示] 与条目标题', !!capturedUraUserContent && capturedUraUserContent.includes('[最近的通達/公示') && capturedUraUserContent.includes('残業規制強化のお知らせ')],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
+    async function runM12Assertions() {
+        const out = document.getElementById('m12AssertResult');
+        out.textContent = '运行中…';
+        const sections = [
+            ['1. 真路径裏首刷', await assertForumUraMainFlow()],
+            ['2. fold:表/裏各自过滤正确', assertForumSideFilterAndTag()],
+            ['3. 裏盖楼(G2)', await assertForumUraThreadContinue()],
+            ['4. 表帖盖楼路径零变化', await assertForumOmoteThreadContinueUnaffected()],
+            ['5. deleteForumAll 后 forumUra 水位复位', await assertDeleteForumAllResetsUraWatermark()],
+            ['6. digest:回响材料(表板话题 + 通達/公示)', await assertForumUraDigestRespondsToOmoteAndAlmanac()],
+        ];
+        let allPass = true;
+        const lines = [];
+        for (const [title, checks] of sections) {
+            lines.push(`<b>${escapeHtml(title)}</b>`);
+            for (const [label, pass] of checks) {
+                if (!pass) allPass = false;
+                lines.push(`  <span class="${pass ? 'pass' : 'fail'}">${pass ? 'PASS' : 'FAIL'}</span> ${escapeHtml(label)}`);
+            }
+        }
+        out.innerHTML = lines.join('\n');
+        log(`M12 断言跑完:${allPass ? '全绿' : '有未过项,见断言面板'}`);
+    }
+
+    document.getElementById('runM12AssertBtn').addEventListener('click', () => {
+        runM12Assertions().catch(err => {
+            document.getElementById('m12AssertResult').textContent = `断言运行出错:${err?.message || err}`;
+            console.error('[M12 断言]', err);
         });
     });
 

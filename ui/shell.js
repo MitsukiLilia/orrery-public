@@ -11,7 +11,7 @@ import {
 import * as store from '../core/store.js';
 import * as generator from '../core/generator.js';
 import {
-    generateMore, continueThread, generateMoreForum, continueForumThread,
+    generateMore, continueThread, generateMoreForum, generateMoreForumUra, continueForumThread,
     generateMoreSns, continueTweetReplies, generateMoreBrowser,
     generateMoreGallery, generateMoreMemo, generateSnsSearch, generateWebSnapshot,
     generateMoreAlmanac, generateAlmanacPage,
@@ -300,13 +300,14 @@ export function createShell(ctx, onExternalChange) {
                     photos: [], memos: new Map(),
                     sections: new Map(), almanacItems: new Map(), almanacPages: new Map(),
                 },
-                tip: -1, watermarks: { messenger: -1, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1, almanac: -1 }, seen: {}, starred: {},
+                tip: -1, watermarks: { messenger: -1, forum: -1, forumUra: -1, sns: -1, browser: -1, gallery: -1, memo: -1, almanac: -1 }, seen: {}, starred: {},
             };
         }
-        const [entries, wmMessenger, wmForum, wmSns, wmBrowser, wmGallery, wmMemo, wmAlmanac] = await Promise.all([
+        const [entries, wmMessenger, wmForum, wmForumUra, wmSns, wmBrowser, wmGallery, wmMemo, wmAlmanac] = await Promise.all([
             store.getEntriesForWorld(worldKey),
             store.getWatermark(worldKey, 'messenger'),
             store.getWatermark(worldKey, 'forum'),
+            store.getWatermark(worldKey, 'forumUra'),
             store.getWatermark(worldKey, 'sns'),
             store.getWatermark(worldKey, 'browser'),
             store.getWatermark(worldKey, 'gallery'),
@@ -322,7 +323,7 @@ export function createShell(ctx, onExternalChange) {
         const [seen, starred] = await Promise.all([store.getSeenMap(worldKey), store.getStarred(worldKey)]);
         return {
             worldKey, world, tip,
-            watermarks: { messenger: wmMessenger, forum: wmForum, sns: wmSns, browser: wmBrowser, gallery: wmGallery, memo: wmMemo, almanac: wmAlmanac },
+            watermarks: { messenger: wmMessenger, forum: wmForum, forumUra: wmForumUra, sns: wmSns, browser: wmBrowser, gallery: wmGallery, memo: wmMemo, almanac: wmAlmanac },
             seen, starred,
         };
     }
@@ -364,7 +365,7 @@ export function createShell(ctx, onExternalChange) {
         + '.or-gallery-list, .or-memo-list, .or-gallery-detail-scroll, .or-memo-detail-scroll, .or-sns-list, .or-sns-scroll, .or-aster-list, '
         + '.or-sns-suggest-list, .or-webpage-body, .or-alm-home, .or-alm-list, .or-alm-item-body';
     function screenKey(top) {
-        return [top.type, top.threadId || '', top.boardId || '', top.tweetId || '', top.accountId || '', top.photoId || '', top.noteId || '', top.tab || '', top.word || '', top.visitId || '', top.sectionId || '', top.itemId || ''].join('|');
+        return [top.type, top.threadId || '', top.boardId || '', top.tweetId || '', top.accountId || '', top.photoId || '', top.noteId || '', top.tab || '', top.word || '', top.visitId || '', top.sectionId || '', top.itemId || '', top.side || ''].join('|');
     }
     let lastScreenKey = null;
 
@@ -430,10 +431,13 @@ export function createShell(ctx, onExternalChange) {
         if (top.type === 'setup') {
             screenEl.innerHTML = renderSetupHtml(ctx.name2 || '');
         } else if (top.type === 'grid') {
-            // 角标 = 有新楼层还没生成余波 ‖ 有生成好但她还没看过的内容(真手机的角标就是后者)
+            // 角标 = 有新楼层还没生成余波 ‖ 有生成好但她还没看过的内容(真手机的角标就是后者)。
+            // M12:forum 多一路——裏サイト有没有「新楼待生成」只在她已经开过裏之后才算数
+            // (hasUra 判据同 forumUra 水位:她没开始用裏之前,这个水位永远落后,不能让悬浮球常亮)。
+            const hasUra = [...world.forumThreads.values()].some(t => t.side === 'ura');
             const dots = {
                 messenger: watermarks.messenger < tip || hasUnseenInApp('messenger', world, seen),
-                forum: watermarks.forum < tip || hasUnseenInApp('forum', world, seen),
+                forum: watermarks.forum < tip || (watermarks.forumUra < tip && hasUra) || hasUnseenInApp('forum', world, seen),
                 sns: watermarks.sns < tip || hasUnseenInApp('sns', world, seen),
                 browser: watermarks.browser < tip || hasUnseenInApp('browser', world, seen),
                 gallery: watermarks.gallery < tip || hasUnseenInApp('gallery', world, seen),
@@ -463,7 +467,7 @@ export function createShell(ctx, onExternalChange) {
             markSeenAfter = [seenKey, latestTsOfThread(thread)];
         } else if (top.type === 'forum-list') {
             screenEl.innerHTML = renderForumListHtml({
-                world, busy: busy.forum, boardId: top.boardId || null, page: top.page || 1, seen, justUpdated,
+                world, busy: busy.forum, side: top.side || 'omote', page: top.page || 1, seen, justUpdated,
             });
         } else if (top.type === 'forum-thread') {
             const thread = world.forumThreads.get(top.threadId);
@@ -620,7 +624,7 @@ export function createShell(ctx, onExternalChange) {
         }
         if (appId === 'messenger') navPush({ type: 'messenger-list' });
         else if (appId === 'settings') navPush({ type: 'settings' });
-        else if (appId === 'forum') navPush({ type: 'forum-list', boardId: null });
+        else if (appId === 'forum') navPush({ type: 'forum-list', side: 'omote' });
         else if (appId === 'sns') navPush({ type: 'sns-tl', tab: 'tl', myRole: 'omote' });
         // M11:内网 lane 撤除后,浏览器不再有常驻卡要补建,进屋就是单纯的 navPush(此前这里要
         // 多跑一步:进屋后立刻补建常驻卡,现在那套机制已经整个撤掉)。
@@ -739,8 +743,11 @@ export function createShell(ctx, onExternalChange) {
     // ── 论坛:独立水位的「刷新」/「生成更多」+ 反悔(单楼倒带同消息工法 / 整帖级联删)。 ──
 
     async function doGenerateMoreForum() {
+        // M12:表裏共用一个「刷新」按钮与同一把 busy.forum 锁,读当前 top.side 决定生成哪一条 lane
+        // ——两条独立水位互不相扰,同 messenger/forum 分家的先例。
+        const isUra = navStack[navStack.length - 1]?.side === 'ura';
         await runGeneration('forum', async ({ worldKey, owner, s }) => {
-            const result = await generateMoreForum(ctx, store, {
+            const result = await (isUra ? generateMoreForumUra : generateMoreForum)(ctx, store, {
                 worldKey, floorWindow: s.floorWindow,
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
                 excludeTags: s.excludeTags || '',
@@ -799,11 +806,12 @@ export function createShell(ctx, onExternalChange) {
         onExternalChange?.();
     }
 
-    function doSelectForumBoard(boardId) {
+    // M12:表裏切换——同板块降级前那套过滤态的哲学,只是过滤态,不入栈,不当导航。
+    function doSelectForumSide(side) {
         const top = navStack[navStack.length - 1];
         if (top.type !== 'forum-list') return;
-        top.boardId = boardId || null; // 只是过滤态,不入栈,不当导航
-        top.page = 1;                  // 换板块=换了一份列表,页码归位
+        top.side = side === 'ura' ? 'ura' : 'omote';
+        top.page = 1; // 换 lane=换了一份列表,页码归位
         render();
     }
 
@@ -830,7 +838,7 @@ export function createShell(ctx, onExternalChange) {
         await store.deleteForumAll(worldKey);
         const top = navStack[navStack.length - 1];
         if (top.type === 'forum-list') {
-            top.boardId = null; top.page = 1;
+            top.side = 'omote'; top.page = 1;
         }
         showToast('论坛已清空,点「刷新」按新所属建板');
         await render();
@@ -1501,7 +1509,7 @@ export function createShell(ctx, onExternalChange) {
             case 'open-forum-thread': navPush({ type: 'forum-thread', threadId: el.dataset.threadId }); break;
             case 'forum-refresh': doGenerateMoreForum(); break;
             case 'forum-generate-more': doContinueForumThread(); break;
-            case 'select-forum-board': doSelectForumBoard(el.dataset.boardId); break;
+            case 'forum-select-side': doSelectForumSide(el.dataset.side); break;
             case 'forum-page': doForumPage(parseInt(el.dataset.page, 10)); break;
             case 'forum-reorganize': doForumReorganize(); break;
             case 'open-sns-tweet': navPush({ type: 'sns-tweet', tweetId: el.dataset.tweetId }); break;

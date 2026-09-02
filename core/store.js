@@ -419,7 +419,10 @@ export async function deleteForumAll(worldKey) {
         tx.onerror = () => reject(tx.error);
     });
     // 论坛水位清零,下一次刷新按「首次」跑(同 pendingOrRegrow 对空水位的处理)。
+    // 裏サイト同属 app==='forum',上面的游标已经把它的帖子/回复一并清空,水位也要跟着复位——
+    // 否则改組后裏板的水位还停在旧账本的楼层上,下次「刷新」会被 pendingOrRegrow 误判成「无新楼层」。
     await setWatermark(worldKey, 'forum', -1);
+    await setWatermark(worldKey, 'forumUra', -1);
     // 清论坛的 seen/star 键:Asterism 星图里的论坛来源卡片随之消失——如实显示消失,同反悔语义。
     // 前缀硬编码而不 import world.js 的 seenKeyForForumThread/starKeyForForumThread('forum:'/'ft:')——
     // store.js 本来就不认业务语义(见文件头注),两处前缀改名要记得一起改,同其余 store 函数的先例。
@@ -475,12 +478,14 @@ async function writeMeta(meta) {
 // 水位归一化:新格式({ messenger, forum, sns })直接用;旧格式(单一 lastProcessedFloor,M0 遗留)
 // 一次性搬进 watermarks.messenger,forum/sns 从 -1 起(旧数据里论坛/SNS 这回事根本不存在)。
 // 旧 pendingFloors 字段直接丢弃——M1 已废除该机制,pending 完全靠水位推导(见 generator.js)。
+// M12:forumUra 是裏サイト自己的水位(与表板的 forum 各存各的,同 messenger/forum 分家的先例)——
+// 她没开始用裏之前这个键永远是 -1,不会让悬浮球角标常亮(见 ui/shell.js 网格红点的 hasUra 判据)。
 function normalizeWatermarks(meta) {
     if (meta.watermarks && typeof meta.watermarks === 'object') {
-        return { messenger: -1, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1, almanac: -1, ...meta.watermarks };
+        return { messenger: -1, forum: -1, forumUra: -1, sns: -1, browser: -1, gallery: -1, memo: -1, almanac: -1, ...meta.watermarks };
     }
     const messenger = Number.isFinite(meta.lastProcessedFloor) ? meta.lastProcessedFloor : -1;
-    return { messenger, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1, almanac: -1 };
+    return { messenger, forum: -1, forumUra: -1, sns: -1, browser: -1, gallery: -1, memo: -1, almanac: -1 };
 }
 
 /**
