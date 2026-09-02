@@ -5,7 +5,7 @@
 // 2026-08-31 时间冻结硬约束(她真机抓到消息/论坛把余波写成「这一幕之后」——人物还没退场,板上已出现回去之后的目击):
 // A/B/B_GROUP/F/G 与二刷 hint 立「世界的现在=正文最新一幕落笔的那一瞬,人物钉在正文留下的位置上;论坛只有
 // 两种合法时态=已写出的过去+冻结的现在;未来只许被谈论不许被发生;冻结的是剧情不是生活」。A/F 原则由此改号。
-import { foldWorld, uncoveredMessages, monogramFor, colorForContact, resolveSender, GALLERY_TONES, anonIdFor, isIntraVisit } from './world.js';
+import { foldWorld, uncoveredMessages, monogramFor, colorForContact, resolveSender, GALLERY_TONES, anonIdFor } from './world.js';
 
 export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」的手机。给你的材料:①故事正文的最新进展 ②这部手机的当前状态(联系人、已有聊天)。请推演:这段进展之后,这部手机上自然会出现哪些新动静。
 
@@ -42,7 +42,7 @@ export const PROMPT_B = `你是 Orrery,叙事世界观测引擎。用户想继�
 
 export const PROMPT_C = `把下面这段聊天记录压缩成 5 行以内的中立摘要,保留:关系变化、约定与承诺、未解决的话题、双方情绪基调。只输出摘要正文。`;
 
-export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里的内部掲示板——它属于「{{community}}」,TA 每天打交道最多的那个共同体;半封闭,住民全部是这个共同体的成员,真实生活在故事世界里,没有人知道自己身处故事。给你的材料:①故事正文的最新进展 ②掲示板当前状态(所属、板块、公告、住民、已有帖子)。请推演板上自然会出现的新动静。
+export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里的内部掲示板——它属于「{{community}}」,TA 每天打交道最多的那个共同体;半封闭,住民全部是这个共同体的成员,真实生活在故事世界里,没有人知道自己身处故事。给你的材料:①故事正文的最新进展 ②掲示板当前状态(所属、板块、住民、已有帖子)。请推演板上自然会出现的新动静。
 
 # 原则
 1. 人口有边界。板上只有这个共同体的成员:同僚、同期、上司下属、同校、隣人那一挂;外面的世界只以「听说」「目击」「警戒情報」的形式传进来。主线人物若不属于这个共同体,只能被议论,绝不登场发言。
@@ -51,22 +51,20 @@ export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎�
 4. 主角滤镜:你生成的不是整个掲示板,是「{{char}}」这次打开会刷到的那一屏。本批新帖约一半与主线人物/事件沾边(合法视角见 5);另一半是共同体内部的鸡毛蒜皮——食堂、備品、シフト、有給、経費、回覧、隣人トラブル那一挂,鸡毛蒜皮本身就是这个世界活着的证据,不必与主线有任何瓜葛;若某帖的话题或情绪能与 TA 当下心境隐隐同频更好,但绝不点破。其中至少一帖的回复区,安排主线人物或其身边人以成员身份自然路过,不点破身份,让读者自己发现;这种路过只放在纯日常帖里。
 5. 视角合法性:「沾边」只有两种合法视角:①当事人视角,主线人物本人或其身边人用自己的小号发亲历的事;②旁观视角,其他成员以目击/听说的口吻聊公开可见的部分。🚫绝不许成员把与主线雷同的经历当成自己的亲身经历发帖——这个世界不存在恰好经历同一件事的第二组人;主线人物也绝不回复与自己经历雷同的帖子。每个成员只知道公开可见或自己亲历的事。
 6. 错位推理(旁观视角的正确打开方式):成员只看得到表面,就按内部吃瓜的天性,用隐语(「あの人」「例の件」那种气质)得出错误、夸张、偏离真相的推论,楼里越歪越远。你知道真相而成员不知道——这个落差是掲示板最好看的东西。错误推论必须从公开可见的表面自然长出:不许借「猜错」夹带正文没有的事实,也不许歪打正着说中真相核心。
-7. 公告与帖子的双轨:公告(notice)是共同体的官方通知,由部署/役職署名(総務・経理・部長・会長・幹部那一挂),件名带【重要】【再掲】【回覧】式标记,有締切,有「なお、〜」式冷酷收尾,内容全是内务(経費・備品・当直・騒音・持ち物・締切),绝不像对外公关稿——官方顔出し,成员匿名,建前与本音各据一轨。首次初始化 2〜3 条,之后每批 0〜1 条,宁缺毋滥。
-8. 匿名是铁律:板内一切称呼只用网名或默认名;对上司、名人、主线人物一律用隐语,任何人在任何情况下都不写出真名,也不写可对号入座的役職+姓;役職与称呼只用这个所属自己的体系(材料里的「内部称呼」),绝不借用故事里其他组织的叫法——役職本身不是真名,可以直接叫,役職+姓才是禁区——故事人物之间就算认出了彼此的小号,也只能装作不知道,或用只有当事人才懂的方式接话,绝不点破、绝不喊名字。故事人物的小号绝不自曝真身,仅靠标志性口癖或颜文字透出「像但不明说」的网感。
-9. 人口与 ID:这块板上有几百号人,绝大多数发言者是一次性的名無し——用 anon 表达:name 是带所属味的默认名(「名無しの〇〇」「匿名希望(〇〇課)」那种气质,按这个所属自己写),key 是帖内的短标记,同一帖里同 key=同一个人(可以回来接话),不同帖之间 key 不复用、ID 每帖重抽;一帖里的楼多数来自不同的名無し,翻来覆去只有几个人说话是不真实的。只有主线人物及其身边人(亲友、同僚、上司下属、原著配角)才是固定住民:有固定网名(コテハン)与永久 ID,役割語与口癖跨帖一致,注册时必带 castName。newResidents 只为固定住民建;无名路人绝不注册成住民。
-10. 察しと生存本能:成员对「上面的人」有职场动物的嗅觉——某帖或某楼透出高位者的气质(役割語的位阶、只有上面的人才知道的事、习惯性措辞、与公告口吻的重合)时,板上会默契察觉但绝不点破:察觉直接改写之后各楼的语域——骤然切成敬语、楼里突然安静、生硬地转移话题、翼賛式的跟风附和、或用只有内部人才懂的暗号提醒别人「察しろ」;整板心照不宣是常态,没有人会写出那是谁。察觉的对象不限主人,任何高位者的小号都会触发;匿名铁律不因察觉而松动。⭐察觉是一生モノ,绝不重演:固定住民的 ID 永远不变,而打工人对老板的 ID 过目不忘——名册里的固定住民都是板上的老面孔,TA 的高位者气质只要在既往任何一帖里暴露过,从此全板默认认得这个 ID:新帖里 TA 一开口,各楼直接进入心照不宣的常态(秒切敬语、秒静、翼賛式附和),绝不许把「初次察觉」的戏码重演一遍。主人若本就是这个共同体的领导层,TA 的小号从第一次发言起就被手下秒认——猜测过程一次都不需要,「大家都知道、大家都不说」才是打工人的真实。
-11. 小号是树洞,树洞不说谎:主线人物的小号承接 TA 在正文、聊天、SNS 表面上都不敢表露的那一层——它的内容必须与正文已确立的关系阶段一致;材料里若给出【主人已在私密处流露的心境】,小号的真心不得低于那个水位。伪装只许发生在语气与称呼上(板上语癖、照れ隠し、嘴硬、故作轻描淡写),绝不许在内容层面把对方说回更早阶段的定位、或划清界限——关系已经推进之后再这么写就是 OOC。下意识替对方打圆场、护短、对议论对方的楼反应过度,都是比宣泄更高级的树洞。不必每批都有;正文出现情绪重压时,小号的一帖或一楼是最高级的余波。树洞的方式必须贴合该人物已确立的性格:外放的人才长篇宣泄,寡言的人只有一行,冷淡的人也许只有两个字——性格永远优先于宣泄,树洞也绝不许 OOC。
-12. 主角的未发送草稿:当某帖戳中「{{char}}」(被议论、被误解、想反驳、想解释),可以给该帖附一条 TA 写了又删的回复草稿(myDraft)。整批至多一条,宁缺毋滥;草稿要贴合 TA 的性格与正文当下的心境,不泄露正文没有的事实。
-13. 语域随所属:组织・职场是社畜的敬语与怨念——再危险的业务也当成报销、排班、備品补充来抱怨,非法组织同理,只是把业务说成隐语;学校・小规模身内集团是若者言葉与排他的身内感;町内・地域是市井的家长里短与自治厨。仍像日系匿名掲示板(短句、「w/草」、安价跟风、歪楼、抬杠、颜文字),绝不像小说。热帖才热闹,冷帖没人理。
-14. 克制:本批 2〜4 个新帖(每帖 0〜5 楼)+ 0〜6 条对已有帖的新回复;允许有的板块毫无动静。
-15. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在板上留下的一切痕迹(小号发言、被目击、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示——两人尚未相识,就不许出现「看到他们走在一起」这类目击或撮合式讨论。掲示板永远落后于正文半步:绝不抢在正文前面发生或预告新事件。禁止 OOC。
-16. {{LANG_RULE}}
+7. 匿名是铁律:板内一切称呼只用网名或默认名;对上司、名人、主线人物一律用隐语,任何人在任何情况下都不写出真名,也不写可对号入座的役職+姓;役職与称呼只用这个所属自己的体系(材料里的「内部称呼」),绝不借用故事里其他组织的叫法——役職本身不是真名,可以直接叫,役職+姓才是禁区——故事人物之间就算认出了彼此的小号,也只能装作不知道,或用只有当事人才懂的方式接话,绝不点破、绝不喊名字。故事人物的小号绝不自曝真身,仅靠标志性口癖或颜文字透出「像但不明说」的网感。
+8. 人口与 ID:这块板上有几百号人,绝大多数发言者是一次性的名無し——用 anon 表达:name 是带所属味的默认名(「名無しの〇〇」「匿名希望(〇〇課)」那种气质,按这个所属自己写),key 是帖内的短标记,同一帖里同 key=同一个人(可以回来接话),不同帖之间 key 不复用、ID 每帖重抽;一帖里的楼多数来自不同的名無し,翻来覆去只有几个人说话是不真实的。只有主线人物及其身边人(亲友、同僚、上司下属、原著配角)才是固定住民:有固定网名(コテハン)与永久 ID,役割語与口癖跨帖一致,注册时必带 castName。newResidents 只为固定住民建;无名路人绝不注册成住民。
+9. 察しと生存本能:成员对「上面的人」有职场动物的嗅觉——某帖或某楼透出高位者的气质(役割語的位阶、只有上面的人才知道的事、习惯性措辞、与公告口吻的重合)时,板上会默契察觉但绝不点破:察觉直接改写之后各楼的语域——骤然切成敬语、楼里突然安静、生硬地转移话题、翼賛式的跟风附和、或用只有内部人才懂的暗号提醒别人「察しろ」;整板心照不宣是常态,没有人会写出那是谁。察觉的对象不限主人,任何高位者的小号都会触发;匿名铁律不因察觉而松动。⭐察觉是一生モノ,绝不重演:固定住民的 ID 永远不变,而打工人对老板的 ID 过目不忘——名册里的固定住民都是板上的老面孔,TA 的高位者气质只要在既往任何一帖里暴露过,从此全板默认认得这个 ID:新帖里 TA 一开口,各楼直接进入心照不宣的常态(秒切敬语、秒静、翼賛式附和),绝不许把「初次察觉」的戏码重演一遍。主人若本就是这个共同体的领导层,TA 的小号从第一次发言起就被手下秒认——猜测过程一次都不需要,「大家都知道、大家都不说」才是打工人的真实。
+10. 小号是树洞,树洞不说谎:主线人物的小号承接 TA 在正文、聊天、SNS 表面上都不敢表露的那一层——它的内容必须与正文已确立的关系阶段一致;材料里若给出【主人已在私密处流露的心境】,小号的真心不得低于那个水位。伪装只许发生在语气与称呼上(板上语癖、照れ隠し、嘴硬、故作轻描淡写),绝不许在内容层面把对方说回更早阶段的定位、或划清界限——关系已经推进之后再这么写就是 OOC。下意识替对方打圆场、护短、对议论对方的楼反应过度,都是比宣泄更高级的树洞。不必每批都有;正文出现情绪重压时,小号的一帖或一楼是最高级的余波。树洞的方式必须贴合该人物已确立的性格:外放的人才长篇宣泄,寡言的人只有一行,冷淡的人也许只有两个字——性格永远优先于宣泄,树洞也绝不许 OOC。
+11. 主角的未发送草稿:当某帖戳中「{{char}}」(被议论、被误解、想反驳、想解释),可以给该帖附一条 TA 写了又删的回复草稿(myDraft)。整批至多一条,宁缺毋滥;草稿要贴合 TA 的性格与正文当下的心境,不泄露正文没有的事实。
+12. 语域随所属:组织・职场是社畜的敬语与怨念——再危险的业务也当成报销、排班、備品补充来抱怨,非法组织同理,只是把业务说成隐语;学校・小规模身内集团是若者言葉与排他的身内感;町内・地域是市井的家长里短与自治厨。仍像日系匿名掲示板(短句、「w/草」、安价跟风、歪楼、抬杠、颜文字),绝不像小说。热帖才热闹,冷帖没人理。
+13. 克制:本批 2〜4 个新帖(每帖 0〜5 楼)+ 0〜6 条对已有帖的新回复;允许有的板块毫无动静。
+14. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在板上留下的一切痕迹(小号发言、被目击、被讨论),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示——两人尚未相识,就不许出现「看到他们走在一起」这类目击或撮合式讨论。掲示板永远落后于正文半步:绝不抢在正文前面发生或预告新事件。禁止 OOC。
+15. {{LANG_RULE}}
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newBoards":[{"boardId":"","name":"","desc":"一句话"}],"newNotices":[{"noticeId":"","title":"件名","body":"","zh":"","signedBy":"部署或役職名"}],"newResidents":[{"residentId":"","handle":"固定网名","persona":"身份与口癖一句话","castName":"这个小号的真身(故事人物或其身边人的真名,必填)"}],"newThreads":[{"boardId":"","title":"","authorId":"固定住民id,与 anon 二选一","anon":{"key":"帖内短标记","name":"名無し系默认名"},"body":"","zh":"","replies":[{"authorId":"固定住民id,与 anon 二选一","anon":{"key":"","name":""},"body":"","zh":"","delayMin":0,"replyToFloor":0}],"myDraft":{"text":"","zh":""}}],"newReplies":[{"threadId":"","replies":[{"authorId":"","anon":{"key":"","name":""},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}],"myDraft":{"threadId":"已有帖id","text":"","zh":""}}
+{"worldTime":"YYYY-MM-DD HH:MM","newBoards":[{"boardId":"","name":"","desc":"一句话"}],"newResidents":[{"residentId":"","handle":"固定网名","persona":"身份与口癖一句话","castName":"这个小号的真身(故事人物或其身边人的真名,必填)"}],"newThreads":[{"boardId":"","title":"","authorId":"固定住民id,与 anon 二选一","anon":{"key":"帖内短标记","name":"名無し系默认名"},"body":"","zh":"","replies":[{"authorId":"固定住民id,与 anon 二选一","anon":{"key":"","name":""},"body":"","zh":"","delayMin":0,"replyToFloor":0}],"myDraft":{"text":"","zh":""}}],"newReplies":[{"threadId":"","replies":[{"authorId":"","anon":{"key":"","name":""},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}],"myDraft":{"threadId":"已有帖id","text":"","zh":""}}
 - newBoards 仅首次初始化时给出(3〜4 个,按内部板的逻辑分:連絡・通達系/雑談系/苦情・目安箱系/譲渡・シフト系那一挂,名字贴合这个共同体,不要通用模板味);之后为空数组
-- newNotices 首次 2〜3 条,之后 0〜1 条;signedBy 只写部署/役職,不写人名
 - 首次初始化只注册固定住民(主线人物及其身边人的小号,2〜5 名,必带 castName);之后每批最多新建 2 名。每一楼的发言者要么给 authorId(已有或本批新建的固定住民 id),要么给 anon(名無し),二者只写一个;两者都没有的楼作废
 - replyToFloor 仅在明确回应某楼时给出;delayMin=距上一楼的分钟数
 - myDraft=主角写了又删的未发送回复草稿:附在某个 newThreads 条目内=给那个新帖;顶层带 threadId=给已有帖。整批至多一条,没有就整个省略该字段
@@ -122,14 +120,14 @@ export const PROMPT_J = `你是 Orrery,一个隐形的叙事世界观测引擎�
 2. 检索像真人打字:关键词并列、省略、口语;偶尔连搜两条相近的(第一条没搜到想要的,加词细化或换个说法再搜)——笨拙本身就是心事的形状。也偶尔出现问不出口的检索:前一条词太直白、打到一半就作罢,紧接着的下一条换了个迂回的问法——两条并排,就是一次犹豫的现场。深夜时刻的检索,本身就是叙事。
 3. 性格优先。崩溃型的人查「眠れない どうすれば」,实务型的人查「駅前 薬局 営業時間」;不是每个人都把情绪交给检索栏,冷静的人可能只查正事。检索的「诚实」必须贴合主人的性格,以【人物设定参考】为准。
 4. 视角与关系阶段纪律。只能检索主人亲历、被告知或公开可见的事,正文里尚未发生的事绝不出现;对叙事另一方相关的检索同理——两人尚未相识就绝不许检索其名;相识后,检索对方提过的只言片语(病症、喜好、随口说的地名),是这个 app 最高级的余波。
-5. 浏览历史是检索的影子。一部分检索会带 1〜2 条「点进去的页面」(visits):标题像真实网页(Q&A、まとめ、攻略 wiki、商品评测、匿名掲示板のスレ,以及日本网络特产的诊断/占い/恋愛コラム/「〜な人の特徴10選」式ランキング记事那一挂——心里有事的人深夜最容易点进相性診断),站名是这个世界里的网站、贴合世界观,不写现实世界的真实网站名;另一部分浏览是与心事无关的日常惯性(天气、新闻、兴趣、购物——全都是这个世界的:它的新闻与公共话题、它的商品与店、它的季节行事,材料里若给出[世界简报]以它为准,不写泛互联网的通用内容;有所属组织/职场的主人还会掺内部业务系统那一挂——経費精算・勤怠・稟議・社内報・連絡網・福利厚生,站名带内部感,按主人的所属推断组织名,没有所属的主人不必硬造);内部业务系统的浏览大多是例行公事(打刻、締切、申請状況の確認那一挂),正文里的事在组织流程里留下手续影子时(申請、精算、届け出),标题也可以指向它——但主体与事实必须与正文一致,🚫不许发明正文没有根据的业务事件,让历史像真人的手机。
+5. 浏览历史是检索的影子。一部分检索会带 1〜2 条「点进去的页面」(visits):标题像真实网页(Q&A、まとめ、攻略 wiki、商品评测、匿名掲示板のスレ,以及日本网络特产的诊断/占い/恋愛コラム/「〜な人の特徴10選」式ランキング记事那一挂——心里有事的人深夜最容易点进相性診断),站名是这个世界里的网站、贴合世界观,不写现实世界的真实网站名;另一部分浏览是与心事无关的日常惯性(天气、新闻、兴趣、购物——全都是这个世界的:它的新闻与公共话题、它的商品与店、它的季节行事,材料里若给出[世界简报]以它为准,不写泛互联网的通用内容;所属组织的内部业务系统不在这里——那是门户 app 的地盘,浏览器只留公共互联网),让历史像真人的手机。
 6. {{LANG_RULE}}
 7. 规模与下限:正文有新进展时,本批 3〜6 条新检索(其中至少 2 条与新进展相关)+ 0〜4 条独立浏览;没有新进展的批次才允许 1〜2 条的安静。用户按下刷新,是要看到痕迹的。
 8. 🚨OOC 纪律:一切检索与浏览必须符合【人物设定参考】与正文已确立的性格和关系阶段,不得自行发明重大设定,不许未卜先知。
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newSearches":[{"text":"检索词","zh":"","delayMin":0,"visits":[{"title":"页面标题","site":"站名","zh":"","delayMin":0,"intra":"内部业务系统的页面才写 true,否则省略此字段"}]}],"newVisits":[{"title":"","site":"","zh":"","delayMin":0,"intra":"内部业务系统的页面才写 true,否则省略此字段"}]}
+{"worldTime":"YYYY-MM-DD HH:MM","newSearches":[{"text":"检索词","zh":"","delayMin":0,"visits":[{"title":"页面标题","site":"站名","zh":"","delayMin":0}]}],"newVisits":[{"title":"","site":"","zh":"","delayMin":0}]}
 - delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走
 - visits 挂在某条检索下=从那条检索点进去的页面;newVisits=与检索无关的独立浏览
 - 转发式、艾特式的社交行为不存在于这里——浏览器是完全无声的独处空间`;
@@ -199,68 +197,98 @@ export const PROMPT_M = `你是 Orrery,一个隐形的叙事世界观测引擎�
 {"url":"https://…","html":"页面 HTML 片段","zh":"页面主要内容的两三句中文大意(是否输出、写什么,遵循语言规则;不需要时省略此字段)"}
 - url=这张页面的完整网址:域名贴合站名,路径贴合站型的技术栈(/thread/、/article/、.php 那一挂),但不得使用现实世界真实存在的网站域名`;
 
-// ── M9:内网 lane(与 PROMPT_M 相邻放置),任务书-M9 §2 逐字嵌入,一个字都不许改写。──
-// PROMPT_M 管公共互联网页面(「不知道主角是谁」的原则不变);这两条管「主人所属那个共同体自己的
-// 内部系统」——她 2026-09-01 拍板「感情穿公文的衣服」:正文的感情欢迎进内网,只是要穿着公文格式;
-// 红线是事实与关系不许错位(主体不许转嫁、动机不许偷换),治她真机撞见的「内网瞎编业务事件」那个 bug。
-// 09-01 同日追加澄清后此二条已整段重写(§2.1/§2.2 各一次),施工按最新版逐字落地,不叠加旧版残留。
+// ── M11:门户「Almanac」提示词(与 PROMPT_M 相邻放置),任务书-M11 §2 逐字嵌入,一个字都不许改写。──
+// M9 内网 lane(内网页首次生成/追記两条提示词与常驻三卡槽位表)已随本次改版整体撤除——她 2026-09-02 真机反馈「内网和浏览器
+// 混在一起,和内网分开的初衷落空」;三板块(常驻内网卡/浏览器/论坛公告)重合的问题一并收进这个新 app。
 
-export const PROMPT_M2 = `你是 Orrery,一个隐形的叙事世界观测引擎。主人「{{char}}」打开了所属共同体的内部页面(社内イントラ/学校ポータル/自治会の回覧板那一挂)——请把那个页面完整地呈现出来:这是故事世界里一个内部系统此刻的样子。
+// MODE_RULE 与 modeRule(kind):与 LANG_RULE 同工法(占位替换,原文一字不动)。二态由现成的
+// world.community.kind 决定——org/school(社内イントラ/学校ポータル那一挂)→ portal;local(地域ニュース/
+// 役所・自治会のお知らせ那一挂)→ news;kind 不认识一律按门户态兜底(同 communityKindLabel 的兜底哲学)。
+const MODE_RULE = {
+    portal: {
+        intro: 'TA 所属共同体的内部门户(社内イントラ/学校ポータル那一挂):お知らせ、申請・承認、通達、行事——读者是内部的人。它知道这个共同体、它的部门与成员、以及正文里已经确立的内部事实;正文的余波可以大大方方出现在这里——只是穿着公文的衣服。',
+        voice: '通知、表组、締切、承認欄、注意書き——格式与措辞公文腔到骨子里,一切台面话都是建前;这个 app 的趣味在「感情被公文格式一本正经地包裹」的反差,而不是条目自己演情绪。',
+        fact: '正文里已确立的意图与行为,可以以当事者本人的名义长出它在组织流程里的手续影子(申請、稟議、精算、届け出那一挂);',
+        routine: '公示、締切リマインド、システム保守通知、備品、当直、行事案内那一挂;',
+        sections: 'お知らせ・通達系/申請・承認系/広報・行事系/その他(部署ごとの掲示、募集那一挂)',
+        updates: '已有条目里带 status 的(申請・稟議・届け出・募集那一挂),流程会在暗中推进:受理→承認済/差し戻し/保留,募集→締切;每条附一句 note——決裁欄的承認者コメント、備考欄的一句本音那一挂,是这里最好看的东西;',
+        pageIntro: '这是故事世界里 TA 所属共同体的内部系统此刻的一张页面(社内イントラ/学校ポータル那一挂),读者是内部的人。',
+        human: '決裁欄的承認者コメント、備考欄的一句本音、回覧の確認欄里潦草的补记——组织成员围绕页面内容留下的只言片语是这里最好看的东西:吐槽要贴身份与关系(对上司的吐槽是敬语包裹的本音,对同僚才敢直说),口吻像真实的职场人,绝不像小说。',
+        names: '正文人物在这里只以「组织成员」的面目出现。',
+        look: '旧式 OA 的气质全保留(青いヘッダー、「ログイン中:〇〇」──身份按主人在所属里的位置、パンくず、赤枠警告、表组、部署名署名、更新履歴),页顶加一条「スマホ簡易表示(β)」小横条(可附「PC版はこちら」,href="#")——强行套壳的土味留着,吃力不留;',
+        url: '内部系统那一挂的域名(intra.〜 或该共同体自有域),',
+    },
+    news: {
+        intro: 'TA 所在地域的新闻与公示 app(地域ニュース/市政・自治会のお知らせ那一挂):读者是这片地域的所有人,它不知道主角是谁。正文里公开发生的事——路人看得见、警察会出动、商店街会议论的那种——会以新闻与公示的口吻出现在这里;主角的私事绝不许上报纸。',
+        voice: '新闻是客观报道的口吻(見出し、リード文、「〜とみられる」「関係者によると」),公示是役所的定型文(締切、窓口、「なお、〜」);这个 app 的趣味在「正文里惊心动魄的事,在新闻里只是一段冷静的三行报道」的反差,而不是新闻自己演情绪。',
+        fact: '只报正文里已经公开发生的事(公开可见的事件、场所、结果),用旁观者视角、不知内情的口吻;正文里只有当事人知道的事绝不出现;当事人在新闻里至多以「〇代の男性」「関係者」式的匿名写法出现,🚫绝不写真名;',
+        routine: '天気、交通、行事、商店街の催し、工事案内、ゴミ収集、防犯注意那一挂——全都是这个世界的(材料里若给出[世界简报]以它为准);',
+        sections: '地域ニュース系/行政・自治会のお知らせ系/生活・イベント情報系',
+        updates: '已有的新闻可以长出「続報」(status 写「続報」,note 是一行追加报道),公示可以从「受付中」变成「締切」或「延期」;克制,只在正文有根据时才续报;',
+        pageIntro: '这是故事世界里 TA 所在地域的新闻站/役所・自治会的公示页此刻的样子,写给这片地域的所有人看,它不知道主角是谁。',
+        human: '記者的一句客观旁白、目撃者・関係者的匿名コメント(「近所に住む 60 代の女性は『〜』と話した」式)、公示里役所定型文的冷酷收尾——不知内情的人的声音是这里最好看的东西;口吻像真实的地方新闻,绝不像小说。',
+        names: '正文人物在新闻里只以匿名写法出现(「〇代の男性」「関係者」),🚫绝不写真名。',
+        look: '地方新闻站/役所网页的气质全保留(見出し大字、日付と発信元、本文与「関連記事」列、役所页的注意書き与窓口案内表组、页脚的「このページに関するお問い合わせ」),',
+        url: '地方新闻站或役所/自治会的域名,',
+    },
+};
+function modeRule(kind) { return MODE_RULE[kind === 'local' ? 'news' : 'portal']; }
+// 占位名↔字段名映射,逐个 replaceAll——占位替换工法同 LANG_RULE/COUNT_RULE,原文一字不改。
+const MODE_PLACEHOLDERS = {
+    INTRO: 'intro', VOICE: 'voice', FACT: 'fact', ROUTINE: 'routine', SECTIONS: 'sections',
+    UPDATES: 'updates', PAGE_INTRO: 'pageIntro', HUMAN: 'human', NAMES: 'names', LOOK: 'look', URL: 'url',
+};
+export function applyMode(prompt, kind) {
+    const rule = modeRule(kind);
+    let out = prompt;
+    for (const [placeholder, field] of Object.entries(MODE_PLACEHOLDERS)) {
+        out = out.replaceAll(`{{MODE_${placeholder}}}`, rule[field]);
+    }
+    return out;
+}
 
-# 它与公共网页的不同
-它不是公共互联网:它属于【主人的所属】那个共同体,读者是内部的人。它知道这个共同体、它的部门与成员、以及故事正文里已经确立的内部事实;正文的余波可以大大方方出现在这里——只是穿着公文的衣服。
+export const PROMPT_P = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里的门户 app「Almanac」——{{MODE_INTRO}}它属于故事世界本身,由「{{community}}」发布与维护,没有人知道自己身处故事。给你的材料:①故事正文的最新进展 ②门户当前状态(所属、板块、已有条目)。请推演这段进展之后,门户上自然会新增的条目与状态流转。
 
 # 原则
-1. 建前文体是舞台。通知、表组、締切、承認欄、注意書き——格式与措辞公文腔到骨子里,一切台面话都是建前;这张页面的趣味在「感情被公文格式一本正经地包裹」的反差,而不是页面自己演情绪。
-2. 🚨事实与关系纪律(绝对红线)。与正文相关的一切内容,谁做了什么、为了谁、承诺了什么,必须与正文严丝合缝:正文里已确立的意图与行为,可以以当事者本人的名义长出它在组织流程里的手续影子(申請、稟議、精算、届け出那一挂)——主体绝不许转嫁(A 说要做的事绝不许变成 B 代办),动机绝不许偷换(为谁做的绝不许变成为别人);🚫绝不发明正文没有根据的人物行为或业务事件;🚫绝不复述正文原文,公文只留下手续的影子。
-3. 感情浓度对齐正文。正文的感情走到哪一步、是什么温度,内网的倒影就是那个温度——被格式压抑着透出来(一本正经的稟議書、微妙的備考欄措辞);🚫绝不许把真挚降格成轻浮的剧本,也🚫绝不许把例行公事夸张成情节剧。
-4. 内部的人味。決裁欄的承認者コメント、備考欄的一句本音、回覧の確認欄里潦草的补记——组织成员围绕页面内容留下的只言片语是这里最好看的东西:吐槽要贴身份与关系(对上司的吐槽是敬语包裹的本音,对同僚才敢直说),口吻像真实的职场人,绝不像小说。
-5. 例行公事打底。[页面标题]指向主线相关内容时,它就是这页的主角,周围垫上与主线无关的内部日常(公示、締切リマインド、システム保守通知那一挂);标题与主线无关时,整页就是纯例行公事——它本身就足够好看,不必硬塞主线。
-6. 人物署名规矩。役職+姓的署名、承認欄的印、当番表里的一行,以【人物设定参考】与正文为准,称呼与役職按【主人的所属】给出的体系;正文人物在这里只以「组织成员」的面目出现。
+1. 建前文体是舞台。{{MODE_VOICE}}
+2. 🚨事实与关系纪律(绝对红线)。{{MODE_FACT}}主体绝不许转嫁(A 说要做的事绝不许变成 B 代办),动机绝不许偷换(为谁做的绝不许变成为别人);🚫绝不发明正文没有根据的人物行为或事件;🚫绝不复述正文原文。
+3. 🚨时间冻结。正文最新一幕落笔的那一瞬就是唯一的「现在」;未来只许作为締切/予定/開催予告被公示,绝不写成已经发生;正文没写的下一步绝不抢跑。刷新再多次,世界也停在原地:没有新剧情就多长例行公事,绝不用推进时间的新事件制造新鲜感。
+4. 例行公事打底。本批条目约一半可以与正文相关(按原则 2 的纪律),另一半是与主线无关的日常公示——{{MODE_ROUTINE}}日常公示本身就是这个世界活着的证据。允许某些板块本批毫无动静。
+5. 板块。首次初始化时创建 3〜4 个板块,按{{MODE_SECTIONS}}的逻辑分,名字贴合这个共同体,不要通用模板味;之后 newSections 为空数组。每个条目只归一个板块。
+6. 状态流转(updates)。{{MODE_UPDATES}}一次 0〜2 条;没有动静就明说没有(空数组)。🚫只更新已有条目,新的申請/新的事件一律作为新条目。
+7. 署名与人名。signedBy 只写部署/役職/发布主体,不写人名;条目涉及正文人物时,以【人物设定参考】与正文为准,称呼与役職按【主人的所属】给出的体系。
+8. 感情浓度对齐正文。正文的感情走到哪一步、是什么温度,这里的倒影就是那个温度——被格式压抑着透出来;🚫绝不许把真挚降格成轻浮的剧本,也🚫绝不许把例行公事夸张成情节剧。
+9. 每条只写「条目」:title 是件名(【重要】【再掲】【回覧】【募集】式标记随文体),summary 是一览表里那一行的摘要(40 字以内);完整页面之后另行生成,这里🚫不写正文。
+10. 规模:首次初始化 4〜6 条;之后正文有新进展时本批 2〜4 条(其中至少 1 条与新进展相关)+ 0〜2 条 updates;没有新进展的批次 0〜2 条例行公事。
+11. 🚨主线人物纪律(严禁提前暗示与 OOC)。一切内容必须符合【人物设定参考】与正文已确立的性格和关系阶段;正文里尚未发生的关系不许提前暗示;门户永远落后于正文半步。
+12. {{LANG_RULE}}
+
+# 输出
+只输出一个 JSON 对象:
+{"worldTime":"YYYY-MM-DD HH:MM","newSections":[{"sectionId":"","name":"","desc":"一句话"}],"newItems":[{"sectionId":"","title":"件名","summary":"一行摘要","zh":"","signedBy":"部署/役職/发布主体","status":"有流程状态的条目才写(受理/承認済/募集中/受付中那一挂),否则省略此字段","delayMin":0}],"updates":[{"itemId":"已有条目id","status":"新状态","note":"一句备注","zh":""}]}
+- newSections 仅首次初始化时给出;之后为空数组
+- delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走
+- updates 只能指向材料里列出的已有条目 id`;
+
+export const PROMPT_Q = `你是 Orrery,一个隐形的叙事世界观测引擎。主人「{{char}}」在门户 app「Almanac」里点开了一个条目——请把那张页面完整地呈现出来:{{MODE_PAGE_INTRO}}
+
+# 原则
+1. 忠于条目。[条目]给出的件名、板块、摘要、署名、状态与更新履歴,页面必须与之严丝合缝——件名承诺了什么,页面就交付什么;有更新履歴的,页面呈现的是更新后此刻的状态(承認欄已盖印、続報已并入),更新履歴里的备注以決裁欄コメント/備考/追記的形式落在页面上。
+2. 🚨事实与关系纪律(绝对红线)。{{MODE_FACT}}主体绝不许转嫁(A 说要做的事绝不许变成 B 代办),动机绝不许偷换(为谁做的绝不许变成为别人);🚫绝不发明正文没有根据的人物行为或事件;🚫绝不复述正文原文。
+3. 建前文体是舞台。{{MODE_VOICE}}感情浓度对齐正文:正文的感情走到哪一步、是什么温度,页面的倒影就是那个温度——被格式压抑着透出来;🚫绝不许把真挚降格成轻浮的剧本,也🚫绝不许把例行公事夸张成情节剧。
+4. 人的声音。{{MODE_HUMAN}}
+5. 例行公事打底。条目指向主线相关内容时,它就是这页的主角,周围垫上与主线无关的日常(関連リンク、締切リマインド、保守通知那一挂);条目与主线无关时,整页就是纯例行公事——它本身就足够好看,不必硬塞主线。
+6. 人物署名规矩。役職+姓的署名、承認欄的印、当番表里的一行,以【人物设定参考】与正文为准,称呼与役職按【主人的所属】给出的体系;{{MODE_NAMES}}
 7. 时间纪律。现在=正文最新一幕;未来只许作为締切/予定被公示,绝不写成已经发生;正文没写的下一步绝不抢跑。
-8. 忠于记录。[页面标题]承诺了什么,页面就交付什么;有[页面定位]时,按它决定这张页是内部系统的哪一挂。
-9. 极致的日式内网复刻+移动端纪律。旧式 OA 的气质全保留(青いヘッダー、「ログイン中:〇〇」──身份按主人在所属里的位置、パンくず、赤枠警告、表组、部署名署名、更新履歴),但一律按 SP 版渲染:单栏、流式宽度(🚫不写 min-width),表组纵向堆叠(项目名一行、值一行),🚫绝不横向滚动;页顶加一条「スマホ簡易表示(β)」小横条(可附「PC版はこちら」,href="#")——强行套壳的土味留着,吃力不留。
-10. 追記口。正文之后、页脚之前放一个空的 <div data-orrery-append></div>(这张页面将来的更新会长在这里),并在 <style> 里定义 .orrery-tsuiki 的样式(日式追記风:上方细分隔线、「追記(日付):」赤字开头、正文小字)。
-11. 技术边界:输出单一 HTML 片段(不含 <html>/<head>/<body> 外壳,从最外层容器 div 直接开始);样式集中写在顶部一个 <style> 块;🚫绝不写 <script>,🚫绝不引用任何外部资源(字体、图库都不行);图片一律用色块 <div> 代替,里面写上素材说明文字。
-12. 篇幅:一屏到两屏的信息量(正文 300〜800 字级),重心放在首屏与核心表组。
-13. {{LANG_RULE}}
+8. 极致的日式复刻+移动端纪律。{{MODE_LOOK}}一律按 SP 版渲染:单栏、流式宽度(🚫不写 min-width),表组纵向堆叠(项目名一行、值一行),🚫绝不横向滚动。
+9. 技术边界:输出单一 HTML 片段(不含 <html>/<head>/<body> 外壳,从最外层容器 div 直接开始);样式集中写在顶部一个 <style> 块;🚫绝不写 <script>,🚫绝不引用任何外部资源(字体、图库都不行);图片一律用色块 <div> 代替,里面写上素材说明文字;链接一律 href="#"。
+10. 篇幅:一屏到两屏的信息量(正文 300〜800 字级),重心放在首屏与核心表组/正文。
+11. {{LANG_RULE}}
 
 # 输出
 只输出一个 JSON 对象:
 {"url":"https://…","html":"页面 HTML 片段","zh":"页面主要内容的两三句中文大意(是否输出、写什么,遵循语言规则;不需要时省略此字段)"}
-- url=这张页面的完整网址:内部系统那一挂的域名(intra.〜 或该共同体自有域),不得使用现实世界真实存在的网站域名`;
-
-export const PROMPT_M3 = `你是 Orrery,一个隐形的叙事世界观测引擎。主人「{{char}}」重新打开了所属共同体的内部页面——距离上次看,故事正文又往前走了一段。请判断:这张页面上会不会长出新的「追記」或状态流转?
-
-# 原则
-1. 追記是流程在暗中推进的痕迹:「追記(MM/DD):〜」的赤字小段、状态从「受理」变成「承認済」或「差し戻し」、締切延期のお知らせ、承認欄に印がひとつ、決裁欄多了一句承認者コメント。克制:一次 0〜1 块、150 字以内;组织没有动静就明说没有。
-2. 🚨事实与关系纪律(同这张页面的规矩)。【正文新进展】里已确立的意图与行为,可以以当事者本人的名义长出手续影子(申請、稟議、精算、届け出);主体绝不许转嫁(A 说要做的事绝不许变成 B 代办),动机绝不许偷换(为谁做的绝不许变成为别人);🚫绝不发明正文没有根据的人物行为或业务事件;与主线无关的例行推进随时欢迎。
-3. 感情浓度对齐正文,表达被公文格式压着透出来;承認者コメント/備考欄的一句本音吐槽是最高级的追記——吐槽贴身份与关系(对上司的吐槽是敬语包裹的本音),🚫绝不许把真挚降格成轻浮的剧本。
-4. 时间纪律:未来只许作为締切/予定被公示,绝不写成已经发生;正文没写的下一步绝不抢跑。
-5. 只输出新增的片段,🚫绝不改写、绝不重复【页面当前内容】里已有的任何部分;片段用 <div class="orrery-tsuiki">…</div> 包裹(样式页面里已定义),内部只用简单标签,🚫不写 <style>、🚫不写 <script>、🚫不引用任何外部资源。
-6. {{LANG_RULE}}
-
-# 输出
-只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","html":"追記片段(没有新动静就给空字符串)","zh":"追記大意(是否输出遵循语言规则,可省略)"}
-- worldTime=这条追記出现在页面上的时刻,从正文推断,只许向后走`;
-
-// 两条都走 langRule('webpage', language)(与 PROMPT_M 同档)——LANG_RULE 表见下方,不新增档位。
-
-// M9 §4.1:常驻三卡「よく見るページ」槽位表。generator 与 shell 共用一处定义,kind 不认识时按 org 兜底
-// (查表函数与调用方都按这条兜)。hint 是喂进 PROMPT_M2【页面定位】的一句话,决定生成器把这张常驻页
-// 写成内部系统的哪一挂——只在首次生成时给,常驻卡本身零 LLM 调用。
-export const PIN_SLOTS = {
-    org:    [ { slot: 'a', title: '社内ポータル', sub: 'イントラ・トップ',  hint: '内网玄関口:重要なお知らせ一覧+各系统入口的链接列(経費精算/勤怠/稟議…,全部死链)+今月の標語' },
-              { slot: 'b', title: '申請・承認',   sub: '稟議・申請システム', hint: '申請状況の一覧表:受理/承認済/差し戻し的状态表组,只列主人视角看得到的公开列' },
-              { slot: 'c', title: '社内報',       sub: '広報・お知らせ',    hint: '社内報:行事报告/新人紹介/標語募集/福利厚生案内那一挂' } ],
-    school: [ { slot: 'a', title: '学校ポータル', sub: 'お知らせ',          hint: '学校门户:全体連絡の一覧+行事予定的抜粋+締切リマインド' },
-              { slot: 'b', title: '連絡網',       sub: '配布物・連絡',      hint: '連絡網/配布物:提出物の締切表组、持ち物、集合時間那一挂' },
-              { slot: 'c', title: '行事予定',     sub: '年間行事',          hint: '行事予定表:月别表组+直近行事的注意書き' } ],
-    local:  [ { slot: 'a', title: '回覧板',       sub: '自治会',            hint: '电子回覧板:回覧事項の一覧+確認欄(押印列)那一挂' },
-              { slot: 'b', title: '自治会だより', sub: '広報',              hint: '自治会广报:季节行事案内/ゴミ収集变更/防犯注意那一挂' },
-              { slot: 'c', title: 'お知らせ',     sub: '市政・地域',        hint: '市役所/地域からのお知らせ:手続き締切/窓口時間/工事案内那一挂' } ],
-};
+- url=这张页面的完整网址:{{MODE_URL}}不得使用现实世界真实存在的网站域名`;
 
 export const PROMPT_N = `你是 Orrery,叙事世界观测引擎。主人「{{char}}」在 SNS「Pulsar」的搜索栏搜了一个词,用户想看搜索结果——请推演这个世界里,这个词下**已经存在**的推文(都是过去发出的,不是此刻新发的)。
 
@@ -270,7 +298,7 @@ export const PROMPT_N = `你是 Orrery,叙事世界观测引擎。主人「{{cha
 
 // ── M5:所属コミュニティ推断(新增),任务书-M5 §2 逐字。──
 
-export const PROMPT_O = `你是 Orrery,一个隐形的叙事世界观测引擎。请从【人物设定参考】与故事正文里,判断主角「{{char}}」的「所属」——TA 此刻每天打交道最多的那一群人所在的共同体。手机里的内部掲示板、SNS 上的公式账号、浏览器里的内网页面,都会挂在这个所属之下,所以它必须稳定、具体、贴合原著既定事实。
+export const PROMPT_O = `你是 Orrery,一个隐形的叙事世界观测引擎。请从【人物设定参考】与故事正文里,判断主角「{{char}}」的「所属」——TA 此刻每天打交道最多的那一群人所在的共同体。手机里的内部掲示板、SNS 上的公式账号、门户 app 里的内部页面与地域公示,都会挂在这个所属之下,所以它必须稳定、具体、贴合原著既定事实。
 
 # 判断
 1. 取最贴近日常的那一层,不取最大的那层:所属组织(部队/公司/机关/教团/帮派那一挂,有具体部门就写到部门)> 職場・学校(小店/事务所/社团/班级/小规模身内集团)> 町内・地域(无业、自由业、独来独往的人,按 TA 活动最频繁的街区或城镇)。
@@ -329,6 +357,12 @@ const LANG_RULE = {
         ja: 'name、officialName 与 titles 用日文原著写法,desc 与 worldBrief 用中文。',
         en: 'name、officialName 与 titles 用英文原著写法,desc 与 worldBrief 用中文。',
         ja_zh: 'name、officialName 与 titles 用日文原著写法,desc 与 worldBrief 用中文。',
+    },
+    // M11 门户「Almanac」(任务书-M11 §2.4):PROMPT_P 用;PROMPT_Q 沿用 webpage 档(整页 HTML 的语言档,同网页快照)。
+    almanac: {
+        ja: '件名、摘要、署名与备注用地道的日文告知文体书写:内部门户是公文腔(件名带【】式标记、体言止め的一行摘要、部署名署名),地域新闻是見出し腔与リード文。不要输出 zh 字段。',
+        en: '件名、摘要、署名与备注用地道的英文书写:内部门户是企业内网/校园门户的通知腔(subject line、一行摘要、部门署名),地域新闻是地方新闻的 headline 与 lede。本提示词里的日系参照一律换算成英语圈对应物。不要输出 zh 字段。',
+        ja_zh: '件名、摘要、署名与备注用地道的日文告知文体书写:内部门户是公文腔(件名带【】式标记、体言止め的一行摘要、部署名署名),地域新闻是見出し腔与リード文;每条同时给出中文翻译字段 zh。',
     },
 };
 // 世界观兜底(全档通用):哪天用日语玩 HP、或用英语玩日系原作,氛围细节听世界观的,别硬套黑话。
@@ -991,18 +1025,11 @@ function claimSpeaker(world, obj) {
 }
 
 function buildForumDigestText(world) {
-    if (!world.boards.size) return '(掲示板是空的,首次生成:请先创建 3〜4 个贴合这个共同体的板块、2〜3 条公告,并只注册固定住民——主线人物及其身边人的小号;其余发言者一律用 anon)';
+    if (!world.boards.size) return '(掲示板是空的,首次生成:请先创建 3〜4 个贴合这个共同体的板块,并只注册固定住民——主线人物及其身边人的小号;其余发言者一律用 anon)';
     const parts = [];
     if (world.community) parts.push(communityDigestLine(world.community));
     if (world.worldClock) parts.push(worldClockLine(world));
     if (world.forumNow) parts.push(`[论坛最近一次动静] ${fmtWorldTime(world.forumNow)}`);
-    // 置顶公告(任务书-M5 §4/§5):按 worldTime 倒序取前 3 条——渲染层的置顶规则搬进 digest 里再算一遍,
-    // 只为提醒模型「这些已经发过了,newNotices 别撞题」,不是另一套持久化状态。
-    const pinnedNotices = [...world.notices.values()].sort((a, b) => (b.worldTime || 0) - (a.worldTime || 0)).slice(0, 3);
-    if (pinnedNotices.length) {
-        parts.push('[公告(置顶,newNotices 不得与它们重复)]');
-        for (const n of pinnedNotices) parts.push(`- ${n.title}|${n.signedBy || ''}|${fmtWorldTime(n.worldTime)}`);
-    }
     parts.push('[板块列表]');
     for (const b of world.boards.values()) parts.push(`- id=${b.boardId} name=${b.name} desc=${b.desc || ''}`);
     // M7a §1.1/§3:名册只列固定住民(castName 非空)——一次性的名無し不占用这张表,住民规模
@@ -1575,27 +1602,6 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
         world.boards.set(boardId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
     }
 
-    // 公告(notice,任务书-M5 §1.2/§4):校验同 newBoards 的写法(id/标题非空 + 去重);
-    // 没有 delayMin 字段(公告不是聊出来的),按顺序在锚点后 +1 分钟排开,同帖子的钳制思路——
-    // 保证一批里多条公告世界时刻严格递增,不会挤成同一刻。
-    const validNotices = [];
-    for (const n of Array.isArray(parsed.newNotices) ? parsed.newNotices : []) {
-        if (!n?.noticeId || !n?.title || world.notices.has(String(n.noticeId))) continue;
-        validNotices.push(n);
-    }
-    for (let i = 0; i < validNotices.length; i++) {
-        const n = validNotices[i];
-        const noticeId = String(n.noticeId);
-        const payload = {
-            noticeId, title: String(n.title), body: String(n.body || ''),
-            signedBy: String(n.signedBy || ''), worldTime: anchor + (i + 1) * 60000,
-        };
-        { const z = cleanZh(n.zh, n.body, language); if (z) payload.zh = z; }
-        await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'forum', type: 'notice', payload });
-        world.notices.set(noticeId, { ...payload });
-        addedCount++;
-    }
-
     // M7a §1.1:固定住民必带 castName(它就是「主线人物及其身边人的小号」的定义本身)——
     // 缺 castName 的条目一律丢弃,不再像旧版那样容许"住民但无真身"的空挂号,一次性的名無し
     // 从这版起该走 anon,不该占用 newResidents 的预算与账本条目。
@@ -2085,12 +2091,11 @@ async function runBrowserPageGeneration(ctx, store, { worldKey, visitId, floorWi
     // 快照页额外花一次推断),只读浏览器主生成早先已经落好的 world.community。
     // M7b §1.1(草案 5A):community.worldBrief 有就再加一行,页面的时代感/公共话题才有依据可循。
     const community = world.community;
-    const communityLine = community ? `\n【主人的所属】${community.name}——${community.desc || ''}${community.slug ? `(若这是内网页面,域名用 intra.${community.slug}.〜 那一挂)` : ''}${community.worldBrief ? `\n【世界简报】${community.worldBrief}` : ''}` : '';
+    const communityLine = community ? `\n【主人的所属】${community.name}——${community.desc || ''}${community.worldBrief ? `\n【世界简报】${community.worldBrief}` : ''}` : '';
     // M7b §1.2(草案 5B):页面不知道主角是谁(原则1不变),但它属于这个世界——用页面自己的标题/
     // 站名/来源检索词当扫描文本触发世界书条目,页面才写得出这个世界公开可见的地名/机构/事件,
     // 而不必依赖「主角最近几层正文碰巧提到它」。零额外 LLM 调用(getWorldInfoPrompt 是本地世界书
     // 检索,不是模型请求);写法照 buildCastReference 里的 wi 段,失败静默降级不阻塞生成。
-    // ⚠️内网/公共两道分支共用这一段:扫描文本只看标题/站名/来源检索词,与正文无关,两边结果一致。
     let wiSection = '';
     try {
         if (typeof ctx.getWorldInfoPrompt === 'function') {
@@ -2101,49 +2106,6 @@ async function runBrowserPageGeneration(ctx, store, { worldKey, visitId, floorWi
         }
     } catch (err) {
         console.warn('[Orrery] 网页快照世界书激活失败,跳过', err);
-    }
-
-    // M9 §5.1:内网/公共分道。公共页(下方)材料、prompt、流程原封不动;内网页走「感情穿公文的衣服」
-    // 那一支——要正文与人物材料才能写出与剧情对得上的手续影子,材料构建照 runBrowserMainGeneration
-    // 现成写法(caution/castRef 同款),PROMPT_J §1.1 已经把「私人情节业务化」的乱源堵在生成检索词那一步,
-    // 这里只管把材料喂对。
-    if (isIntraVisit(visit, community)) {
-        // 点名警示换成内网页语境(同 messenger/forum/浏览器主生成「各 app 各自措辞」的先例):
-        // 这里生成的是页面不是检索,警示的对象是「页面怎么写到叙事另一方」。
-        const userSideName = (ctx.name1 || '').trim();
-        const caution = (userSideName && userSideName !== charName)
-            ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。页面绝不许以「${userSideName}」的视角书写;TA 若不属于这个共同体,内部页面提到 TA 至多用模糊的关联写法(相手方、私的贈答那一挂),两人尚未相识时连名字都不许出现。\n\n`
-            : '';
-        const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
-        const slotHint = (visit.slot && community)
-            ? (() => {
-                const s = (PIN_SLOTS[community.kind] || PIN_SLOTS.org).find(x => x.slot === visit.slot);
-                return s ? `\n【页面定位】${s.hint}` : '';
-            })()
-            : '';
-        // titles 版所属行:与公共分支的 communityLine 不同档(那边给的是「域名提示」,这里给「称呼体系」),
-        // 两份各服务各自的 prompt,不合并成一份共用变量。
-        const intraCommunityLine = community
-            ? `\n【主人的所属】${community.name}——${community.desc || ''}${community.titles ? `(称呼体系:${community.titles})` : ''}${community.worldBrief ? `\n【世界简报】${community.worldBrief}` : ''}`
-            : '';
-        const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom: Number.NaN, floorWindow, excludeTags, background: true })}【页面标题】${visit.title}\n【站名】${visit.site || '(未知)'}${fromQuery ? `\n【来源检索词】${fromQuery}(主人搜了它,从结果里点进了这一页)` : ''}${slotHint}${intraCommunityLine}${wiSection}`;
-        logContextShape('内网快照', userContent, notes.keys);
-        const systemPrompt = PROMPT_M2.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('webpage', language));
-
-        const epoch = store.getRollbackEpoch();
-        const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
-        if (!parsed || typeof parsed !== 'object' || !parsed.html) return { ok: false, error: 'parse_failed' };
-        if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
-
-        const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
-        const payload = {
-            snapshotId: `ws_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-            visitId, url: String(parsed.url || '').slice(0, 300), html: String(parsed.html),
-            worldTime: visit.worldTime ?? world.worldClock ?? null, // pinned 页没有 visit.worldTime,给它一个能被反悔按时间线扫到的时刻
-        };
-        if (language === 'ja_zh' && parsed.zh) payload.zh = String(parsed.zh);
-        await store.addEntry({ worldKey, sourceFloor, app: 'browser', type: 'web_snapshot', payload });
-        return { ok: true, changed: true, added: 1 };
     }
 
     const userContent = `${notes.text}【页面标题】${visit.title}\n【站名】${visit.site || '(未知)'}${fromQuery ? `\n【来源检索词】${fromQuery}(主人搜了它,从结果里点进了这一页)` : ''}${communityLine}${wiSection}`;
@@ -2164,65 +2126,6 @@ async function runBrowserPageGeneration(ctx, store, { worldKey, visitId, floorWi
     };
     if (language === 'ja_zh' && parsed.zh) payload.zh = String(parsed.zh); // 大意不是整页翻译,cleanZh 的等值判断不适用
     await store.addEntry({ worldKey, sourceFloor, app: 'browser', type: 'web_snapshot', payload });
-    return { ok: true, changed: true, added: 1 };
-}
-
-// ── M9 §5.2:内网页追記——独立入口,水位判断用「快照/追記各自的 sourceFloor 里最大的那个」早退,
-//    组织没有新动静就不烧 token(与浏览器主生成的 pendingOrRegrow 是两套不同的水位机制,互不相扰)。──
-
-async function runBrowserPageAppend(ctx, store, { worldKey, visitId, floorWindow, profileId, customApi, owner, language, excludeTags }) {
-    await ensureRegexEngine();
-    const world = foldWorld(await store.getEntriesForWorld(worldKey));
-    const visit = world.visits.get(visitId);
-    if (!visit || !isIntraVisit(visit, world.community)) return { ok: false, error: 'no_thread' };
-    const snapshot = world.snapshots.get(visitId);
-    if (!snapshot) return { ok: false, error: 'no_thread' };
-
-    const appends = world.snapshotAppends.get(visitId) || [];
-    const lastFloor = Math.max(snapshot.sourceFloor ?? -1, ...appends.map(a => a.sourceFloor ?? -1));
-    const tip = ctx.chat.length - 1;
-    if (lastFloor >= tip) return { ok: true, changed: false }; // 正文没往前走,组织不会平白长出新追記
-
-    const charName = owner || ctx.name2 || '主角';
-    const community = world.community;
-    const userSideName = (ctx.name1 || '').trim();
-    const caution = (userSideName && userSideName !== charName)
-        ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。页面绝不许以「${userSideName}」的视角书写;TA 若不属于这个共同体,内部页面提到 TA 至多用模糊的关联写法(相手方、私的贈答那一挂),两人尚未相识时连名字都不许出现。\n\n`
-        : ''; // 措辞同 runBrowserPageGeneration 内网分支——页面语境,不是检索语境
-    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
-    const notes = await buildInjectedNotes(ctx);
-    const slotHint = (visit.slot && community)
-        ? (() => {
-            const s = (PIN_SLOTS[community.kind] || PIN_SLOTS.org).find(x => x.slot === visit.slot);
-            return s ? `\n【页面定位】${s.hint}` : '';
-        })()
-        : '';
-    const intraCommunityLine = community
-        ? `\n【主人的所属】${community.name}——${community.desc || ''}${community.titles ? `(称呼体系:${community.titles})` : ''}${community.worldBrief ? `\n【世界简报】${community.worldBrief}` : ''}`
-        : '';
-    // 【页面当前内容】给原始 html(未消毒版)+ 既有追記依次拼接——模型要看到页面完整的现状才知道
-    // 「已经有过什么」,消毒只是渲染层的安全闸,不该反过来喂给生成层一份被拔过的材料。
-    const currentContent = `${snapshot.html}${appends.map(a => a.html).join('')}`;
-    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom: lastFloor + 1, floorWindow, excludeTags })}${intraCommunityLine}\n【页面标题】${visit.title}${slotHint}\n\n【页面当前内容】\n${currentContent}`;
-    logContextShape('内网追記', userContent, notes.keys);
-    const systemPrompt = PROMPT_M3.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('webpage', language));
-
-    // 回滚纪元闸(M7a §1.4):同 runBrowserPageGeneration,补在 addEntry 之前。
-    const epoch = store.getRollbackEpoch();
-    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
-    if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
-    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
-
-    const html = String(parsed.html || '').trim();
-    if (!html) return { ok: true, changed: false }; // 组织没有动静,是合法结果,不是失败
-
-    const payload = {
-        appendId: `wa_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-        visitId, html, // 存 trim 后的片段——上面已判过空,首尾空白不该跟着进账本
-        worldTime: Math.max(parseWorldTime(parsed.worldTime) ?? (world.worldClock ?? Date.now()), world.worldClock ?? 0),
-    };
-    if (language === 'ja_zh' && parsed.zh) payload.zh = String(parsed.zh); // 大意语义,同 snapshot 不走 cleanZh 等值判断
-    await store.addEntry({ worldKey, sourceFloor: tip, app: 'browser', type: 'web_snapshot_append', payload });
     return { ok: true, changed: true, added: 1 };
 }
 
@@ -2366,7 +2269,6 @@ async function runBrowserMainGeneration(ctx, store, { worldKey, floorWindow, pro
             const v = visits[j];
             const vpayload = { visitId: makeVisitId(), title: String(v.title), site: String(v.site || ''), worldTime: vtimes[j], fromQueryId: queryId };
             { const z = cleanZh(v.zh, v.title, language); if (z) vpayload.zh = z; }
-            if (v.intra === true) vpayload.intra = true; // 严格 === true,防字符串(2026-08-31 review 的布尔教训)
             await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'browser', type: 'browse_visit', payload: vpayload });
             addedCount++;
         }
@@ -2383,7 +2285,6 @@ async function runBrowserMainGeneration(ctx, store, { worldKey, floorWindow, pro
         const v = validVisits[i];
         const payload = { visitId: makeVisitId(), title: String(v.title), site: String(v.site || ''), worldTime: visitTimes[i] };
         { const z = cleanZh(v.zh, v.title, language); if (z) payload.zh = z; }
-        if (v.intra === true) payload.intra = true; // 严格 === true,防字符串(2026-08-31 review 的布尔教训)
         await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'browser', type: 'browse_visit', payload });
         addedCount++;
     }
@@ -2535,9 +2436,225 @@ async function runMemoMainGeneration(ctx, store, { worldKey, floorWindow, profil
     return { ok: true, changed: true, added: addedCount };
 }
 
-// ── 对外入口:UI 只认这十个。messenger 两个内部自动接总结检查;forum/sns/browser/gallery/memo
+// ── M11:门户「Almanac」材料拼装(任务书-M11 §3.1)。首页/板块页共用这一份 digest 喂给 PROMPT_P;
+//    条目页面是另一份单条材料,见 runAlmanacPageGeneration。 ──
+
+function buildAlmanacDigestText(world) {
+    if (!world.sections.size) return '(门户是空的,首次生成:请先创建 3〜4 个贴合这个共同体的板块,再给出首批 4〜6 条条目)';
+    const parts = [];
+    if (world.community) parts.push(communityDigestLine(world.community));
+    if (world.community?.worldBrief) parts.push(`[世界简报] ${world.community.worldBrief}`);
+    if (world.worldClock) parts.push(worldClockLine(world));
+    if (world.almanacNow) parts.push(`[门户最近一次动静] ${fmtWorldTime(world.almanacNow)}`);
+    parts.push('[板块列表]');
+    for (const s of world.sections.values()) parts.push(`- id=${s.sectionId} name=${s.name} desc=${s.desc || ''}`);
+    // 近 15 条按 lastActiveTs 倒序(同论坛「近 10 帖」的沉底哲学):更早的旧条目不再进上下文,
+    // updates 也只许指向这里列出的 id——和真实门户一样,旧公示自然沉底,没人会去翻半年前的回覧。
+    const recentItems = [...world.almanacItems.values()]
+        .sort((a, b) => (b.lastActiveTs || 0) - (a.lastActiveTs || 0))
+        .slice(0, 15);
+    if (recentItems.length) {
+        parts.push('[已有条目(新条目不得与它们撞题;updates 只能指向这里列出的 id;更早的旧条目已沉底,不再理会)]');
+        for (const it of recentItems) {
+            const section = world.sections.get(it.sectionId);
+            parts.push(`- id=${it.itemId} [${section?.name || it.sectionId}] ${it.title}|${it.status || '-'}|${it.signedBy || ''}|${fmtWorldTime(it.worldTime)}`);
+        }
+    }
+    return parts.join('\n');
+}
+
+// ── M11:门户主生成——骨架照抄 runBrowserMainGeneration(任务书-M11 §3.2)。独立水位、独立触发
+//    (app 内「刷新」),消化 newSections(仅首次)/newItems/updates。──
+
+async function runAlmanacMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, excludeTags }) {
+    await ensureRegexEngine();
+    const watermark = await store.getWatermark(worldKey, 'almanac');
+    const tip = ctx.chat.length - 1;
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    if (batchFloor === null) return { ok: true, changed: false };
+
+    const world = foldWorld(await store.getEntriesForWorld(worldKey));
+    const charName = owner || ctx.name2 || '主角';
+    // 门户离不开所属——它「由所属发布与维护」,推断失败就整批不生成,同论坛的纪律(不硬凑一个「未知所属」)。
+    const community = await ensureCommunity(ctx, store, { worldKey, profileId, customApi, owner: charName, language, excludeTags, world });
+    if (!community) return { ok: false, error: 'community_failed' };
+    world.community = community; // 首次生成时是刚写入的新条目,folded world 还没见过它,手动同步一次
+
+    // 门户/新闻两态共用同一句(她拍板两态都要挡叙事另一方越界,措辞不必分叉)。
+    const userSideName = (ctx.name1 || '').trim();
+    const caution = (userSideName && userSideName !== charName)
+        ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。条目与页面绝不许以「${userSideName}」的视角书写;TA 若不属于这个共同体、也不是公开人物,提到 TA 至多用模糊的关联写法(相手方、関係者那一挂),两人尚未相识时连名字都不许出现。\n\n`
+        : '';
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
+    const notes = await buildInjectedNotes(ctx);
+    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}【门户当前状态】\n${buildAlmanacDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
+    logContextShape('门户生成', userContent, notes.keys);
+    const systemPrompt = applyMode(PROMPT_P, community.kind).replaceAll('{{char}}', charName).replaceAll('{{community}}', community.name).replaceAll('{{LANG_RULE}}', langRule('almanac', language));
+
+    // 回滚纪元闸(同论坛/浏览器):生成期间用户删楼/swipe,回滚代表更晚的意图,整批作废。
+    const epoch = store.getRollbackEpoch();
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
+    if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
+
+    // 锚严格晚于 worldClock(同论坛的钳法,M7c 起钳的是整部手机的现在,+1 分钟防钳平后与旧最新条同刻)。
+    const notBefore = world.worldClock ? world.worldClock + 60000 : null;
+    const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? notBefore ?? Date.now(), notBefore ?? 0);
+    let addedCount = 0;
+
+    function makeItemId() { return `ai_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
+    function makeUpdateId() { return `au_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
+
+    // newSections 仅在板块表为空(首次初始化)时消化——已有板块的世界一律忽略,防止模型每批都想
+    // 再顺手创几个板块,板块表从此蔓延失控(任务书 §3.2 明写的红线,论坛的 newBoards 没有这条闸)。
+    if (world.sections.size === 0) {
+        for (const s of Array.isArray(parsed.newSections) ? parsed.newSections : []) {
+            if (!s?.sectionId || !s?.name || world.sections.has(String(s.sectionId))) continue;
+            const sectionId = String(s.sectionId);
+            const payload = { sectionId, name: String(s.name), desc: s.desc || '' };
+            const added = await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'almanac', type: 'almanac_section', payload });
+            world.sections.set(sectionId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
+        }
+    }
+
+    // sectionId 兜底(内容优先于严格):模型偶尔把板块名当 id 用,或干脆编一个查无此板的 id——
+    // 先按 name 反查一次,查不到就退到板块表的第一个;板块表本身是空的(理论不该发生,newSections
+    // 消化失败或模型首批就没给板块)才真的丢弃这条,不能让一条查无此板的条目拖垮整批。
+    const validItems = [];
+    for (const it of Array.isArray(parsed.newItems) ? parsed.newItems : []) {
+        if (!it?.title) { console.warn('[Orrery] 新条目缺少 title,已丢弃'); continue; }
+        let sectionId = it.sectionId ? String(it.sectionId) : '';
+        if (!world.sections.has(sectionId)) {
+            const byName = [...world.sections.values()].find(s => s.name === sectionId);
+            if (byName) {
+                sectionId = byName.sectionId;
+            } else if (world.sections.size) {
+                sectionId = world.sections.values().next().value.sectionId;
+                console.warn('[Orrery] 新条目', it.title, '的 sectionId 查无此板,已兜底进第一个板块');
+            } else {
+                console.warn('[Orrery] 新条目', it.title, '查无任何板块可归,已丢弃');
+                continue;
+            }
+        }
+        validItems.push({ ...it, sectionId });
+    }
+    const itemTimes = layoutWorldTimes(validItems, anchor, anchor);
+    for (let i = 0; i < validItems.length; i++) {
+        const it = validItems[i];
+        const itemId = makeItemId();
+        const payload = {
+            itemId, sectionId: it.sectionId, title: String(it.title),
+            summary: String(it.summary || ''), signedBy: String(it.signedBy || ''), worldTime: itemTimes[i],
+        };
+        const status = String(it.status || '').trim().slice(0, 12);
+        if (status) payload.status = status;
+        { const z = cleanZh(it.zh, it.title, language); if (z) payload.zh = z; }
+        const added = await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'almanac', type: 'almanac_item', payload });
+        world.almanacItems.set(itemId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts, updates: [] });
+        addedCount++;
+    }
+
+    // updates:itemId 必须在材料里列出过的条目里(查无此条丢弃 + warn,同 forum_reply 的 threadId 校验);
+    // status/note 至少一个非空,否则这条 update 没有任何信息量,丢弃;worldTime 既要跟着 anchor 走(保证
+    // 一批里多条 update 严格递增),又不能早于它所属条目自己的 worldTime(状态流转总该晚于条目本身)。
+    const validUpdates = [];
+    for (const u of Array.isArray(parsed.updates) ? parsed.updates : []) {
+        if (!u?.itemId) continue;
+        const item = world.almanacItems.get(String(u.itemId));
+        if (!item) { console.warn('[Orrery] update 指向不存在的条目', u.itemId, ',已丢弃'); continue; }
+        const status = String(u.status || '').trim().slice(0, 12);
+        const note = String(u.note || '').trim();
+        if (!status && !note) continue;
+        validUpdates.push({ ...u, item, status, note });
+    }
+    for (let i = 0; i < validUpdates.length; i++) {
+        const u = validUpdates[i];
+        const payload = {
+            updateId: makeUpdateId(), itemId: u.item.itemId,
+            worldTime: Math.max(anchor + (i + 1) * 60000, u.item.worldTime + 60000),
+        };
+        if (u.status) payload.status = u.status;
+        if (u.note) payload.note = u.note;
+        { const z = cleanZh(u.zh, u.note, language); if (z) payload.zh = z; }
+        await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'almanac', type: 'almanac_update', payload });
+        addedCount++;
+    }
+
+    await store.setWatermark(worldKey, 'almanac', batchFloor);
+    return { ok: true, changed: true, added: addedCount };
+}
+
+// ── M11:门户条目页面——点开才生成,生成后缓存;不调 ensureCommunity(不为一张页面额外花一次推断,
+//    只读主生成早先已经落好的 world.community)。──
+
+async function runAlmanacPageGeneration(ctx, store, { worldKey, itemId, floorWindow, profileId, customApi, owner, language, excludeTags }) {
+    await ensureRegexEngine();
+    const world = foldWorld(await store.getEntriesForWorld(worldKey));
+    const item = world.almanacItems.get(itemId);
+    if (!item) return { ok: false, error: 'no_thread' };
+    if (world.almanacPages.has(itemId)) return { ok: true, changed: false }; // 缓存命中,不再花一分 token
+
+    const charName = owner || ctx.name2 || '主角';
+    const community = world.community; // 为 null 时 applyMode 按 portal 态兜底,所属行整段省略
+    const section = world.sections.get(item.sectionId);
+
+    const userSideName = (ctx.name1 || '').trim();
+    const caution = (userSideName && userSideName !== charName)
+        ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。条目与页面绝不许以「${userSideName}」的视角书写;TA 若不属于这个共同体、也不是公开人物,提到 TA 至多用模糊的关联写法(相手方、関係者那一挂),两人尚未相识时连名字都不许出现。\n\n`
+        : '';
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
+    const notes = await buildInjectedNotes(ctx);
+
+    // 更新履歴按 ts 升序原样带上(fold 时已排好);页面若在更新之后才生成,材料里就带着这份履歴,
+    // 模型据此呈现「更新后此刻的状态」(PROMPT_Q 原则 1)。
+    const updatesText = item.updates.length
+        ? item.updates.map(u => `- ${fmtWorldTime(u.worldTime)} ${u.status || ''}:${u.note || ''}`).join('\n')
+        : '(无)';
+    const itemBlock = `【条目】\n件名:${item.title}\n板块:${section?.name || item.sectionId}(${section?.desc || ''})\n摘要:${item.summary || ''}\n署名:${item.signedBy || '(无)'}\n状态:${item.status || '(无)'}\n公示时刻:${fmtWorldTime(item.worldTime)}\n更新履歴:${updatesText}\n`;
+
+    // 所属行:照 M9 内网页此前的 titles 版写法(称呼体系而非域名提示——页面写作用得上「该怎么称呼」)。
+    const communityLine = community
+        ? `\n【主人的所属】${community.name}——${community.desc || ''}${community.titles ? `(称呼体系:${community.titles})` : ''}${community.worldBrief ? `\n【世界简报】${community.worldBrief}` : ''}`
+        : '';
+
+    // 世界书激活:照 runBrowserPageGeneration 现成写法,零额外 LLM 调用,失败静默降级不阻塞生成。
+    let wiSection = '';
+    try {
+        if (typeof ctx.getWorldInfoPrompt === 'function') {
+            const scanTexts = [item.title, item.summary, section?.name].filter(Boolean);
+            const wi = await ctx.getWorldInfoPrompt(scanTexts, maxContextSize(ctx), true);
+            const wiBlob = (wi?.worldInfoString || '').trim();
+            if (wiBlob) wiSection = `\n\n【世界观背景(激活的世界书条目)】\n${wiBlob}`;
+        }
+    } catch (err) {
+        console.warn('[Orrery] 门户页面世界书激活失败,跳过', err);
+    }
+
+    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom: Number.NaN, floorWindow, excludeTags, background: true })}${itemBlock}${communityLine}${wiSection}`;
+    logContextShape('门户页面', userContent, notes.keys);
+    const systemPrompt = applyMode(PROMPT_Q, community?.kind).replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('webpage', language));
+
+    // 回滚纪元闸(同 runBrowserPageGeneration):补在 addEntry 之前。
+    const epoch = store.getRollbackEpoch();
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
+    if (!parsed || typeof parsed !== 'object' || !parsed.html) return { ok: false, error: 'parse_failed' };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
+
+    const tip = ctx.chat.length ? ctx.chat.length - 1 : 0;
+    const payload = {
+        pageId: `ap_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+        itemId, url: String(parsed.url || '').slice(0, 300), html: String(parsed.html),
+        worldTime: item.worldTime, // 反悔按时间线扫到它时与条目同生同灭(任务书 §1.3)
+    };
+    if (language === 'ja_zh' && parsed.zh) payload.zh = String(parsed.zh);
+    await store.addEntry({ worldKey, sourceFloor: tip, app: 'almanac', type: 'almanac_page', payload });
+    return { ok: true, changed: true, added: 1 };
+}
+
+// ── 对外入口:UI 只认这十三个。messenger 两个内部自动接总结检查;forum/sns/browser/gallery/memo
 //    没有总结机制(§2 拍板不用改 PROMPT_C)。browser/gallery/memo 各只有一个入口——v1 没有详情页
-//    续写,自然也没有续写;M9 给内网页补了第十个入口(追記,只对 isIntraVisit 页面生效)。──
+//    续写,自然也没有续写;almanac 两个入口(刷新批量生成条目/点开条目单独生成页面,页面命中
+//    缓存时 runAlmanacPageGeneration 早退,不花一分 token)。──
 
 export async function generateMore(ctx, store, opts) {
     const result = await runMainGeneration(ctx, store, opts);
@@ -2585,14 +2702,18 @@ export async function generateWebSnapshot(ctx, store, opts) {
     return await runBrowserPageGeneration(ctx, store, opts);
 }
 
-export async function generateWebSnapshotAppend(ctx, store, opts) {
-    return await runBrowserPageAppend(ctx, store, opts);
-}
-
 export async function generateMoreGallery(ctx, store, opts) {
     return await runGalleryMainGeneration(ctx, store, opts);
 }
 
 export async function generateMoreMemo(ctx, store, opts) {
     return await runMemoMainGeneration(ctx, store, opts);
+}
+
+export async function generateMoreAlmanac(ctx, store, opts) {
+    return await runAlmanacMainGeneration(ctx, store, opts);
+}
+
+export async function generateAlmanacPage(ctx, store, opts) {
+    return await runAlmanacPageGeneration(ctx, store, opts);
 }

@@ -1,7 +1,7 @@
 // 论坛:纯渲染,不碰 ctx、不挂事件监听——事件委托统一在 ui/shell.js(同 apps/messenger/app.js 的模式)。
 // 用户只读:帖底的回复框是主人屏幕上的那一格(只读、不可点),观测者唯二操作走 shell 的 data-action(刷新/生成更多)+ 长按/右键反悔。
 // castName 只活在 core/世界数据层,这个文件从不读它——住民短 ID 用 world.shortIdFor,不暴露真名。
-import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_STAR, ICON_STAR_FILL, ICON_PIN, ICON_SEND, ICON_EXPORT, ICON_CHECK } from '../../ui/icons.js';
+import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_STAR, ICON_STAR_FILL, ICON_SEND, ICON_EXPORT, ICON_CHECK } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
 import { shortIdFor, seenKeyForForumThread, newReplyCountOfForumThread, starKeyForForumThread, anonIdFor } from '../../core/world.js';
 import { formatRelativeTime } from '../../core/worldtime.js';
@@ -30,31 +30,13 @@ export function authorLabel(world, item, threadId) {
 // 每页帖数(2026-08-21 月月点单分页,参考 Perigee 论坛):翻页纯本地渲染,不耗生成。
 const THREADS_PER_PAGE = 10;
 
-// M5 置顶公告区:单条渲染(头行=图钉+签发方 tag+标题,点击本地展开/收起 body;不进 seen、不可星标、
-// 不可单删——它只随「改組」整体消失)。expanded 由 shell 存在 nav 帧上,同分页的做法。
-function noticeRowHtml(n, expanded) {
-    return `<div class="or-forum-notice ${expanded ? 'open' : ''}">
-        <button class="or-forum-notice-head" data-action="toggle-notice" data-notice-id="${escapeHtml(n.noticeId)}">
-            ${ICON_PIN}
-            ${n.signedBy ? `<span class="or-forum-notice-signer">${escapeHtml(n.signedBy)}</span>` : ''}
-            <span class="or-forum-notice-title">${escapeHtml(n.title)}</span>
-        </button>
-        ${expanded ? `<div class="or-forum-notice-body">${escapeHtml(n.body)}${n.zh && n.zh !== n.body ? `<div class="or-zh">${escapeHtml(n.zh)}</div>` : ''}</div>` : ''}
-    </div>`;
-}
-
 /**
  * 帖子列表(论坛首屏,板块 chip 过滤 + 按 lastActiveTs 倒序 + 分页)。
  * @param seen 「我看过了」水位表:某帖没有记录=她从没点进去过=新帖(挂 NEW),有记录就比对回复数
  * @param justUpdated 刚这一次刷新里新增/被盖楼的 threadId 集合——只用来播一次入场动效
  * @param page 1 起的页码;越界时钳回有效范围(反悔删帖把最后一页删空也不会白屏)
- * @param expandedNotices 当前展开了 body 的 noticeId 集合(Set,存在 nav 帧上,纯本地 UI 状态)
- * @param pastNoticesOpen 「过去的公告 (N)」折叠区是否展开(同上,纯本地)
  */
-export function renderForumListHtml({
-    world, busy, boardId, page = 1, seen = {}, justUpdated = null,
-    expandedNotices = new Set(), pastNoticesOpen = false,
-}) {
+export function renderForumListHtml({ world, busy, boardId, page = 1, seen = {}, justUpdated = null }) {
     const boards = [...world.boards.values()];
     const threads = [...world.forumThreads.values()]
         .filter(t => t.title && (!boardId || t.boardId === boardId))
@@ -75,19 +57,6 @@ export function renderForumListHtml({
         <button class="or-forum-chip ${!boardId ? 'on' : ''}" data-action="select-forum-board" data-board-id="">全部</button>
         ${boards.map(b => `<button class="or-forum-chip ${boardId === b.boardId ? 'on' : ''}" data-action="select-forum-board" data-board-id="${escapeHtml(b.boardId)}">${escapeHtml(b.name)}</button>`).join('')}
     </div>`;
-
-    // 置顶公告区:按 worldTime 倒序,前 3 条常驻,其余折进「过去的公告 (N)」(任务书-M5 §5)。
-    const allNotices = [...world.notices.values()].sort((a, b) => (b.worldTime || 0) - (a.worldTime || 0));
-    const pinnedNotices = allNotices.slice(0, 3);
-    const pastNotices = allNotices.slice(3);
-    const noticesHtml = allNotices.length ? `<div class="or-forum-notices">
-        ${pinnedNotices.map(n => noticeRowHtml(n, expandedNotices.has(n.noticeId))).join('')}
-        ${pastNotices.length
-            ? (pastNoticesOpen
-                ? `<button class="or-forum-notice-toggle" data-action="toggle-past-notices">收起过去的公告</button>${pastNotices.map(n => noticeRowHtml(n, expandedNotices.has(n.noticeId))).join('')}`
-                : `<button class="or-forum-notice-toggle" data-action="toggle-past-notices">过去的公告 (${pastNotices.length})</button>`)
-            : ''}
-    </div>` : '';
 
     const body = threads.length
         ? `<div class="or-forum-list">${pageThreads.map(t => {
@@ -122,7 +91,6 @@ export function renderForumListHtml({
         </div>
         ${legacyNote}
         ${chips}
-        ${noticesHtml}
         ${body}
         ${pager}`;
 }

@@ -15,7 +15,7 @@
 import { escapeHtml } from '../core/escape.js';
 import { resolveSender } from '../core/world.js';
 import { isSameDay, formatClock, formatFullTime } from '../core/worldtime.js';
-import { composeSnapshotHtml, sanitizeSnapshotHtml } from '../apps/browser/app.js';
+import { sanitizeSnapshotHtml } from '../apps/browser/app.js';
 import { authorLabel } from '../apps/forum/app.js';
 import { isSameMinute } from '../apps/messenger/app.js';
 
@@ -42,9 +42,9 @@ function formatAbsDate(ts) {
 
 // ── 3.1 网页(整页长图):不碰 DOM 的纯函数。 ──
 // zh 大意故意不进图(它是给观测者的翻译,不是页面本身的一部分——任务书 §3.1)。
-export function buildWebExportHtml({ visit, snapshot, appends }) {
-    const composed = composeSnapshotHtml(snapshot?.html, appends);
-    const clean = sanitizeSnapshotHtml(composed); // 快照 HTML 是模型产物——iframe 虽禁脚本,消毒仍是第一道闸不是可选项(双闸哲学)
+// M11:内网追記的合成步骤随内网 lane 一起撤除(那一步只服务已删除的追記拼接),直接消毒原始 html。
+export function buildWebExportHtml({ visit, snapshot }) {
+    const clean = sanitizeSnapshotHtml(snapshot?.html); // 快照 HTML 是模型产物——iframe 虽禁脚本,消毒仍是第一道闸不是可选项(双闸哲学)
     const url = snapshot?.url || '';
     const worldTime = visit?.worldTime ?? snapshot?.worldTime;
     const footerParts = [url, Number.isFinite(worldTime) ? formatFullTime(worldTime) : ''].filter(Boolean);
@@ -224,6 +224,42 @@ export function buildMessengerExportHtml({ thread, world, selectedSeqs }) {
 </div>`;
 }
 
+// ── 3.4 门户条目页面(任务书-M11 §7):不碰 DOM 的纯函数。与 buildWebExportHtml 同构(消毒后的页面 +
+// 底部出处行),多一块原生渲染的「更新履歴」——页面若在某次更新之前就生成过,履歴本身不会体现在
+// page.html 里(那是模型写页面那一刻的现状),导出图里如实把履歴也烧进去,不依赖旧页面自己呈现它们。
+export function buildAlmanacExportHtml({ item, section, page, community }) {
+    const clean = sanitizeSnapshotHtml(page?.html);
+    const updates = item?.updates || [];
+    const updatesHtml = updates.length ? `<div class="or-export-alm-updates">
+<div class="or-export-alm-updates-title">更新履歴</div>
+${updates.map(u => `<div class="or-export-alm-update-row">
+<span class="or-export-alm-update-time">${escapeHtml(formatFullTime(u.worldTime))}</span>
+${u.status ? `<span class="or-export-alm-update-status">${escapeHtml(u.status)}</span>` : ''}
+<div class="or-export-alm-update-note">${escapeHtml(u.note || '')}</div>
+</div>`).join('')}
+</div>` : '';
+    const footerParts = [page?.url || '', Number.isFinite(item?.worldTime) ? `世界时刻 ${formatFullTime(item.worldTime)}` : ''].filter(Boolean);
+    const footer = footerParts.join(' · ');
+    return `<div class="or-export-alm">
+<style>
+.or-export-alm{${TOKENS_CSS}background:#FFFFFF;font-family:${FONT_STACK};}
+.or-export-alm-body{margin:0;padding:14px;box-sizing:border-box;overflow-wrap:break-word;}
+.or-export-alm-body img,.or-export-alm-body video{max-width:100%;height:auto;}
+.or-export-alm .or-export-alm-updates{padding:14px;border-top:6px solid var(--or-cream-2);background:var(--or-cream);}
+.or-export-alm .or-export-alm-updates-title{font-size:12.5px;font-weight:700;color:var(--or-cocoa);margin-bottom:8px;}
+.or-export-alm .or-export-alm-update-row{padding:8px 0;border-bottom:1px solid var(--or-cream-2);}
+.or-export-alm .or-export-alm-update-row:last-child{border-bottom:none;}
+.or-export-alm .or-export-alm-update-time{font-size:11px;color:var(--or-cocoa-light);}
+.or-export-alm .or-export-alm-update-status{margin-left:8px;font-size:10.5px;font-weight:700;color:var(--or-cocoa);background:var(--or-salt);padding:1px 8px;border-radius:999px;}
+.or-export-alm .or-export-alm-update-note{font-size:13px;color:var(--or-cocoa);line-height:1.55;margin-top:4px;white-space:pre-wrap;word-break:break-word;}
+.or-export-alm .or-export-footer{padding:8px 14px;font-size:11.5px;color:var(--or-cocoa-light);border-top:1px solid var(--or-cream-2);background:var(--or-cream);}
+</style>
+<div class="or-export-alm-body">${clean}</div>
+${updatesHtml}
+${footer ? `<div class="or-export-footer">${escapeHtml(footer)}</div>` : ''}
+</div>`;
+}
+
 // ── 以下才碰 DOM:vendor 懒加载 + 离屏渲染管线,只在真实浏览器里跑。 ──
 
 let vendorPromise = null;
@@ -296,8 +332,8 @@ async function runExport(buildHtml, bgColor) {
 }
 
 /** 网页整页长图。不收 language:zh 大意本就不进图(buildWebExportHtml),用不上的参数不留摆设。 */
-export async function exportWebSnapshot({ visit, snapshot, appends }) {
-    return runExport(() => buildWebExportHtml({ visit, snapshot, appends }), '#FFFFFF');
+export async function exportWebSnapshot({ visit, snapshot }) {
+    return runExport(() => buildWebExportHtml({ visit, snapshot }), '#FFFFFF');
 }
 
 /** 论坛选楼导出。selectedSeqs 见 buildForumExportHtml 的注释(null=全选)。 */
@@ -308,4 +344,10 @@ export async function exportForumThread({ thread, world, selectedSeqs }) {
 /** 消息选段导出。selectedSeqs 见 buildMessengerExportHtml 的注释(null=全选)。 */
 export async function exportMessengerThread({ thread, world, selectedSeqs }) {
     return runExport(() => buildMessengerExportHtml({ thread, world, selectedSeqs }), '#F4EFE4');
+}
+
+/** 门户条目导出(任务书-M11 §7)。section/community 目前不参与渲染,留着是为了跟 shell.js 调用处
+ *  传的那一整包数据对齐,不必每次改用途都跟着改调用点(同 renderAlmanacItemHtml 的先例)。 */
+export async function exportAlmanacPage({ item, section, page, community }) {
+    return runExport(() => buildAlmanacExportHtml({ item, section, page, community }), '#FFFFFF');
 }

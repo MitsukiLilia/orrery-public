@@ -7,36 +7,6 @@
 }
 .or-forum-legacy-note p { flex: 1; margin: 0; font-size: 11.5px; color: var(--or-cocoa-light); line-height: 1.5; }
 
-/* ── M5:置顶公告区(浅色面,与帖子行区分但不抢眼;每条头行=图钉+签发方 tag+标题,点击本地展开) ── */
-.or-forum-notices {
-    flex-shrink: 0; display: flex; flex-direction: column; gap: 6px;
-    padding: 10px 14px; background: var(--or-cream-2);
-}
-.or-forum-notice { background: var(--or-white); border-radius: 10px; overflow: hidden; }
-.or-forum-notice-head {
-    display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
-    border: none; background: none; cursor: pointer; font-family: inherit;
-    padding: 8px 10px;
-}
-.or-forum-notice-head svg { width: 13px; height: 13px; color: var(--or-cocoa-light); flex-shrink: 0; }
-.or-forum-notice-signer {
-    flex-shrink: 0; font-size: 10px; font-weight: 700; color: var(--or-cocoa); background: var(--or-salt-deep);
-    padding: 2px 8px; border-radius: 999px; white-space: nowrap; /* 深色字才在三套皮上都读得清,同 NEW 徽标 */
-}
-.or-forum-notice-title {
-    flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--or-cocoa);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.or-forum-notice.open .or-forum-notice-title { white-space: normal; }
-.or-forum-notice-body {
-    padding: 0 10px 10px 32px; font-size: 12px; color: var(--or-cocoa-light);
-    line-height: 1.6; white-space: pre-wrap; word-break: break-word;
-}
-.or-forum-notice-toggle {
-    align-self: flex-start; border: none; background: none; color: var(--or-cocoa-light);
-    font-size: 11.5px; padding: 4px 2px; cursor: pointer; font-family: inherit;
-}
-
 /* ── 板块 chip 横滑条 ── */
 .or-forum-chips {
     flex-shrink: 0; display: flex; gap: 6px; overflow-x: auto;

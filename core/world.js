@@ -135,17 +135,6 @@ export function anonIdFor(threadId, key) {
     return ((h >>> 0) % 36 ** 6).toString(36).padStart(6, '0'); // 异或会把值带回有符号,最后再转一次无符号
 }
 
-// ── M9 内网判定:单一定义,generator/shell/app 三处共用,谁也不许自己重写一遍这条正则。──
-// pinned/intra 标志优先(常驻卡与 PROMPT_J 消化层已经把判断做完的条目);关键词兜底只在有所属时生效——
-// 没有所属就没有内网这回事,不能靠站名/标题里偶然出现的词把一张公共页错判成内网页(公共 lane 零风险
-// 是任务书的红线,兜底必须保守)。
-export function isIntraVisit(visit, community) {
-    if (!visit) return false;
-    if (visit.pinned || visit.intra) return true;
-    if (!community) return false;
-    return /(intra\.|イントラ|社内システム|稟議|勤怠|経費精算)/.test(`${visit.site || ''} ${visit.title || ''}`);
-}
-
 /**
  * 账本 fold 成世界状态:{ contacts, groups, threads, worldNow, boards, residents, forumThreads, forumNow,
  *   snsAccounts, tweets, snsNow, searches, visits, browserNow, worldClock }。
@@ -173,12 +162,17 @@ export function isIntraVisit(visit, community) {
  * nowPlaying: { title, ts } 或 null(app='world' type='now_playing',一世界一条,后写覆盖=只留最新一首——
  *   同 community 的语义。心境没变时模型省略这个字段=不写入新条目,fold 出来的自然还是上一首,不需要
  *   额外的"沿用"逻辑——这就是"省略=沿用上一首"在账本层面的全部实现,M8 桌面小组件的音乐组件用它。
- * notices: noticeId -> { noticeId, title, body, zh?, signedBy, worldTime },M5 论坛公告——worldTime 参与
- *   forumNow 推进(它是论坛活动),置顶(前 3 条)与折叠规则在渲染层算,fold 只原样收着不作取舍。
  * follows: { omote: Set<accountId>, ura: Set<accountId> }——M6 关注表,按账本顺序回放 sns_follow
  *   (follow=add,unfollow=delete;Set 语义天然让"unfollow 一个不在表里的 id"是 no-op)。fold 收尾时
  *   过滤掉 accountId 已不在 snsAccounts 里的悬空关注(账号被回滚/删除的防御性兜底,同 memo_edit 的第二道闸)。
- * worldClock: 六个 xxxNow 里的最大值(M7c 单一世界钟,见下方 return 前的长注),六个都空才是 null。
+ * sections: sectionId -> { sectionId, name, desc, sourceFloor, ts },M11 门户板块——仅首次初始化落账,
+ *   永不按 worldTime 删(板块不是时间轴事件,同 deleteAlmanacFrom 的长注)。
+ * almanacItems: itemId -> { ...条目 payload, sourceFloor, ts, updates:[按 ts 升序], status, lastActiveTs },
+ *   M11 门户条目——status 取「有 update 带 status 就用最后一条的,否则用条目自己的」,lastActiveTs 取
+ *   条目与全部 updates 的 worldTime 最大值(新着区/角标排序用它,收尾统一算好,见 return 前的长注)。
+ * almanacPages: itemId -> { ...页面 payload, id, sourceFloor, ts },M11 门户条目页面——点开才生成,
+ *   一条目一张,后写覆盖(理论上不会重发,同 community 的语义)。
+ * worldClock: 七个 xxxNow 里的最大值(M7c 单一世界钟 + M11 补第七项,见下方 return 前的长注),七个都空才是 null。
  */
 export function foldWorld(entries) {
     const contacts = new Map();
@@ -194,12 +188,13 @@ export function foldWorld(entries) {
     const photosById = new Map(); // 内部工作表,最终按 worldTime 排序输出为 photos 数组(见 return)
     const memos = new Map();
     const snapshots = new Map();  // v0.14 网页快照:visitId -> web_snapshot(一 visit 一张,后写覆盖)
-    const snapshotAppends = new Map(); // M9:visitId -> web_snapshot_append[](一 visit 可多条追記,组内按 ts 升序,见下方排序)
     let snsSuggest = null;        // v0.14 搜索联想:整批一条,后写覆盖=只留最新一批
     let community = null;         // M5 所属:一世界一条,后写覆盖=只留最新(同 snsSuggest 的语义)
     let nowPlaying = null;        // M8 单曲循环:一世界一条,后写覆盖=只留最新一首(同 community 的语义)
-    const notices = new Map();    // M5 公告:noticeId -> notice,置顶规则在渲染层算,fold 只管原样收着
     const follows = { omote: new Set(), ura: new Set() }; // M6 关注表:by 分两套,follow/unfollow 按账本顺序回放
+    const sections = new Map();       // M11 门户板块:sectionId -> section,仅首次初始化落账
+    const almanacItems = new Map();   // M11 门户条目:itemId -> { ...payload, updates:[] }(updates 收尾再排序,见下方)
+    const almanacPages = new Map();   // M11 门户条目页面:itemId -> page,后写覆盖
 
     function ensureThread(threadId) {
         if (!threads.has(threadId)) {
@@ -272,21 +267,30 @@ export function foldWorld(entries) {
         } else if (e.type === 'search_query') {
             searches.set(e.payload.queryId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'browse_visit') {
+            // M11:内网 lane 收编后,pinned 常驻卡不再是浏览器的东西——旧世界残留的 bvpin_* 条目
+            // 直接跳过不入 visits,UI 不需要再像 M9 那样另写一层过滤(任务书 §8)。
+            if (e.payload.pinned) continue;
             visits.set(e.payload.visitId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'web_snapshot') {
             snapshots.set(e.payload.visitId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
-        } else if (e.type === 'web_snapshot_append') {
-            const list = snapshotAppends.get(e.payload.visitId) || [];
-            list.push({ ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
-            snapshotAppends.set(e.payload.visitId, list);
         } else if (e.type === 'sns_suggest') {
             snsSuggest = { ...e.payload, ts: e.ts };
         } else if (e.type === 'community') {
             community = { ...e.payload, sourceFloor: e.sourceFloor, ts: e.ts }; // 后写覆盖=只留最新
         } else if (e.type === 'now_playing') {
             nowPlaying = { title: e.payload.title, ts: e.ts }; // 后写覆盖=只留最新一首,同 community 的语义
-        } else if (e.type === 'notice') {
-            notices.set(e.payload.noticeId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'almanac_section') {
+            sections.set(e.payload.sectionId, { ...e.payload, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'almanac_item') {
+            almanacItems.set(e.payload.itemId, { ...e.payload, sourceFloor: e.sourceFloor, ts: e.ts, updates: [] });
+        } else if (e.type === 'almanac_update') {
+            // 正常流程下 updates 只会指向已经入账的条目(生成层已校验过一遍,见 runAlmanacMainGeneration
+            // 的长注)——这里是防御性的第二道闸,同 memo_edit 指向不存在 noteId 的先例。
+            const item = almanacItems.get(e.payload.itemId);
+            if (!item) { console.warn('[Orrery] almanac_update 指向不存在的条目', e.payload.itemId, ',已跳过'); continue; }
+            item.updates.push({ ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'almanac_page') {
+            almanacPages.set(e.payload.itemId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'photo') {
             photosById.set(e.payload.photoId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'memo_note') {
@@ -339,8 +343,6 @@ export function foldWorld(entries) {
         // 不需要专门的"恢复草稿"逻辑——同 memo_edit 回滚即还原的哲学。
         if (t.myDraft && t.replies.some(r => r.fromDraftId === t.myDraft.draftId)) t.myDraft = null;
     }
-    // 公告也是论坛活动(任务书-M5 §1.2):worldTime 参与 forumNow 推进,和帖子/回复同一条时钟。
-    for (const n of notices.values()) if (Number.isFinite(n.worldTime)) forumNow = Math.max(forumNow, n.worldTime);
 
     let snsNow = 0;
     for (const t of tweets.values()) {
@@ -356,12 +358,6 @@ export function foldWorld(entries) {
     let browserNow = 0;
     for (const s of searches.values()) if (Number.isFinite(s.worldTime)) browserNow = Math.max(browserNow, s.worldTime);
     for (const v of visits.values()) if (Number.isFinite(v.worldTime)) browserNow = Math.max(browserNow, v.worldTime);
-    // M9:追記也是浏览器的动静(同 M7c「worldClock=max 六 Now」的哲学),组内顺带排好 ts 升序——
-    // fold 只做一次,UI/生成层都直接消费排好的顺序,不必各自再排一遍。
-    for (const list of snapshotAppends.values()) {
-        list.sort((a, b) => (a.ts || 0) - (b.ts || 0));
-        for (const a of list) if (Number.isFinite(a.worldTime)) browserNow = Math.max(browserNow, a.worldTime);
-    }
 
     // M4 相册时钟:photos 按 worldTime 升序输出(任务书 §2 明写的契约),UI 需要倒序时自己再排一遍
     // (同 browser 的习惯,app.js 不借 foldWorld 排好的方向,各自按自己的展示需求排)。
@@ -372,6 +368,21 @@ export function foldWorld(entries) {
     // M4 备忘录时钟:memoNow 取每条备忘 latestTs(创建或最后编辑,取较新者)里的最大值。
     let memoNow = 0;
     for (const m of memos.values()) if (Number.isFinite(m.latestTs)) memoNow = Math.max(memoNow, m.latestTs);
+
+    // M11 门户收尾:updates 组内按 ts 升序排好(同浏览器追記此前的排序习惯——fold 只做一次,
+    // UI/生成层都直接消费排好的顺序);status 取「有 update 带 status 的就用最后一条,否则用条目自己的」
+    // (从后往前找第一条带 status 的 update,找不到就沿用条目自身);lastActiveTs 取条目与全部 updates
+    // 的 worldTime 最大值,almanacNow 只看 items/updates(页面是用户点开触发的,不算世界自己的动静)。
+    let almanacNow = 0;
+    for (const item of almanacItems.values()) {
+        item.updates.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+        const withStatus = [...item.updates].reverse().find(u => u.status);
+        if (withStatus) item.status = withStatus.status;
+        const times = [item.worldTime, ...item.updates.map(u => u.worldTime)].filter(Number.isFinite);
+        item.lastActiveTs = times.length ? Math.max(...times) : 0;
+        if (Number.isFinite(item.worldTime)) almanacNow = Math.max(almanacNow, item.worldTime);
+        for (const u of item.updates) if (Number.isFinite(u.worldTime)) almanacNow = Math.max(almanacNow, u.worldTime);
+    }
 
     // M6 关注表收尾:渲染前过滤一次悬空引用(account 已不在 snsAccounts 里的 accountId)——
     // 现有删除机制都是账号与关注同 sourceFloor 一起被 deleteEntriesFromFloor 清走,理论上不会出现,
@@ -385,23 +396,24 @@ export function foldWorld(entries) {
     // M7c 单一 worldClock(时间统一):此前六个 app 各自把自己的 xxxNow 当「现在」讲给 LLM、
     // 也各自当 UI 的相对时间参照——于是六个 app 各管各的钟,互不知情(真机症状:消息刚推到
     // 今晚,论坛还停在三天前却显示"刚刚",新一批论坛帖又可能被模型标进比消息更早的时刻)。
-    // worldClock 取六者的最大值:谁的动静最新,就代表"整部手机此刻确定活到多晚"——全手机的
-    // 现在不该早于任何一个 app 已经走到的时刻。六个 app 自己的 xxxNow 语义不变、原样保留
+    // worldClock 取七者的最大值(M11 补 almanacNow):谁的动静最新,就代表"整部手机此刻确定活到多晚"——
+    // 全手机的现在不该早于任何一个 app 已经走到的时刻。每个 app 自己的 xxxNow 语义不变、原样保留
     // (红点/NEW/latestTsOf* 仍靠它们认"这个 app 有没有新动静"),worldClock 只是叠加在上面的
-    // 一把统一读数,不取代它们。六个都还是空世界(0)时 worldClock 才是 null。
-    const worldClock = Math.max(worldNow, forumNow, snsNow, browserNow, galleryNow, memoNow) || null;
+    // 一把统一读数,不取代它们。七个都还是空世界(0)时 worldClock 才是 null。
+    const worldClock = Math.max(worldNow, forumNow, snsNow, browserNow, galleryNow, memoNow, almanacNow) || null;
 
     return {
         contacts, groups, threads, worldNow: worldNow || null,
         boards, residents, forumThreads, forumNow: forumNow || null,
         snsAccounts, tweets, snsNow: snsNow || null,
-        searches, visits, browserNow: browserNow || null, snapshots, snapshotAppends, snsSuggest,
+        searches, visits, browserNow: browserNow || null, snapshots, snsSuggest,
         photos, galleryNow: galleryNow || null,
         memos, memoNow: memoNow || null,
-        community, notices, // M5:所属(对象或 null)+ 公告表
+        community, // M5:所属(对象或 null)
         nowPlaying, // M8:{ title, ts } 或 null,见上方长注
         follows, // M6:{ omote: Set, ura: Set } 关注表
-        worldClock, // M7c:整部手机六个 app 共用的「现在」,见上方长注
+        sections, almanacItems, almanacPages, almanacNow: almanacNow || null, // M11:门户板块/条目/页面 + 门户自己的时钟
+        worldClock, // M7c:整部手机七个 app 共用的「现在」,见上方长注
     };
 }
 
@@ -425,6 +437,8 @@ export function starKeyForVisit(visitId) { return `wv:${visitId}`; }
 // M4 相册/备忘录同浏览器的整 app 一把快照工法(任务书-M4 §2)。
 export function seenKeyForGallery() { return 'gallery:app'; }
 export function seenKeyForMemo() { return 'memo:app'; }
+// M11 门户同上,整 app 一把(条目/更新混在一起判新旧,不按板块/条目分)。
+export function seenKeyForAlmanac() { return 'almanac:app'; }
 
 /** 线程里最新一条消息的入账 ts(空线程 0)——看过之后 seen 就记到这个值。 */
 export function latestTsOfThread(thread) {
@@ -473,7 +487,6 @@ export function latestTsOfBrowser(world) {
     let max = 0;
     for (const s of world.searches.values()) if (s.ts > max) max = s.ts;
     for (const v of world.visits.values()) if (v.ts > max) max = v.ts;
-    for (const list of world.snapshotAppends.values()) for (const a of list) if (a.ts > max) max = a.ts;
     return max;
 }
 
@@ -488,6 +501,16 @@ export function latestTsOfGallery(world) {
 export function latestTsOfMemo(world) {
     let max = 0;
     for (const m of world.memos.values()) if (m.ts > max) max = m.ts;
+    return max;
+}
+
+/** 门户全部条目(items 与 updates)里最新的入账 ts——同 latestTsOfBrowser 的整 app 一把快照工法(页面不算)。 */
+export function latestTsOfAlmanac(world) {
+    let max = 0;
+    for (const it of world.almanacItems.values()) {
+        if (it.ts > max) max = it.ts;
+        for (const u of it.updates) if (u.ts > max) max = u.ts;
+    }
     return max;
 }
 
@@ -524,6 +547,11 @@ export function hasUnseenInApp(app, world, seen) {
         if (!latest) return false; // 备忘录还是空的,不该为它亮角标
         return (seen[seenKeyForMemo()] || 0) < latest;
     }
+    if (app === 'almanac') {
+        const latest = latestTsOfAlmanac(world);
+        if (!latest) return false; // 门户还是空的,不该为它亮角标
+        return (seen[seenKeyForAlmanac()] || 0) < latest;
+    }
     for (const t of world.forumThreads.values()) {
         if (!t.title) continue; // 帖子壳(悬空回复)不是能点开的东西,不该为它亮角标
         const s = seen[seenKeyForForumThread(t.threadId)];
@@ -553,6 +581,8 @@ export function seenBaselinePairs(world) {
     if (galleryTs) pairs.push([seenKeyForGallery(), galleryTs]);
     const memoTs = latestTsOfMemo(world);
     if (memoTs) pairs.push([seenKeyForMemo(), memoTs]);
+    const almanacTs = latestTsOfAlmanac(world);
+    if (almanacTs) pairs.push([seenKeyForAlmanac(), almanacTs]);
     return pairs;
 }
 

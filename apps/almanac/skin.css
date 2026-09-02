@@ -1,0 +1,108 @@
+/* 门户「Almanac」皮肤——依赖 ui/shell.css 里定义的 --or-* token,自己不重定义。
+   列表行质感对齐 apps/browser/skin.css 的列表行,板块 chip 质感对齐 apps/forum/skin.css。
+   apps 互相零依赖:日期分隔条不借 browser/skin.css 的 .or-browser-date-sep,自己独立一份同款式。 */
+
+/* ── 品牌条:app 图标 + "Almanac" 字标 + 模式标签(所属名|イントラネット/ポータル/地域ニュース) ── */
+.or-alm-brand {
+    flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; background: var(--or-cream-2);
+}
+.or-alm-brand-icon { display: inline-flex; width: 20px; height: 20px; color: var(--or-cocoa); flex-shrink: 0; }
+.or-alm-brand-icon svg { width: 100%; height: 100%; }
+.or-alm-brand-name { font-size: 13.5px; font-weight: 700; color: var(--or-cocoa); letter-spacing: .01em; }
+.or-alm-brand-sub {
+    margin-left: auto; font-size: 11px; color: var(--or-cocoa-light);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.or-alm-home { flex: 1; overflow-y: auto; }
+
+/* ── 板块入口列表(首页) ── */
+.or-alm-sections { display: flex; flex-direction: column; }
+.or-alm-section-row {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    border: none; background: none; cursor: pointer; font-family: inherit;
+    padding: 13px 16px; border-bottom: 1px solid var(--or-cream-2);
+}
+.or-alm-section-row:active { background: rgba(110, 90, 80, .05); }
+.or-alm-section-main { flex: 1; min-width: 0; }
+.or-alm-section-name { font-size: 14px; font-weight: 600; color: var(--or-cocoa); }
+.or-alm-section-desc {
+    font-size: 11.5px; color: var(--or-cocoa-light); margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.or-alm-section-badge {
+    flex-shrink: 0; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+    background: var(--or-salt-deep); color: var(--or-cocoa);
+    font-size: 10.5px; font-weight: 700; line-height: 18px; text-align: center;
+}
+
+/* ── 新着(首页,全部条目按 lastActiveTs 倒序前 5 条) ── */
+.or-alm-recent-title {
+    padding: 12px 16px 4px; font-size: 11.5px; font-weight: 700; color: var(--or-cocoa-light);
+    letter-spacing: .04em;
+}
+
+/* ── 条目行(新着区与板块页共用) ── */
+.or-alm-list { flex: 1; overflow-y: auto; }
+.or-alm-date-sep { text-align: center; margin: 10px 0 4px; }
+.or-alm-date-sep span {
+    background: var(--or-cream-2); color: var(--or-cocoa-light);
+    font-size: 11px; padding: 3px 12px; border-radius: 12px;
+}
+.or-alm-row {
+    display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px;
+    border-bottom: 1px solid var(--or-cream-2); position: relative;
+}
+.or-alm-row.clickable { cursor: pointer; }
+.or-alm-row.clickable:active { background: rgba(110, 90, 80, .05); }
+.or-alm-row-body { flex: 1; min-width: 0; }
+.or-alm-row-title { font-size: 13.5px; font-weight: 600; color: var(--or-cocoa); line-height: 1.5; word-break: break-word; }
+.or-alm-row-summary { font-size: 12px; color: var(--or-cocoa-light); margin-top: 3px; line-height: 1.5; }
+.or-alm-row-meta { font-size: 11px; color: var(--or-cocoa-light); margin-top: 4px; }
+.or-alm-row-time { flex-shrink: 0; font-size: 11px; color: var(--or-cocoa-light); margin-top: 1px; }
+
+/* 新内容小圆点:同 browser 的 .or-browser-dot 脉冲(独立一份,apps 互相零依赖) */
+.or-alm-dot {
+    flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; margin-top: 5px;
+    background: var(--or-salt-deep);
+    animation: or-alm-dot-pulse 2.6s ease-in-out infinite;
+}
+@keyframes or-alm-dot-pulse {
+    0%, 72%, 100% { transform: scale(1); }
+    82% { transform: scale(1.3); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .or-alm-dot { animation: none; }
+}
+
+/* 状态徽章:纯色小圆角标签,无渐变——建前公文的印章感 */
+.or-alm-status {
+    display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--or-cocoa);
+    background: var(--or-salt); padding: 1px 8px; border-radius: 999px; white-space: nowrap;
+}
+
+/* ── 条目页:meta 卡 + 正文(消毒后的 sandbox iframe,类名与消毒函数复用 browser)+ 更新履歴卡 ── */
+.or-alm-meta {
+    flex-shrink: 0; padding: 14px 16px; background: var(--or-cream); border-bottom: 1px solid var(--or-cream-2);
+}
+.or-alm-meta-title { font-size: 16px; font-weight: 700; color: var(--or-cocoa); line-height: 1.4; }
+.or-alm-meta-line { font-size: 11.5px; color: var(--or-cocoa-light); margin-top: 6px; }
+
+.or-alm-item-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+/* 沙箱 iframe 没有脚本、无法把内容高度回报给父页——给它一个「至少 62vh、没有更新履歴时撑满剩余
+   高度」的弹性框(flex-basis 62vh + grow 1),自己内部原生滚动;有更新履歴时履歴卡按自然高度排在
+   下方,总高超出就由 .or-alm-item-body 再滚一层。没有履歴的条目页因此和浏览器阅读器一样满屏,
+   不会在 iframe 下方留一截空白(小克 review 时改的)。选择器刻意比 browser/skin.css 的
+   .or-webpage-frame{flex:1} 更具体,只在门户条目页内生效,不污染浏览器阅读器自己的样式。 */
+.or-alm-item-body .or-webpage-frame { display: block; width: 100%; flex: 1 0 62vh; min-height: 62vh; border: none; background: #FFFFFF; }
+.or-alm-item-body .or-webpage-zh { flex-shrink: 0; border-top: 1px solid var(--or-cream-2); }
+.or-alm-item-body .or-empty { flex: 1; }
+
+.or-alm-updates { flex-shrink: 0; padding: 14px 16px; border-top: 6px solid var(--or-cream-2); }
+.or-alm-updates-title { font-size: 12.5px; font-weight: 700; color: var(--or-cocoa); margin-bottom: 8px; }
+.or-alm-update-row { padding: 10px 0; border-bottom: 1px solid var(--or-cream-2); }
+.or-alm-update-row:last-child { border-bottom: none; }
+.or-alm-update-head { display: flex; align-items: center; gap: 8px; }
+.or-alm-update-time { font-size: 11px; color: var(--or-cocoa-light); }
+.or-alm-update-note { font-size: 13px; color: var(--or-cocoa); line-height: 1.55; margin-top: 4px; white-space: pre-wrap; word-break: break-word; }

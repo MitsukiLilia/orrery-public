@@ -33,6 +33,9 @@ export const ICON_APP_GALLERY = '<svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" 
 // M3 浏览器「Astrolabe」:手绘星盘——外圈(星盘边缘)+ 内圈刻度环(虚线,一圈刻度的写意)+ 十字准线
 // (中心枢轴四向短线,星盘的对齐基准)+ 一粒小星(rete 指针,古代星盘上用来指星位的那一点)。
 export const ICON_APP_BROWSER = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="1.3 1.7"/><circle cx="12" cy="12" r="1" fill="currentColor"/><line x1="12" y1="5.6" x2="12" y2="7.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="12" y1="16.3" x2="12" y2="18.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="5.6" y1="12" x2="7.7" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="16.3" y1="12" x2="18.4" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M16.6 6.8l.9-.4.4-.9.4.9.9.4-.9.4-.4.9-.4-.9Z" fill="currentColor"/></svg>';
+// M11 门户「Almanac」:手绘写意「公示板」——顶部一枚小圆图钉(钉住公告的意象)+ 圆角公告纸 +
+// 三条横线(件名一览的抽象),线条粗细与其余 app 网格图标同族,56px 内也能读清是"贴着公告的板子"。
+export const ICON_APP_ALMANAC = '<svg viewBox="0 0 24 24"><circle cx="12" cy="4.3" r="1.5" fill="currentColor"/><rect x="4.5" y="6.5" width="15" height="14.5" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="7.5" y1="10.5" x2="16.5" y2="10.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="7.5" y1="14" x2="16.5" y2="14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="7.5" y1="17.5" x2="13" y2="17.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
 // 检索行前缀小图标(放大镜),尺寸家族同 ICON_REPLY_SM/ICON_RT_SM(24 viewBox,内联用时约 13〜14px)。
 export const ICON_SEARCH_SM = '<svg viewBox="0 0 24 24"><circle cx="10.3" cy="10.3" r="6" fill="none" stroke="currentColor" stroke-width="1.7"/><line x1="14.9" y1="14.9" x2="19.5" y2="19.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 
@@ -64,9 +67,6 @@ export function scallopWaveDataUri(color = '#FBF9F4') {
 // v0.13.0 Asterism 星图件:空心星=未收藏,实心星=已点亮(观测者的收藏符号——月相属于世界,星星属于观测者)
 export const ICON_STAR = '<svg viewBox="0 0 24 24"><path d="M12 3.6l2.47 5.46 5.93.62-4.43 4.02 1.24 5.84L12 16.56l-5.21 2.98 1.24-5.84-4.43-4.02 5.93-.62Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
 export const ICON_STAR_FILL = '<svg viewBox="0 0 24 24"><path d="M12 3.6l2.47 5.46 5.93.62-4.43 4.02 1.24 5.84L12 16.56l-5.21 2.98 1.24-5.84-4.43-4.02 5.93-.62Z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
-
-// M5 论坛置顶公告小图标(图钉):胶囊形针头 + 扁平肩台 + 向下的针身,手绘写意「钉在板上」的意象。
-export const ICON_PIN = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="8" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 11h10l-2 3H9Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><line x1="12" y1="14" x2="12" y2="21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
 // M7a 论坛输入框常驻(草案 3A):帖内页底部那条只读回复框上的发送图标——简洁纸飞机线稿,
 // 风格同 ICON_REPLY_SM/ICON_RT_SM(stroke currentColor,折线内芯表现"折过的纸")。

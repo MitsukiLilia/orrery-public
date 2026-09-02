@@ -3,9 +3,9 @@
 import {
     computeWorldKey, foldWorld,
     seenKeyForThread, seenKeyForForumThread, seenKeyForTweet, seenKeyForBrowser,
-    seenKeyForGallery, seenKeyForMemo,
+    seenKeyForGallery, seenKeyForMemo, seenKeyForAlmanac,
     latestTsOfThread, latestTsOfForumThread, latestTsOfTweet, latestTsOfBrowser,
-    latestTsOfGallery, latestTsOfMemo,
+    latestTsOfGallery, latestTsOfMemo, latestTsOfAlmanac,
     hasUnseenInApp, seenBaselinePairs,
 } from '../core/world.js';
 import * as store from '../core/store.js';
@@ -14,7 +14,7 @@ import {
     generateMore, continueThread, generateMoreForum, continueForumThread,
     generateMoreSns, continueTweetReplies, generateMoreBrowser,
     generateMoreGallery, generateMoreMemo, generateSnsSearch, generateWebSnapshot,
-    generateWebSnapshotAppend, PIN_SLOTS,
+    generateMoreAlmanac, generateAlmanacPage,
 } from '../core/generator.js';
 import { manualRevert } from '../core/rollback.js';
 import { escapeHtml } from '../core/escape.js';
@@ -22,7 +22,7 @@ import { formatClock, formatClockDate } from '../core/worldtime.js';
 import {
     ICON_BACK, ICON_CHEVRON_RIGHT, ICON_CHECK, ICON_MINUS, ICON_PLUS, ICON_CLOSE,
     ICON_APP_MESSENGER, ICON_APP_SETTINGS, ICON_APP_FORUM, ICON_APP_MEMO, ICON_APP_SNS, ICON_APP_GALLERY,
-    ICON_APP_BROWSER,
+    ICON_APP_BROWSER, ICON_APP_ALMANAC,
     ICON_HUD_STARS, ICON_HUD_RING, ICON_STAR, ICON_STAR_FILL, dotPatternDataUri, scallopWaveDataUri,
     ICON_LOOP, ICON_PIXEL_MOON,
 } from './icons.js';
@@ -32,7 +32,8 @@ import { renderSnsTlHtml, renderSnsTweetHtml, renderSnsProfileHtml, renderSnsMyP
 import { renderBrowserHtml, renderWebPageHtml, BROWSER_SKIN_URL } from '../apps/browser/app.js';
 import { renderGalleryListHtml, renderGalleryPhotoHtml, GALLERY_SKIN_URL } from '../apps/gallery/app.js';
 import { renderMemoListHtml, renderMemoNoteHtml, MEMO_SKIN_URL } from '../apps/memo/app.js';
-import { exportWebSnapshot, exportForumThread, exportMessengerThread } from './exporter.js';
+import { renderAlmanacHomeHtml, renderAlmanacSectionHtml, renderAlmanacItemHtml, ALMANAC_SKIN_URL } from '../apps/almanac/app.js';
+import { exportWebSnapshot, exportForumThread, exportMessengerThread, exportAlmanacPage } from './exporter.js';
 
 const SHELL_CSS_URL = new URL('./shell.css', import.meta.url).href;
 
@@ -49,7 +50,7 @@ const DEFAULT_SETTINGS = {
     customApi: { enabled: false, baseUrl: '', apiKey: '', model: '' },
 };
 
-// M4:备忘录 + 相册开通,7 个 app 全亮(网格 3+3+1)。
+// M11:门户「Almanac」开通,8 个 app 全亮(网格 3+3+2)。
 const APPS = [
     { id: 'messenger', label: '消息', bg: 'salt', icon: ICON_APP_MESSENGER, enabled: true },
     { id: 'settings', label: '设置', bg: 'cocoa', icon: ICON_APP_SETTINGS, enabled: true },
@@ -58,6 +59,7 @@ const APPS = [
     { id: 'sns', label: 'SNS', bg: 'cream', icon: ICON_APP_SNS, enabled: true },
     { id: 'gallery', label: '相册', bg: 'cocoa', icon: ICON_APP_GALLERY, enabled: true },
     { id: 'browser', label: '浏览器', bg: 'salt', icon: ICON_APP_BROWSER, enabled: true },
+    { id: 'almanac', label: '门户', bg: 'cream', icon: ICON_APP_ALMANAC, enabled: true },
 ];
 
 // escapeHtml 收编进 core/escape.js(带引号转义的安全版,六个 app 共用,注释见彼处)。
@@ -234,11 +236,11 @@ export function createShell(ctx, onExternalChange) {
     // 生成锁按 app 分:她的用法是一边等消息生成一边去翻论坛,共用一把锁会把整部手机锁死。
     // 六个 app 的账、水位、prompt 本来就各走各的,锁也该各管各的
     // (M2 补 sns、M3 补 browser、M4 补 gallery/memo,照 forum 的接法)。
-    const busy = { messenger: false, forum: false, sns: false, browser: false, gallery: false, memo: false };
+    const busy = { messenger: false, forum: false, sns: false, browser: false, gallery: false, memo: false, almanac: false };
     // M10 导出:与上面的 LLM 生成锁完全独立(她 2026-09-01 点单「导出与生成互不相扰」)——
-    // 三把各管各,导出中不锁生成,生成中也不挡导出。exporter.js 内部另有自己的「一次只跑一张图」
-    // 闸(跨这三把之上的全局闸),这里只管"哪个按钮该转 spinner"这层 UI 状态。
-    const exportBusy = { web: false, forum: false, messenger: false };
+    // 各把各管各,导出中不锁生成,生成中也不挡导出。exporter.js 内部另有自己的「一次只跑一张图」
+    // 闸(跨这几把之上的全局闸),这里只管"哪个按钮该转 spinner"这层 UI 状态。
+    const exportBusy = { web: false, forum: false, messenger: false, almanac: false };
     let exportPreviewEl = null;     // 导出预览弹层(Shadow 内直接 append,不进 navStack/render 管线)
     let exportPreviewData = null;   // { dataUrl, kind }——kind 用于「保存图片」时拼文件名
     let autoQueued = false;         // 生成锁占用期间被挡下的自动刷新,解锁后补跑一次(见 autoGenerate)
@@ -294,13 +296,14 @@ export function createShell(ctx, onExternalChange) {
                 worldKey: null,
                 world: {
                     contacts: new Map(), threads: new Map(), boards: new Map(), residents: new Map(), forumThreads: new Map(),
-                    snsAccounts: new Map(), tweets: new Map(), searches: new Map(), visits: new Map(), snapshotAppends: new Map(),
+                    snsAccounts: new Map(), tweets: new Map(), searches: new Map(), visits: new Map(),
                     photos: [], memos: new Map(),
+                    sections: new Map(), almanacItems: new Map(), almanacPages: new Map(),
                 },
-                tip: -1, watermarks: { messenger: -1, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1 }, seen: {}, starred: {},
+                tip: -1, watermarks: { messenger: -1, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1, almanac: -1 }, seen: {}, starred: {},
             };
         }
-        const [entries, wmMessenger, wmForum, wmSns, wmBrowser, wmGallery, wmMemo] = await Promise.all([
+        const [entries, wmMessenger, wmForum, wmSns, wmBrowser, wmGallery, wmMemo, wmAlmanac] = await Promise.all([
             store.getEntriesForWorld(worldKey),
             store.getWatermark(worldKey, 'messenger'),
             store.getWatermark(worldKey, 'forum'),
@@ -308,6 +311,7 @@ export function createShell(ctx, onExternalChange) {
             store.getWatermark(worldKey, 'browser'),
             store.getWatermark(worldKey, 'gallery'),
             store.getWatermark(worldKey, 'memo'),
+            store.getWatermark(worldKey, 'almanac'),
         ]);
         const world = foldWorld(entries);
         // 基线必须赶在读 seen 之前——顺序反了,升级后的第一屏就是满屏未读,而且那一眼再也收不回来
@@ -318,7 +322,7 @@ export function createShell(ctx, onExternalChange) {
         const [seen, starred] = await Promise.all([store.getSeenMap(worldKey), store.getStarred(worldKey)]);
         return {
             worldKey, world, tip,
-            watermarks: { messenger: wmMessenger, forum: wmForum, sns: wmSns, browser: wmBrowser, gallery: wmGallery, memo: wmMemo },
+            watermarks: { messenger: wmMessenger, forum: wmForum, sns: wmSns, browser: wmBrowser, gallery: wmGallery, memo: wmMemo, almanac: wmAlmanac },
             seen, starred,
         };
     }
@@ -358,9 +362,9 @@ export function createShell(ctx, onExternalChange) {
     // 规则:同一块屏幕重渲染 → 原地保持;刚进屋 / 刚生成完 → 跳到新内容分界线。 ──
     const SCROLLERS = '.or-chat-scroll, .or-forum-scroll, .or-thread-list, .or-forum-list, .or-browser-list, .or-list, .or-home, '
         + '.or-gallery-list, .or-memo-list, .or-gallery-detail-scroll, .or-memo-detail-scroll, .or-sns-list, .or-sns-scroll, .or-aster-list, '
-        + '.or-sns-suggest-list, .or-webpage-body';
+        + '.or-sns-suggest-list, .or-webpage-body, .or-alm-home, .or-alm-list, .or-alm-item-body';
     function screenKey(top) {
-        return [top.type, top.threadId || '', top.boardId || '', top.tweetId || '', top.accountId || '', top.photoId || '', top.noteId || '', top.tab || '', top.word || '', top.visitId || ''].join('|');
+        return [top.type, top.threadId || '', top.boardId || '', top.tweetId || '', top.accountId || '', top.photoId || '', top.noteId || '', top.tab || '', top.word || '', top.visitId || '', top.sectionId || '', top.itemId || ''].join('|');
     }
     let lastScreenKey = null;
 
@@ -434,6 +438,7 @@ export function createShell(ctx, onExternalChange) {
                 browser: watermarks.browser < tip || hasUnseenInApp('browser', world, seen),
                 gallery: watermarks.gallery < tip || hasUnseenInApp('gallery', world, seen),
                 memo: watermarks.memo < tip || hasUnseenInApp('memo', world, seen),
+                almanac: watermarks.almanac < tip || hasUnseenInApp('almanac', world, seen),
             };
             // M8:时钟(顶)+ 图标网格 + 音乐组件(底)一起装进 .or-home 这个滚动容器——
             // 三者都可能不渲染(空世界的时钟、没有 nowPlaying 的音乐),空字符串不占位,桌面保持现状。
@@ -459,7 +464,6 @@ export function createShell(ctx, onExternalChange) {
         } else if (top.type === 'forum-list') {
             screenEl.innerHTML = renderForumListHtml({
                 world, busy: busy.forum, boardId: top.boardId || null, page: top.page || 1, seen, justUpdated,
-                expandedNotices: top.expandedNotices || new Set(), pastNoticesOpen: !!top.pastNoticesOpen,
             });
         } else if (top.type === 'forum-thread') {
             const thread = world.forumThreads.get(top.threadId);
@@ -552,8 +556,26 @@ export function createShell(ctx, onExternalChange) {
             const visit = world.visits.get(top.visitId);
             if (!visit) { navStack = [{ type: 'grid' }]; return render(); } // 已被倒带清空
             screenEl.innerHTML = renderWebPageHtml({
-                visit, snapshot: world.snapshots.get(top.visitId), appends: world.snapshotAppends.get(top.visitId) || [],
-                community: world.community, busy: busy.browser, starred, exportBusy: exportBusy.web,
+                visit, snapshot: world.snapshots.get(top.visitId), busy: busy.browser, starred, exportBusy: exportBusy.web,
+            });
+        } else if (top.type === 'almanac') {
+            // seenAt 快照工法照 browser:进屋定格一次,tab/重渲染都不再挪动(见 core/world.js seenKeyForAlmanac 的长注)。
+            const seenKey = seenKeyForAlmanac();
+            if (top.seenAt === undefined) top.seenAt = seen[seenKey] || 0;
+            screenEl.innerHTML = renderAlmanacHomeHtml({ world, busy: busy.almanac, seenAt: top.seenAt });
+            markSeenAfter = [seenKey, latestTsOfAlmanac(world)];
+        } else if (top.type === 'almanac-section') {
+            // seenAt 由推栈时从首页帧复制(见 doOpenAlmanacSection);没有就回落当前水位——首页已经记过
+            // 这一批的 seen,这里不再重复 markSeenAfter。
+            const seenAt = top.seenAt !== undefined ? top.seenAt : (seen[seenKeyForAlmanac()] || 0);
+            screenEl.innerHTML = renderAlmanacSectionHtml({ world, sectionId: top.sectionId, seenAt, almanacNow: world.worldClock });
+        } else if (top.type === 'almanac-item') {
+            const item = world.almanacItems.get(top.itemId);
+            if (!item) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚/反悔清空
+            const section = world.sections.get(item.sectionId);
+            const page = world.almanacPages.get(top.itemId);
+            screenEl.innerHTML = renderAlmanacItemHtml({
+                item, section, page, community: world.community, busy: busy.almanac, exportBusy: exportBusy.almanac,
             });
         } else if (top.type === 'asterism') {
             screenEl.innerHTML = renderAsterismHtml({ world, starred });
@@ -600,19 +622,12 @@ export function createShell(ctx, onExternalChange) {
         else if (appId === 'settings') navPush({ type: 'settings' });
         else if (appId === 'forum') navPush({ type: 'forum-list', boardId: null });
         else if (appId === 'sns') navPush({ type: 'sns-tl', tab: 'tl', myRole: 'omote' });
-        else if (appId === 'browser') openBrowserApp();
+        // M11:内网 lane 撤除后,浏览器不再有常驻卡要补建,进屋就是单纯的 navPush(此前这里要
+        // 多跑一步:进屋后立刻补建常驻卡,现在那套机制已经整个撤掉)。
+        else if (appId === 'browser') navPush({ type: 'browser', tab: 'search' });
         else if (appId === 'gallery') navPush({ type: 'gallery' });
         else if (appId === 'memo') navPush({ type: 'memo' });
-    }
-
-    // M9 §4.2 触发点①:进浏览器屏之后补建常驻卡——已认主的世界才有 worldKey/community 可查,
-    // 未认主(setup 门还没过)或没有所属都静默跳过,不打扰空世界的首屏。
-    async function openBrowserApp() {
-        navPush({ type: 'browser', tab: 'search' });
-        const worldKey = currentWorldKey();
-        if (!worldKey) return;
-        const { world } = await currentWorld();
-        if (await ensurePinnedVisits(worldKey, world)) render();
+        else if (appId === 'almanac') navPush({ type: 'almanac' });
     }
 
     // 失败措辞分档:此前四个入口一律「生成失败,请重试」,把「模型没吐出能用的结果」「配置/网络出错」
@@ -653,6 +668,7 @@ export function createShell(ctx, onExternalChange) {
             else if (app === 'browser') showToast(`浏览器里多了 ${result.added} 道痕迹`);
             else if (app === 'gallery') showToast(`相册里多了 ${result.added} 张照片`);
             else if (app === 'memo') showToast(`备忘录里多了 ${result.added} 处动静`);
+            else if (app === 'almanac') showToast(`门户里多了 ${result.added} 处动静`);
             else showToast(`小世界起了 ${result.added} 圈涟漪`);
             return { skipped: null, result };
         } catch (err) {
@@ -801,38 +817,20 @@ export function createShell(ctx, onExternalChange) {
         render();
     }
 
-    // ── M5:置顶公告——纯本地展开/收起(不耗生成),状态存在 forum-list 的 nav 帧上,同分页的做法。 ──
-
-    function doToggleNotice(noticeId) {
-        const top = navStack[navStack.length - 1];
-        if (top.type !== 'forum-list' || !noticeId) return;
-        if (!top.expandedNotices) top.expandedNotices = new Set();
-        if (top.expandedNotices.has(noticeId)) top.expandedNotices.delete(noticeId);
-        else top.expandedNotices.add(noticeId);
-        render();
-    }
-
-    function doTogglePastNotices() {
-        const top = navStack[navStack.length - 1];
-        if (top.type !== 'forum-list') return;
-        top.pastNoticesOpen = !top.pastNoticesOpen;
-        render();
-    }
-
     // 改組(任务书-M5 §5):旧式(全世界型)论坛一次性清空重建,按主人的所属重新初始化。
     // 同「抹掉这部手机」的确认方式——先问清楚不可逆的后果,再动手。
     async function doForumReorganize() {
         const worldKey = currentWorldKey();
         if (!worldKey) return;
         const confirmed = await ctx.callGenericPopup(
-            '改組会清空这个论坛的板块、住民、帖子与公告,按主人的所属重新初始化,不可恢复。确定吗?',
+            '改組会清空这个论坛的板块、住民与帖子,按主人的所属重新初始化,不可恢复。确定吗?',
             ctx.POPUP_TYPE.CONFIRM,
         );
         if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
         await store.deleteForumAll(worldKey);
         const top = navStack[navStack.length - 1];
         if (top.type === 'forum-list') {
-            top.boardId = null; top.page = 1; top.expandedNotices = new Set(); top.pastNoticesOpen = false;
+            top.boardId = null; top.page = 1;
         }
         showToast('论坛已清空,点「刷新」按新所属建板');
         await render();
@@ -966,35 +964,6 @@ export function createShell(ctx, onExternalChange) {
         });
     }
 
-    // M9 §7.1:内网页追記——独立于「打开」的手动刷新,复用 browser 生成锁(内网页仍是浏览器 app
-    // 的一张快照,没必要另开一把锁),但成功提示照任务书定制,不走 runGeneration 那句共用的
-    // 「浏览器里多了 N 道痕迹」(那句是给主刷新的,追記要说清「有没有长出新东西」这件更具体的事)。
-    async function doWebPageRefresh(visitId) {
-        if (!visitId || busy.browser) return;
-        busy.browser = true;
-        try {
-            const worldKey = currentWorldKey();
-            if (!worldKey) return;
-            const owner = await store.getOwner(worldKey);
-            if (!owner) return;
-            await render();
-            const s = settings();
-            const result = await generateWebSnapshotAppend(ctx, store, {
-                worldKey, visitId, floorWindow: s.floorWindow, excludeTags: s.excludeTags || '',
-                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
-            });
-            if (!result?.ok) showToast(FAIL_TEXT[result?.error] || '观测中断了,请再试一次');
-            else if (result.changed && result.added) showToast('页面长出了一条追記');
-            else showToast('没有新的动静——组织照常运转');
-            onExternalChange?.();
-        } catch (err) {
-            console.error('[Orrery] 内网追記生成出错', err);
-            showToast(`生成出错:${err?.message || '未知错误'}`);
-        } finally {
-            busy.browser = false;
-            await render();
-        }
-    }
 
     // ── M10 导出图片(任务书-M10):网页整页长图 / 论坛选楼 / 消息选段。全程只读 world,
     //    不往世界账本写任何东西——同星标先例,观测者侧操作合法(§0 的铁律边界)。 ──
@@ -1019,11 +988,10 @@ export function createShell(ctx, onExternalChange) {
         const visit = world.visits.get(visitId);
         const snapshot = world.snapshots.get(visitId);
         if (!visit || !snapshot) return; // 没内容导不出图(header 按钮本就只在有 snapshot 时才出现)
-        const appends = world.snapshotAppends.get(visitId) || [];
         exportBusy.web = true;
         await render();
         try {
-            const result = await exportWebSnapshot({ visit, snapshot, appends });
+            const result = await exportWebSnapshot({ visit, snapshot });
             const dataUrl = handleExportResult(result);
             if (dataUrl) showExportPreview(dataUrl, 'web');
         } finally {
@@ -1272,26 +1240,6 @@ export function createShell(ctx, onExternalChange) {
     // ── M3:浏览器「Astrolabe」:独立水位的「刷新」(唯一入口,没有续写)+ tab 切换(纯本地渲染)
     //    + 反悔(两 tab 一起倒带,按世界时间——见 store.deleteBrowserFrom 的长注)。 ──
 
-    // M9 §4.2:常驻三卡「よく見るページ」——零 LLM 调用,按所属 kind 兜底建三个固定槽位;
-    // 已存在的槽位跳过(幂等,重复调用无害)。community 不存在时不建(没有所属就没有可挂的内网入口)。
-    // @returns {Promise<boolean>} 是否真的创建了新卡——调用方靠它决定要不要补一次 render()
-    async function ensurePinnedVisits(worldKey, world) {
-        if (!world.community) return false;
-        const slots = PIN_SLOTS[world.community.kind] || PIN_SLOTS.org;
-        const sourceFloor = Math.max(0, (ctx.chat?.length ?? 1) - 1);
-        let created = false;
-        for (const slot of slots) {
-            const visitId = 'bvpin_' + slot.slot;
-            if (world.visits.has(visitId)) continue;
-            await store.addEntry({
-                worldKey, sourceFloor, app: 'browser', type: 'browse_visit',
-                payload: { visitId, title: slot.title, site: slot.sub, slot: slot.slot, pinned: true, intra: true, worldTime: null },
-            });
-            created = true;
-        }
-        return created;
-    }
-
     async function doGenerateMoreBrowser() {
         // 浏览器是单屏 app,「刷新」本身就是从这个带 seen 快照的屏里发起的(不像消息/论坛/SNS的主生成
         // 是从不追踪 seen 的列表页发起)——所以要照 doContinueThread 的工法,把水位先挪到这批新内容
@@ -1308,9 +1256,6 @@ export function createShell(ctx, onExternalChange) {
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
                 excludeTags: s.excludeTags || '',
             });
-            // M9 §4.2 触发点②:所属可能是这一批才推断出来的(ensureCommunity 挂在浏览器主生成里),
-            // 常驻卡因此要在这里补建一次——用生成后的最新账本查,不能用调用前那份陈旧的 world。
-            if (result?.ok) await ensurePinnedVisits(worldKey, foldWorld(await store.getEntriesForWorld(worldKey)));
             if (result?.ok && result.added > 0 && top.type === 'browser') top.seenAt = before;
             onExternalChange?.();
             return result;
@@ -1401,6 +1346,81 @@ export function createShell(ctx, onExternalChange) {
         await render();
     }
 
+    // ── M11:门户「Almanac」:独立水位的「刷新」(唯一批量入口,首页/板块页共用)+ 条目页面
+    //    点开才生成(缓存命中免生成,同 doOpenWebPage)+ 导出条目页面 + 反悔(按世界时间倒带,
+    //    板块幸存——见 store.deleteAlmanacFrom 的长注)。 ──
+
+    async function doGenerateMoreAlmanac() {
+        // 同 doGenerateMoreBrowser 的工法:水位先挪到这批新内容之前,新长出来的条目才挂得上 NEW 点。
+        const top = navStack[navStack.length - 1];
+        await runGeneration('almanac', async ({ worldKey, owner, s }) => {
+            let before = 0;
+            if (top.type === 'almanac') {
+                const seenMap = await store.getSeenMap(worldKey);
+                before = seenMap[seenKeyForAlmanac()] || 0;
+            }
+            const result = await generateMoreAlmanac(ctx, store, {
+                worldKey, floorWindow: s.floorWindow,
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                excludeTags: s.excludeTags || '',
+            });
+            if (result?.ok && result.added > 0 && top.type === 'almanac') top.seenAt = before;
+            onExternalChange?.();
+            return result;
+        });
+    }
+
+    // 板块页的 seenAt 从首页帧直接复制(同一批「看过了」不该因为点进板块又重新定格一次)。
+    function doOpenAlmanacSection(sectionId) {
+        if (!sectionId) return;
+        const top = navStack[navStack.length - 1];
+        navPush({ type: 'almanac-section', sectionId, seenAt: top.seenAt });
+    }
+
+    async function doOpenAlmanacItem(itemId) {
+        if (!itemId) return;
+        const top = navStack[navStack.length - 1];
+        if (!(top.type === 'almanac-item' && top.itemId === itemId)) navPush({ type: 'almanac-item', itemId });
+        const { world } = await currentWorld();
+        if (!world.almanacItems.get(itemId) || world.almanacPages.get(itemId)) return; // 无此记录/缓存命中
+        await runGeneration('almanac', async ({ worldKey, owner, s }) => {
+            return await generateAlmanacPage(ctx, store, {
+                worldKey, itemId, floorWindow: s.floorWindow, excludeTags: s.excludeTags || '',
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+            });
+        });
+    }
+
+    async function doExportAlmanacPage(itemId) {
+        if (!itemId || exportBusy.almanac) return;
+        const { world } = await currentWorld();
+        const item = world.almanacItems.get(itemId);
+        const page = world.almanacPages.get(itemId);
+        if (!item || !page) return; // 没内容导不出图(header 按钮本就只在有 page 时才出现)
+        const section = world.sections.get(item.sectionId);
+        exportBusy.almanac = true;
+        await render();
+        try {
+            const result = await exportAlmanacPage({ item, section, page, community: world.community });
+            const dataUrl = handleExportResult(result);
+            if (dataUrl) showExportPreview(dataUrl, 'almanac');
+        } finally {
+            exportBusy.almanac = false;
+            await render();
+        }
+    }
+
+    async function doAlmanacRevert(worldTime) {
+        const top = navStack[navStack.length - 1];
+        if ((top.type !== 'almanac' && top.type !== 'almanac-section') || !Number.isFinite(worldTime)) return;
+        const confirmed = await ctx.callGenericPopup('从这条起删除之后的所有门户条目?', ctx.POPUP_TYPE.CONFIRM);
+        if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        await store.deleteAlmanacFrom(worldKey, worldTime); // 板块幸存,只删 items/updates/pages
+        await render();
+    }
+
     function doStepper(field, delta) {
         const s = settings();
         // 0 = 整本聊天(默认,与酒馆每轮实际发送的一致;旧楼层由预设正则自行收敛成摘要)
@@ -1483,8 +1503,6 @@ export function createShell(ctx, onExternalChange) {
             case 'forum-generate-more': doContinueForumThread(); break;
             case 'select-forum-board': doSelectForumBoard(el.dataset.boardId); break;
             case 'forum-page': doForumPage(parseInt(el.dataset.page, 10)); break;
-            case 'toggle-notice': doToggleNotice(el.dataset.noticeId); break;
-            case 'toggle-past-notices': doTogglePastNotices(); break;
             case 'forum-reorganize': doForumReorganize(); break;
             case 'open-sns-tweet': navPush({ type: 'sns-tweet', tweetId: el.dataset.tweetId }); break;
             case 'open-sns-profile': navPush({ type: 'sns-profile', accountId: el.dataset.accountId }); break;
@@ -1498,7 +1516,6 @@ export function createShell(ctx, onExternalChange) {
             case 'sns-search-open': navPush({ type: 'sns-search' }); break;
             case 'sns-search-word': doOpenSnsSearch(el.dataset.word); break;
             case 'open-web-page': doOpenWebPage(el.dataset.visitId); break;
-            case 'webpage-refresh': doWebPageRefresh(el.dataset.visitId); break;
             case 'export-web-page': doExportWebPage(el.dataset.visitId); break;
             case 'forum-export-toggle': doForumExportToggle(); break;
             case 'forum-export-pick': doForumExportPick(el.dataset.key); break;
@@ -1517,6 +1534,10 @@ export function createShell(ctx, onExternalChange) {
             case 'gallery-refresh': doGenerateMoreGallery(); break;
             case 'open-memo-note': navPush({ type: 'memoNote', noteId: el.dataset.noteId }); break;
             case 'memo-refresh': doGenerateMoreMemo(); break;
+            case 'almanac-refresh': doGenerateMoreAlmanac(); break;
+            case 'open-almanac-section': doOpenAlmanacSection(el.dataset.sectionId); break;
+            case 'open-almanac-item': doOpenAlmanacItem(el.dataset.itemId); break;
+            case 'export-almanac-page': doExportAlmanacPage(el.dataset.itemId); break;
             case 'stepper': doStepper(el.dataset.field, Number(el.dataset.delta)); break;
             case 'toggle-field': { const s = settings(); s[el.dataset.field] = !s[el.dataset.field]; saveSettings(); render(); onExternalChange?.(); break; }
             case 'toggle-capi': { const s = settings(); s.customApi.enabled = !s.customApi.enabled; saveSettings(); render(); break; }
@@ -1630,6 +1651,14 @@ export function createShell(ctx, onExternalChange) {
                 suppressNextClick = true;
                 doMemoRevert(Number(memoRow.dataset.worldtime));
             }, 550);
+            return;
+        }
+        const almRow = e.target.closest('.or-alm-row');
+        if (almRow) {
+            longPressTimer = setTimeout(() => {
+                suppressNextClick = true;
+                doAlmanacRevert(Number(almRow.dataset.worldtime));
+            }, 550);
         }
     }
     function onPointerClear() { clearTimeout(longPressTimer); }
@@ -1689,6 +1718,12 @@ export function createShell(ctx, onExternalChange) {
             doMemoRevert(Number(memoRow.dataset.worldtime));
             return;
         }
+        const almRow = e.target.closest('.or-alm-row');
+        if (almRow) {
+            e.preventDefault();
+            doAlmanacRevert(Number(almRow.dataset.worldtime));
+            return;
+        }
         const row = e.target.closest('.or-msg-row');
         if (!row || inExportMode()) return; // 导出选段时右键不唤出反悔钮
         e.preventDefault();
@@ -1703,7 +1738,7 @@ export function createShell(ctx, onExternalChange) {
         document.body.appendChild(host);
         shadow = host.attachShadow({ mode: 'open' });
 
-        for (const href of [SHELL_CSS_URL, MESSENGER_SKIN_URL, FORUM_SKIN_URL, SNS_SKIN_URL, BROWSER_SKIN_URL, GALLERY_SKIN_URL, MEMO_SKIN_URL]) {
+        for (const href of [SHELL_CSS_URL, MESSENGER_SKIN_URL, FORUM_SKIN_URL, SNS_SKIN_URL, BROWSER_SKIN_URL, GALLERY_SKIN_URL, MEMO_SKIN_URL, ALMANAC_SKIN_URL]) {
             const link = document.createElement('link');
             link.rel = 'stylesheet';
             link.href = href;

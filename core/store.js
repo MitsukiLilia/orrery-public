@@ -1,8 +1,8 @@
 // 世界账本:IndexedDB 持久化。全系统只认 RippleEntry(见 §3),这里不解释业务语义,只管存取。
 // 库名 orrery,两个 store:
 //   ledger — RippleEntry 本体,autoIncrement 主键;索引 worldKey(取某世界全部条目)、sourceFloor(极少单独用,配合内存过滤)
-//   meta   — 每个 worldKey 一条,{ worldKey, owner, watermarks: { messenger, forum, sns, browser, gallery, memo } },
-//            各 app 独立水位(M1 水位重构、M2 补 sns 档、M3 补 browser 档、M4 补 gallery/memo 档,见
+//   meta   — 每个 worldKey 一条,{ worldKey, owner, watermarks: { messenger, forum, sns, browser, gallery, memo, almanac } },
+//            各 app 独立水位(M1 水位重构、M2 补 sns 档、M3 补 browser 档、M4 补 gallery/memo 档、M11 补 almanac 档,见
 //            getWatermark/setWatermark/clampWatermarks;旧版单一 lastProcessedFloor + pendingFloors 已废除,
 //            读到旧格式时兼容迁移)
 
@@ -282,13 +282,15 @@ export async function deleteTweetRepliesFrom(worldKey, tweetId, fromTs) {
 }
 
 /**
- * 浏览器专用倒带:search_query/browse_visit/web_snapshot/web_snapshot_append 四型一起,
- * payload.worldTime >= fromWorldTime 的全删(任务书 §2,M9 补 web_snapshot_append)。工法同
- * deleteTweetRepliesFrom(游标扫世界、条件命中就删),但比对字段是 worldTime 不是 ts——两 tab
- * 按世界时间混排展示,长按定位到的是"这一条在时间轴上的位置",反悔边界也该按这条线切,而不是
- * 各型各自的入账序号(检索与它带出的浏览往往同一批入账、ts 挨得很近但 worldTime 才是她在屏幕上
- * 认出来的那条时间线)。缺 worldTime 的畸形条目保守地一并删掉(同 deleteThreadFrom 的先例)——
- * 唯一的例外是 M9 常驻卡(pinned browse_visit),见下方游标回调里的特判。
+ * 浏览器专用倒带:search_query/browse_visit/web_snapshot 三型一起,payload.worldTime >= fromWorldTime
+ * 的全删(任务书 §2)。工法同 deleteTweetRepliesFrom(游标扫世界、条件命中就删),但比对字段是
+ * worldTime 不是 ts——两 tab 按世界时间混排展示,长按定位到的是"这一条在时间轴上的位置",反悔边界
+ * 也该按这条线切,而不是各型各自的入账序号(检索与它带出的浏览往往同一批入账、ts 挨得很近但
+ * worldTime 才是她在屏幕上认出来的那条时间线)。缺 worldTime 的畸形条目保守地一并删掉(同
+ * deleteThreadFrom 的先例)。
+ * ⚠️isBrowserType 仍列着 'web_snapshot_append'——M9 常驻卡与内网追記已随 M11 一并撤除(fold 不再
+ * 消化这两型),但旧世界的账本里可能还躺着这些条目,倒带扫过它们时理应一并清掉,不留孤儿数据;
+ * 这不是内网 lane 的复活,单纯是遗留清理,任务书 §13 的静态 grep 门允许这一处残留。
  */
 export async function deleteBrowserFrom(worldKey, fromWorldTime) {
     if (!worldKey) return;
@@ -302,10 +304,6 @@ export async function deleteBrowserFrom(worldKey, fromWorldTime) {
             const cursor = req.result;
             if (!cursor) return;
             const v = cursor.value;
-            // M9 常驻卡(pinned browse_visit)不是时间轴事件——它没有 worldTime,「缺 worldTime 保守删」
-            // 那条不适用于它,书签本身该留下;挂在它身上的 snapshot/append 仍按 worldTime 正常倒带,
-            // 内容跟着世界倒带,只是入口不会跟着消失。
-            if (v.type === 'browse_visit' && v.payload?.pinned) { cursor.continue(); return; }
             const isBrowserType = v.type === 'search_query' || v.type === 'browse_visit' || v.type === 'web_snapshot' || v.type === 'web_snapshot_append';
             if (isBrowserType && (!Number.isFinite(v.payload?.worldTime) || v.payload.worldTime >= fromWorldTime)) cursor.delete();
             cursor.continue();
@@ -369,7 +367,35 @@ export async function deleteMemoFrom(worldKey, fromWorldTime) {
 }
 
 /**
- * M5 改組:清空该世界论坛的全部内容(board/resident/forum_thread/forum_reply/forum_draft/notice,
+ * M11 门户专用倒带:almanac_item/almanac_update/almanac_page 三型,payload.worldTime >= fromWorldTime
+ * 的全删,工法同 deleteBrowserFrom/deleteGalleryFrom。almanac_section(板块)一律跳过——板块不是
+ * 时间轴事件(它是首次初始化时一次性定下的分类框架,不随剧情"发生"也不该随反悔"消失"),否则
+ * 长按随便一条条目就会把整个门户的板块结构清空,下次刷新又要重新生一遍、原有条目全变孤儿。
+ */
+export async function deleteAlmanacFrom(worldKey, fromWorldTime) {
+    if (!worldKey) return;
+    rollbackEpoch++; // 手动反悔/删除同样代表用户更晚的意图:在飞的生成整批作废(2026-08-31 整体review P0-1 回填)
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_LEDGER, 'readwrite');
+        const idx = tx.objectStore(STORE_LEDGER).index('worldKey');
+        const req = idx.openCursor(IDBKeyRange.only(worldKey));
+        req.onsuccess = () => {
+            const cursor = req.result;
+            if (!cursor) return;
+            const v = cursor.value;
+            if (v.type === 'almanac_section') { cursor.continue(); return; } // 板块不是时间轴事件,永不随反悔删
+            const isAlmanacType = v.type === 'almanac_item' || v.type === 'almanac_update' || v.type === 'almanac_page';
+            if (isAlmanacType && (!Number.isFinite(v.payload?.worldTime) || v.payload.worldTime >= fromWorldTime)) cursor.delete();
+            cursor.continue();
+        };
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+/**
+ * M5 改組:清空该世界论坛的全部内容(board/resident/forum_thread/forum_reply/forum_draft,
  * 全部 app==='forum')+ community(所属,app==='world' type==='community')。旧世界不保留——
  * 一次性抹掉,下次「刷新」按主人的所属重新初始化(任务书-M5 §1.3)。
  * 比 wipeWorld 窄一圈:只清论坛+所属,messenger/sns/browser/gallery/memo 与主人设定原样保留。
@@ -451,10 +477,10 @@ async function writeMeta(meta) {
 // 旧 pendingFloors 字段直接丢弃——M1 已废除该机制,pending 完全靠水位推导(见 generator.js)。
 function normalizeWatermarks(meta) {
     if (meta.watermarks && typeof meta.watermarks === 'object') {
-        return { messenger: -1, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1, ...meta.watermarks };
+        return { messenger: -1, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1, almanac: -1, ...meta.watermarks };
     }
     const messenger = Number.isFinite(meta.lastProcessedFloor) ? meta.lastProcessedFloor : -1;
-    return { messenger, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1 };
+    return { messenger, forum: -1, sns: -1, browser: -1, gallery: -1, memo: -1, almanac: -1 };
 }
 
 /**
