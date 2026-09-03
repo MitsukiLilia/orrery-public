@@ -1,6 +1,7 @@
 // 论坛:纯渲染,不碰 ctx、不挂事件监听——事件委托统一在 ui/shell.js(同 apps/messenger/app.js 的模式)。
 // 用户只读:帖底的回复框是主人屏幕上的那一格(只读、不可点),观测者唯二操作走 shell 的 data-action(刷新/生成更多)+ 长按/右键反悔。
-// castName 只活在 core/世界数据层,这个文件从不读它——住民短 ID 用 world.shortIdFor,不暴露真名。
+// 真身字段只活在 core/世界数据层,这个文件从不读它——UI 读的是 displayName/affiliation/kind,
+// 旧世界没有 displayName 的老住民才退回 world.shortIdFor 的短 ID,不暴露真名。
 import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_STAR, ICON_STAR_FILL, ICON_SEND, ICON_EXPORT, ICON_CHECK } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
 import { shortIdFor, seenKeyForForumThread, newReplyCountOfForumThread, starKeyForForumThread, anonIdFor } from '../../core/world.js';
@@ -18,12 +19,15 @@ function genSpinnerHtml() {
 }
 
 // M7a §4:作者标签——item 是折好的帖子或楼层(authorId/anon 二选一)。次抛匿名现算展示 ID
-// (anonIdFor 按 threadId+key 哈希,同一帖同一 key 永远同一个 ID);固定住民沿用旧的 handle #短ID。
+// (anonIdFor 按 threadId+key 哈希,同一帖同一 key 永远同一个 ID)。
+// M13(任务书-M13 §2.4):表板改実名制——有 displayName 的住民显示「実名 · 所属」(ゲスト 再挂一个
+// 小标),旧世界没有 displayName 的老住民原样退回旧式 handle #短ID,不迁移、不强改历史数据。
 // M10 导出:ui/exporter.js 的论坛模板复用这份逻辑(离屏渲染的楼层作者名与 app 内必须完全一致),
 // 故导出——两处哈希算法不能各揣一份、悄悄漂开。
 export function authorLabel(world, item, threadId) {
     if (item.anon) return `${item.anon.name} ID:${anonIdFor(threadId, item.anon.key)}`;
     const r = world.residents.get(item.authorId);
+    if (r?.displayName) return `${r.displayName}${r.affiliation ? ` · ${r.affiliation}` : ''}${r.kind === 'guest' ? ' · ゲスト' : ''}`;
     return r ? `${r.handle} #${shortIdFor(item.authorId)}` : String(item.authorId);
 }
 

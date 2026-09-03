@@ -151,6 +151,12 @@
         </fieldset>
 
         <fieldset>
+            <legend>7. M13 断言:表板実名制(照任务书-M13 §5 的七条对应,涉生成/账本的用真实 IndexedDB 加临时 worldKey 跑完即清)</legend>
+            <button class="mock-btn" id="runM13AssertBtn">运行全部断言</button>
+            <div id="m13AssertResult">(未运行)</div>
+        </fieldset>
+
+        <fieldset>
             <legend>M10 导出:手动触发完整管线(vendor 懒加载注入 → domToPng → 出图,供真机/CDP 验收用;三个按钮各走一条 fixture,后两个都带"跳选一条"验证「⋯」分隔与楼号/时间戳重算)</legend>
             <button class="mock-btn" id="m10ExportWebBtn">导出网页快照</button>
             <button class="mock-btn" id="m10ExportForumBtn">导出论坛选楼(跳选中间一楼)</button>
@@ -197,9 +203,9 @@
     // ── mock 最小酒馆环境:先于 index.js 执行(同为 module script,按文档顺序保证)。 ──
     import * as store from '../core/store.js';
     import * as generator from '../core/generator.js';
-    import { computeWorldKey, inheritedWorldKey, foldWorld, hasUnseenInApp, seenKeyForAlmanac, latestTsOfAlmanac } from '../core/world.js';
+    import { computeWorldKey, inheritedWorldKey, foldWorld, hasUnseenInApp, seenKeyForAlmanac, latestTsOfAlmanac, shortIdFor } from '../core/world.js';
     import { sanitizeSnapshotHtml } from '../apps/browser/app.js';
-    import { renderForumListHtml } from '../apps/forum/app.js';
+    import { renderForumListHtml, renderForumThreadHtml } from '../apps/forum/app.js';
     import { escapeHtml } from '../core/escape.js';
     import {
         buildForumExportHtml, buildMessengerExportHtml, buildWebExportHtml, buildAlmanacExportHtml,
@@ -319,31 +325,54 @@
         };
     }
 
-    // M7a 首次论坛主生成:2 板块 + 1 名固定住民(castName='千夏',身边人而非主人本人——验证
-    // UI 绝不渲染真名,同时留主人自己在这个世界里"尚无固定住民",好让 G fixture 走 ownerResident 分支)
-    // + 2 帖(第 1 帖楼主与一楼回复都是 anon、二楼回复是固定住民,含 replyToFloor;附一条 myDraft)。
+    // M13 表板実名制专用旁路(assertion②「user 硬防线」用):非 null 时 buildFixtureF 额外塞一个
+    // castName===该值的 ゲスト(invitedBy 指向 r_sato),测完记得清空——默认 null 不影响其余用例。
+    let fixtureFUserGuestCastName = null;
+
+    // M13 首次论坛主生成(実名制形状,任务书-M13 §5):4 名実名住民——r_chinatsu 是身边人(验证
+    // 「真身≠displayName 时也能正常走」)、r_sato 的 castName 与 displayName 故意不同(专供
+    // 「真名不漏进 HTML」断言)、r_guest 是被 r_sato 招待进来的正经 ゲスト、r_bad_guest 没有
+    // invitedBy 必须被丢弃。2 帖:帖 1(标题给 M12 ④ 沿用来找帖)作者 r_sato,回复混一楼固定
+    // 住民、一楼 ゲスト(delayMin/replyToFloor)、一楼 anon(実名制下必须被丢弃);帖 2 作者 r_chinatsu。
     function buildFixtureF() {
+        // fixtureFUserGuestCastName 生效时换成「只有一个 ゲスト 名额」的精简名册——guest 每批至多
+        // 1 名是独立铁律,与 r_guest 挤同一批会把预算耗在 r_guest 身上,反而测不出 user 硬防线
+        // 单独的拦截效果(那样 allowUserContact:true 也会因为「预算已满」而不落账,误判成拦对了)。
+        const newResidents = fixtureFUserGuestCastName
+            ? [
+                { residentId: 'r_chinatsu', displayName: '千夏', affiliation: '総務', persona: '话少但总在场', castName: '千夏', kind: 'member' },
+                { residentId: 'r_sato', displayName: '佐藤', affiliation: '営業二課', persona: '', castName: '本名テスト', kind: 'member' },
+                {
+                    residentId: 'r_user_guest', displayName: 'ゲスト(境界テスト)', affiliation: '取引先',
+                    persona: '', castName: fixtureFUserGuestCastName, kind: 'guest', invitedBy: 'r_sato',
+                },
+            ]
+            : [
+                { residentId: 'r_chinatsu', displayName: '千夏', affiliation: '総務', persona: '话少但总在场', castName: '千夏', kind: 'member' },
+                { residentId: 'r_sato', displayName: '佐藤', affiliation: '営業二課', persona: '', castName: '本名テスト', kind: 'member' },
+                { residentId: 'r_guest', displayName: '外部の友人', affiliation: '取引先', persona: '', castName: '外部の友人', kind: 'guest', invitedBy: 'r_sato' },
+                { residentId: 'r_bad_guest', displayName: '野良ゲスト', persona: '', castName: '野良ゲスト', kind: 'guest' },
+            ];
         return {
             worldTime: '2026-08-10 23:40',
             newBoards: [
                 { boardId: 'b_life', name: '杂谈', desc: '什么都能聊两句的地方' },
                 { boardId: 'b_gossip', name: '八卦', desc: '谁看见谁了' },
             ],
-            newResidents: [
-                { residentId: 'r_shadow', handle: '路过的影子', persona: '话少但总在场', castName: '千夏' },
-            ],
+            newResidents,
             newThreads: [
                 {
-                    boardId: 'b_gossip', anon: { key: 'a1', name: '名無しの野次馬' }, title: '刚刚在便利店看到不熟的两个人',
+                    boardId: 'b_gossip', authorId: 'r_sato', title: '刚刚在便利店看到不熟的两个人',
                     ...withZhBody('真的很奇怪的气氛(小声)'),
                     replies: [
-                        { anon: { key: 'a2', name: '匿名希望' }, ...withZhBody('爆瓜爆瓜'), delayMin: 2 },
-                        { authorId: 'r_shadow', ...withZhBody('……可能只是路过吧'), delayMin: 5, replyToFloor: 1 },
+                        { authorId: 'r_chinatsu', ...withZhBody('……是这样吗'), delayMin: 2 },
+                        { authorId: 'r_guest', ...withZhBody('本当ですか、それは大変ですね'), delayMin: 5, replyToFloor: 1 },
+                        { anon: { key: 'a2', name: '匿名希望' }, ...withZhBody('这条不该被消化(実名制没有匿名)'), delayMin: 2 },
                     ],
                     myDraft: withZh('明明我什么都没做啊…'),
                 },
                 {
-                    boardId: 'b_life', anon: { key: 'a3', name: '疲れたOL' }, title: '今天又被老板骂了,谁懂',
+                    boardId: 'b_life', authorId: 'r_chinatsu', title: '今天又被老板骂了,谁懂',
                     ...withZhBody('干活累死,嘴还不能停'),
                     replies: [],
                 },
@@ -351,24 +380,28 @@
             newReplies: [],
         };
     }
-    // 【本帖的名無し】digest 行里现取第一个已出现的 key(格式 `key=xxx name=… ID:…`),
-    // 拿来验证 G fixture 真的"沿用了材料里已出现的 key"而不是每次都起新的。
+    // 【本帖的名無し】digest 行里现取第一个已出现的 key(格式 `key=xxx name=… ID:…`)——M13 起
+    // 只有 G2(裏,仍匿名)用它,G(表,実名制)不再需要沿用 anon key 这回事。
     function extractExistingAnonKey(userContent) {
         const m = /\[本帖的名無し\][^\n]*?key=(\S+)/.exec(userContent || '');
         return m ? m[1] : null;
     }
-    // M7a 论坛盖楼:回复里混三种身份——沿用材料里已出现的 anon key 一次、起一个全新 key 一次、
-    // 固定住民(F 里注册的 r_shadow)一次;当 userContent 带着【主人刚刚发出的回复】且注明
-    // 「尚无固定住民」时,照 PROMPT_G 的契约给出 ownerResident 为主人的小号起名。
+    // M13 论坛盖楼(実名制形状):回复混三种情形——沿用名册里已有的固定住民(r_chinatsu)一次、
+    // 故意混一条 anon 楼(実名制下必须被丢弃)、一条带 newResident 的楼注册新住民(r_new);
+    // 当 userContent 带着【主人刚刚发出的回复】且注明「尚无名册条目」时,照 PROMPT_G 的新契约
+    // 给出 ownerResident 为主人登记(displayName/affiliation/kind,castName 由代码强制覆盖)。
     function buildFixtureG(userContent) {
-        const reusedKey = extractExistingAnonKey(userContent) || 'a1';
         const body = { replies: [
-            { anon: { key: reusedKey, name: '名無しの野次馬' }, ...withZhBody('笑死,前排吃瓜'), delayMin: 1 },
-            { anon: { key: 'a9', name: '通りすがり' }, ...withZhBody('第一次路过,什么情况'), delayMin: 2 },
-            { authorId: 'r_shadow', ...withZhBody('……可能只是路过吧'), delayMin: 3, replyToFloor: 1 },
+            { authorId: 'r_chinatsu', ...withZhBody('笑死,前排吃瓜'), delayMin: 1 },
+            { anon: { key: 'a9', name: '通りすがり' }, ...withZhBody('这条不该被消化(実名制没有匿名)'), delayMin: 2 },
+            {
+                authorId: 'r_new',
+                newResident: { residentId: 'r_new', displayName: '新人', affiliation: '総務', persona: '', castName: '新人', kind: 'member' },
+                ...withZhBody('よろしくお願いします'), delayMin: 3, replyToFloor: 1,
+            },
         ] };
-        if ((userContent || '').includes('主人刚刚发出的回复') && (userContent || '').includes('尚无固定住民')) {
-            body.ownerResident = { residentId: 'r_owner_fx', handle: '名無しの主', persona: '', castName: '' };
+        if ((userContent || '').includes('主人刚刚发出的回复') && (userContent || '').includes('尚无名册条目')) {
+            body.ownerResident = { residentId: 'r_owner_fx', displayName: 'テスト主人', affiliation: '', persona: '', castName: '', kind: 'member' };
         }
         return body;
     }
@@ -1299,7 +1332,7 @@
             ['thread.side 归一为 omote', thread2.side === 'omote'],
             ['草稿发出仍走固定住民路径(authorId 而非 anon)', !!ownerReply && !!ownerReply.authorId && !ownerReply.anon],
             ['主人的固定住民已注册(castName===owner)', [...folded2.residents.values()].some(r => r.castName === 'テスト主人')],
-            ['模型续写的 anon 楼仍然带 anon(表 lane 零变化)', thread2.replies.some(r => r.anon)],
+            ['表 lane 的 anon 楼被丢弃(実名制)', !thread2.replies.some(r => r.anon)],
         ];
         await store.wipeWorld(wk);
         return out;
@@ -1381,6 +1414,274 @@
         runM12Assertions().catch(err => {
             document.getElementById('m12AssertResult').textContent = `断言运行出错:${err?.message || err}`;
             console.error('[M12 断言]', err);
+        });
+    });
+
+    // ── M13 §5:断言面板。①③④涉真实生成/账本,开临时 worldKey 跑完即清(同 M11/M12 的工法);
+    // ②按 ctx.name1 现取 castName 现造一个越界 ゲスト,跑两次 allowUserContact 开关;⑤复用
+    // M12 已布好的 capturedUraUserContent/capturedUraG2UserContent 侧信道;⑥手工种旧数据兼容;
+    // ⑦纯账本操作验证 deleteForumThreadsOnly。──
+
+    // ① 表主生成(実名制):所有帖与楼都必须有 authorId 且无 anon(anon 楼直接被丢弃);
+    //    r_guest 落账且 kind/invitedBy 正确;r_bad_guest(没有 invitedBy)不存在;
+    //    每个住民 handle===displayName(兼容层的写法)。
+    async function assertForumOmoteRealNameMain() {
+        const wk = `__m13_assert_omote_main_${Date.now()}`;
+        await store.setOwner(wk, 'テスト主人');
+        const result = await generator.generateMoreForum(ctx, store, {
+            worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false,
+        });
+        const folded = foldWorld(await store.getEntriesForWorld(wk));
+        const threads = [...folded.forumThreads.values()].filter(t => t.side !== 'ura');
+        const allHaveAuthorId = threads.length > 0 && threads.every(t =>
+            !!t.authorId && !t.anon && t.replies.every(r => !!r.authorId && !r.anon));
+        const anonSurvived = threads.some(t => t.replies.some(r => r.body === '这条不该被消化(実名制没有匿名)'));
+        const guest = folded.residents.get('r_guest');
+        const out = [
+            ['生成成功', !!result?.ok],
+            ['所有帖与楼都有 authorId 且无 anon', allHaveAuthorId],
+            ['anon 楼被丢弃(実名制没有匿名这回事)', !anonSurvived],
+            ['r_guest 落账 kind===guest 且 invitedBy===r_sato', !!guest && guest.kind === 'guest' && guest.invitedBy === 'r_sato'],
+            ['r_bad_guest 不存在(没有 invitedBy 被丢弃)', !folded.residents.has('r_bad_guest')],
+            ['每个住民 handle===displayName', [...folded.residents.values()].every(r => r.handle === r.displayName)],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
+    // ② user 硬防线:fixture 现取 ctx.name1 造一个 castName===ctx.name1 的 ゲスト(带合法
+    //    invitedBy),allowUserContact:false 时应被拦、true 时应正常落账——证明拦的是「user 越界」
+    //    本身,不是被别的校验顺带挡下的。
+    async function assertUserSideHardLineOnGuest() {
+        const guestCastName = ctx.name1; // 按 ctx.name1 现取,不写死
+        fixtureFUserGuestCastName = guestCastName;
+        try {
+            const wkOff = `__m13_assert_userguest_off_${Date.now()}`;
+            await store.setOwner(wkOff, 'テスト主人');
+            await generator.generateMoreForum(ctx, store, {
+                worldKey: wkOff, floorWindow: 0, profileId: null, customApi: { enabled: false },
+                owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false,
+            });
+            const foldedOff = foldWorld(await store.getEntriesForWorld(wkOff));
+            const blockedOk = ![...foldedOff.residents.values()].some(r => r.castName === guestCastName);
+            await store.wipeWorld(wkOff);
+
+            const wkOn = `__m13_assert_userguest_on_${Date.now()}`;
+            await store.setOwner(wkOn, 'テスト主人');
+            await generator.generateMoreForum(ctx, store, {
+                worldKey: wkOn, floorWindow: 0, profileId: null, customApi: { enabled: false },
+                owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: true,
+            });
+            const foldedOn = foldWorld(await store.getEntriesForWorld(wkOn));
+            const allowedOk = [...foldedOn.residents.values()].some(r => r.castName === guestCastName && r.kind === 'guest');
+            await store.wipeWorld(wkOn);
+
+            return [
+                [`allowUserContact:false 时不落账(castName===ctx.name1="${guestCastName}")`, blockedOk],
+                ['allowUserContact:true 时正常落账(kind===guest)', allowedOk],
+            ];
+        } finally {
+            fixtureFUserGuestCastName = null; // 无论成败都要清掉旁路,不能漏到别的用例
+        }
+    }
+
+    // ③ 渲染:表帖 HTML 用実名+所属(+ゲスト 标)展示,不漏真身、不再挂旧式短 ID。
+    async function assertForumOmoteRenderRealName() {
+        const wk = `__m13_assert_render_${Date.now()}`;
+        await store.setOwner(wk, 'テスト主人');
+        await generator.generateMoreForum(ctx, store, {
+            worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false,
+        });
+        const folded = foldWorld(await store.getEntriesForWorld(wk));
+        const thread = [...folded.forumThreads.values()].find(t => t.title === '刚刚在便利店看到不熟的两个人');
+        const html = thread ? renderForumThreadHtml({ thread, world: folded, busy: false, forumNow: folded.worldClock || Date.now() }) : '';
+        const out = [
+            ['找到帖子', !!thread],
+            ['含「佐藤 · 営業二課」', html.includes('佐藤 · 営業二課')],
+            ['含「外部の友人 · 取引先 · ゲスト」', html.includes('外部の友人 · 取引先 · ゲスト')],
+            ['不含真身「本名テスト」', !html.includes('本名テスト')],
+            ['不含旧式短 ID(新式住民不再显示)', !html.includes(` #${shortIdFor('r_sato')}`)],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
+    // ④ 表盖楼(実名制):anon 楼被丢弃;newResident 正常注册;草稿发出仍走 authorId;
+    //    ownerResident 新契约落地(castName/kind 由代码强制,不听 fixture 摆布)。
+    async function assertForumOmoteContinueRealName() {
+        const wk = `__m13_assert_continue_${Date.now()}`;
+        await store.setOwner(wk, 'テスト主人');
+        await generator.generateMoreForum(ctx, store, {
+            worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false,
+        });
+        const folded1 = foldWorld(await store.getEntriesForWorld(wk));
+        const targetThread = [...folded1.forumThreads.values()].find(t => t.title === '刚刚在便利店看到不熟的两个人');
+        const result = await generator.continueForumThread(ctx, store, {
+            worldKey: wk, threadId: targetThread.threadId, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false, count: 3,
+        });
+        const folded2 = foldWorld(await store.getEntriesForWorld(wk));
+        const thread2 = folded2.forumThreads.get(targetThread.threadId);
+        const rNew = folded2.residents.get('r_new');
+        const ownerReply = thread2.replies.find(r => r.fromDraftId);
+        const ownerResident = ownerReply ? folded2.residents.get(ownerReply.authorId) : null;
+        const out = [
+            ['生成成功', !!result?.ok],
+            ['anon 楼被丢弃(実名制)', !thread2.replies.some(r => r.anon)],
+            ['r_new 注册且 displayName===新人', !!rNew && rNew.displayName === '新人'],
+            ['草稿发出仍走 authorId', !!ownerReply && !!ownerReply.authorId && !ownerReply.anon],
+            ['主人住民 castName===テスト主人 且 kind===member', !!ownerResident && ownerResident.castName === 'テスト主人' && ownerResident.kind === 'member'],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
+    // ⑤ 裏材料:主生成与盖楼(G2)捕获的 userContent 都要含表板実名名册的隐藏材料,且绝不
+    //    带真身/authorId——复用 M12 已布好的 capturedUraUserContent/capturedUraG2UserContent。
+    async function assertUraSeesOmoteRosterHidden() {
+        const wk = `__m13_assert_ura_roster_${Date.now()}`;
+        await store.setOwner(wk, 'テスト主人');
+        await generator.generateMoreForum(ctx, store, {
+            worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false,
+        });
+        capturedUraUserContent = null;
+        const uraResult = await generator.generateMoreForumUra(ctx, store, {
+            worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false,
+        });
+        const uc1 = capturedUraUserContent || '';
+        const foldedAfterUra = foldWorld(await store.getEntriesForWorld(wk));
+        const uraThread = [...foldedAfterUra.forumThreads.values()].find(t => t.side === 'ura' && t.title);
+        capturedUraG2UserContent = null;
+        let g2Result = null;
+        if (uraThread) {
+            g2Result = await generator.continueForumThread(ctx, store, {
+                worldKey: wk, threadId: uraThread.threadId, floorWindow: 0, profileId: null, customApi: { enabled: false },
+                owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false, count: 3,
+            });
+        }
+        const uc2 = capturedUraG2UserContent || '';
+        const hasHiddenBlock = (uc) => uc.includes('[表板の実名メンバー')
+            && uc.includes('佐藤(営業二課)') && uc.includes('ゲスト・外部')
+            && !uc.includes('本名テスト') && !uc.includes('r_sato');
+        const rosterAt = uc2.lastIndexOf('[表板の実名メンバー');
+        const bodyAt = uc2.indexOf('[帖子]');
+        const topicAt = uc2.indexOf('【本帖的主題');
+        const out = [
+            ['裏主生成成功', !!uraResult?.ok],
+            ['裏主生成 userContent 含隐藏名册且不泄露真身/ID', hasHiddenBlock(uc1)],
+            ['找到裏帖用于盖楼', !!uraThread],
+            ['裏盖楼(G2)生成成功', !!g2Result?.ok],
+            ['裏盖楼 userContent 同样含隐藏名册且不泄露', !!uraThread && hasHiddenBlock(uc2)],
+            ['隐藏名册位于 [帖子] 之后、【本帖的主題】之前', !!uraThread && rosterAt > bodyAt && (topicAt < 0 || rosterAt < topicAt)],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
+    // ⑥ 旧数据兼容:手工种一个没有 displayName 的旧住民 + 一帖(作者是它)+ 一条 anon 楼,
+    //    渲染不能抛错,且照旧退回旧式 handle #短ID / anon 的 ID: 展示。
+    async function assertLegacyResidentRenderCompat() {
+        const wk = `__m13_assert_legacy_${Date.now()}`;
+        await store.addEntry({ worldKey: wk, sourceFloor: 0, app: 'forum', type: 'board', payload: { boardId: 'b_old', name: '旧板', desc: '' } });
+        await store.addEntry({ worldKey: wk, sourceFloor: 0, app: 'forum', type: 'resident', payload: { residentId: 'r_old', handle: '旧网名', persona: '', castName: '旧' } });
+        await store.addEntry({
+            worldKey: wk, sourceFloor: 0, app: 'forum', type: 'forum_thread',
+            payload: { threadId: 't_old_seed', boardId: 'b_old', title: '旧世界的老帖子', authorId: 'r_old', body: '旧文本', worldTime: 1000 },
+        });
+        await store.addEntry({
+            worldKey: wk, sourceFloor: 1, app: 'forum', type: 'forum_reply',
+            payload: { threadId: 't_old_seed', anon: { key: 'ox', name: '名無しさん' }, body: '旧匿名回复', worldTime: 1100 },
+        });
+        const folded = foldWorld(await store.getEntriesForWorld(wk));
+        const thread = folded.forumThreads.get('t_old_seed');
+        let html = '';
+        let threw = false;
+        try {
+            html = renderForumThreadHtml({ thread, world: folded, busy: false, forumNow: folded.worldClock || Date.now() });
+        } catch (e) {
+            threw = true;
+            console.error('[M13 断言⑥]', e);
+        }
+        const out = [
+            ['渲染不抛错', !threw],
+            ['含旧式「旧网名 #」', html.includes('旧网名 #')],
+            ['含 anon 的「ID:」', html.includes('ID:')],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
+    // ⑦ 论坛重来:种表帖 + 裏帖 + 住民 + 板块 + 所属后调 deleteForumThreadsOnly,fold 后
+    //    forumThreads/residents 应清空,boards 与 community 应保留,两个水位复位为 -1。
+    async function assertForumRestart() {
+        const wk = `__m13_assert_restart_${Date.now()}`;
+        await store.addEntry({
+            worldKey: wk, sourceFloor: 0, app: 'world', type: 'community',
+            payload: { name: 'テスト組織', kind: 'org', desc: '', slug: 'test-org', officialName: '', titles: '', worldBrief: '' },
+        });
+        await store.addEntry({ worldKey: wk, sourceFloor: 0, app: 'forum', type: 'board', payload: { boardId: 'b_r', name: '重来前的板块', desc: '' } });
+        await store.addEntry({
+            worldKey: wk, sourceFloor: 0, app: 'forum', type: 'resident',
+            payload: { residentId: 'r_r', displayName: '重来前', handle: '重来前', affiliation: '', persona: '', castName: '重来前', kind: 'member' },
+        });
+        await store.addEntry({
+            worldKey: wk, sourceFloor: 0, app: 'forum', type: 'forum_thread',
+            payload: { threadId: 't_r_omote', boardId: 'b_r', title: '重来前的表帖', authorId: 'r_r', body: '', worldTime: 1000 },
+        });
+        await store.addEntry({
+            worldKey: wk, sourceFloor: 0, app: 'forum', type: 'forum_thread',
+            payload: { threadId: 't_r_ura', title: '重来前的裏帖', anon: { key: 'k', name: '名無し' }, body: '', side: 'ura', worldTime: 1000 },
+        });
+        await store.setWatermark(wk, 'forum', 5);
+        await store.setWatermark(wk, 'forumUra', 5);
+        await store.deleteForumThreadsOnly(wk);
+        const folded = foldWorld(await store.getEntriesForWorld(wk));
+        const out = [
+            ['forumThreads 清空', folded.forumThreads.size === 0],
+            ['residents 清空', folded.residents.size === 0],
+            ['boards 仍在', folded.boards.has('b_r')],
+            ['community 仍在', !!folded.community],
+            ['watermark forum 复位为 -1', await store.getWatermark(wk, 'forum') === -1],
+            ['watermark forumUra 复位为 -1', await store.getWatermark(wk, 'forumUra') === -1],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
+    async function runM13Assertions() {
+        const out = document.getElementById('m13AssertResult');
+        out.textContent = '运行中…';
+        const sections = [
+            ['1. 表主生成(実名制)', await assertForumOmoteRealNameMain()],
+            ['2. user 硬防线(ゲスト)', await assertUserSideHardLineOnGuest()],
+            ['3. 渲染(実名+所属+ゲスト)', await assertForumOmoteRenderRealName()],
+            ['4. 表盖楼(実名制)', await assertForumOmoteContinueRealName()],
+            ['5. 裏材料:表板実名名册隐藏投影', await assertUraSeesOmoteRosterHidden()],
+            ['6. 旧数据兼容', await assertLegacyResidentRenderCompat()],
+            ['7. 论坛重来', await assertForumRestart()],
+        ];
+        let allPass = true;
+        const lines = [];
+        for (const [title, checks] of sections) {
+            lines.push(`<b>${escapeHtml(title)}</b>`);
+            for (const [label, pass] of checks) {
+                if (!pass) allPass = false;
+                lines.push(`  <span class="${pass ? 'pass' : 'fail'}">${pass ? 'PASS' : 'FAIL'}</span> ${escapeHtml(label)}`);
+            }
+        }
+        out.innerHTML = lines.join('\n');
+        log(`M13 断言跑完:${allPass ? '全绿' : '有未过项,见断言面板'}`);
+    }
+
+    document.getElementById('runM13AssertBtn').addEventListener('click', () => {
+        runM13Assertions().catch(err => {
+            document.getElementById('m13AssertResult').textContent = `断言运行出错:${err?.message || err}`;
+            console.error('[M13 断言]', err);
         });
     });
 

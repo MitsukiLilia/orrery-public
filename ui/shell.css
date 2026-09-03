@@ -375,6 +375,9 @@
 .or-row.with-note { flex-direction: column; align-items: stretch; gap: 7px; }
 .or-row-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .or-row.with-note .or-row-note { padding: 0; }
+/* with-note 容器里整行都是按钮的情形(论坛重来那一档):去掉 <button> 的默认内边距,
+   交回外层 .or-row 的 14px/18px 统一节奏。 */
+.or-row.with-note button.or-row-main { padding: 0; font-size: inherit; }
 .or-field {
     display: flex; flex-direction: column; gap: 5px;
     padding: 10px 18px; border-bottom: 1px solid var(--or-cream-2);

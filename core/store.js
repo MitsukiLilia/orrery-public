@@ -441,6 +441,50 @@ export async function deleteForumAll(worldKey) {
     if (touched) await writeMeta(meta);
 }
 
+/**
+ * M13(任务书-M13 §2.4)「论坛重来」:旧世界升级到実名制后,清空表板与裏サイト的帖子、回复、
+ * 草稿与名册(type ∈ forum_thread/forum_reply/forum_draft/resident),保留板块(forum_board)与
+ * 所属(community)——比 deleteForumAll 窄一圈:那个连板块和所属一起清、要重新推断所属,这个把
+ * 「组织的架子」留着,只清「架子里发生过的事」,按実名制从零开始又不必重新烧一次所属推断。
+ */
+export async function deleteForumThreadsOnly(worldKey) {
+    if (!worldKey) return;
+    rollbackEpoch++; // 同其他删除:生成中途被清空,整批作废
+    const CLEAR_TYPES = new Set(['forum_thread', 'forum_reply', 'forum_draft', 'resident']);
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_LEDGER, 'readwrite');
+        const idx = tx.objectStore(STORE_LEDGER).index('worldKey');
+        const req = idx.openCursor(IDBKeyRange.only(worldKey));
+        req.onsuccess = () => {
+            const cursor = req.result;
+            if (!cursor) return;
+            const v = cursor.value;
+            if (v.app === 'forum' && CLEAR_TYPES.has(v.type)) cursor.delete();
+            cursor.continue();
+        };
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+    });
+    // 水位复位,写法照 deleteForumAll——表裏两个水位都要归零,下次「刷新」都按「首次」跑。
+    await setWatermark(worldKey, 'forum', -1);
+    await setWatermark(worldKey, 'forumUra', -1);
+    // 清 seen/star 键,写法照 deleteForumAll(帖子都没了,旧键留着也只是死数据)。
+    const meta = await readMeta(worldKey);
+    let touched = false;
+    if (meta.seen && typeof meta.seen === 'object') {
+        for (const key of Object.keys(meta.seen)) {
+            if (key.startsWith('forum:')) { delete meta.seen[key]; touched = true; }
+        }
+    }
+    if (meta.starred && typeof meta.starred === 'object') {
+        for (const key of Object.keys(meta.starred)) {
+            if (key.startsWith('ft:')) { delete meta.starred[key]; touched = true; }
+        }
+    }
+    if (touched) await writeMeta(meta);
+}
+
 /** 抹掉这部手机:账本条目 + meta(含主人设定/水位)全删,世界回到未激活状态。 */
 export async function wipeWorld(worldKey) {
     if (!worldKey) return;

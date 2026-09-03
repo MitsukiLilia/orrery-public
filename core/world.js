@@ -148,6 +148,11 @@ export function anonIdFor(threadId, key) {
  *   没有 boardId、也没有固定住民(anon 恒真);其余(缺省)就是表板帖,fold 收尾统一归一成
  *   'omote'(见下方 forumNow 循环),UI/生成层从此不必再判 undefined。myDraft 一旦在 replies 里
  *   发现 fromDraftId 与之相符的一楼(草稿已发出),fold 收尾时置 null(见下方 forumNow 循环)。
+ * residents: residentId -> resident payload(+sourceFloor/ts),同 accountId 一样后写覆盖。M13 表板実名制
+ *   起形状是 { residentId, displayName, affiliation, kind:'member'|'guest', invitedBy?(仅 guest:招待
+ *   TA 的成员 residentId), handle(=displayName,兼容 resolveByHandle/digestAuthorTag/旧渲染), persona,
+ *   castName(真身;必填) }——payload 整份 spread(见下方 resident 分支),新增字段零改动即可落地。
+ *   旧世界没有 displayName 的老住民原样保留在表里(handle 走旧值),不迁移、不强改历史数据。
  * snsAccounts: accountId -> sns_account payload(同 accountId 重发即覆盖——entries 已按 ts 升序 fold,Map.set
  *   天然「后写赢」,同 contacts 先例,不需要额外的"已存在就跳过"判断)。
  * tweets: tweetId -> { tweetId, accountId, body, zh?, worldTime, likes, retweets, retweetOf?, replies:[](按

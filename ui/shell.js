@@ -208,6 +208,10 @@ function renderSettingsHtml(s, profileLabel, owner) {
             <div class="or-field"><label>Base URL</label><input type="text" data-capi="baseUrl" value="${escapeHtml(s.customApi.baseUrl)}" placeholder="https://…/v1" spellcheck="false"></div>
             <div class="or-field"><label>API Key</label><input type="password" data-capi="apiKey" value="${escapeHtml(s.customApi.apiKey)}"></div>
             <div class="or-field"><label>模型名</label><input type="text" data-capi="model" value="${escapeHtml(s.customApi.model)}" placeholder="例:gemini-2.5-flash" spellcheck="false"></div>
+            <div class="or-row with-note">
+                <button class="or-row-main or-danger" data-action="forum-restart"><span class="or-row-label">论坛重来</span></button>
+                <div class="or-row-note">清空表板与裏サイト的帖子、回复、草稿与名册,保留所属与板块;用于让旧世界按実名制重新开始。不可恢复。</div>
+            </div>
             <button class="or-row or-danger" data-action="wipe-phone"><span class="or-row-label">抹掉这部手机</span></button>
         </div>`;
 }
@@ -1486,6 +1490,26 @@ export function createShell(ctx, onExternalChange) {
         onExternalChange?.();
     }
 
+    // M13(任务书-M13 §2.4)「论坛重来」:旧世界升级到実名制后,设置页里清空表板+裏サイト的帖子/
+    // 回复/草稿/名册,保留所属与板块——同「抹掉这部手机」的确认方式。navStack 里若还停着某个
+    // 已被清空的帖内页(理论上只有从设置以外的路径才可能出现),一并退回列表页,不留悬空引用。
+    async function doForumRestart() {
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        const confirmed = await ctx.callGenericPopup(
+            '论坛重来?清空表板与裏サイト的帖子、回复、草稿与名册(保留所属与板块),不可恢复。确定吗?',
+            ctx.POPUP_TYPE.CONFIRM,
+        );
+        if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
+        await store.deleteForumThreadsOnly(worldKey);
+        for (let i = 0; i < navStack.length; i++) {
+            if (navStack[i].type === 'forum-thread') navStack[i] = { type: 'forum-list', side: 'omote', page: 1 };
+        }
+        showToast('论坛已清空,进论坛点「刷新」重新开始');
+        await render();
+        onExternalChange?.();
+    }
+
     function doPickProfile(profileId) {
         const s = settings();
         s.profileId = profileId || null;
@@ -1552,6 +1576,7 @@ export function createShell(ctx, onExternalChange) {
             case 'set-theme': { const s = settings(); s.theme = el.dataset.theme; saveSettings(); render(); break; }
             case 'set-language': { const s = settings(); s.language = el.dataset.language; saveSettings(); render(); break; }
             case 'confirm-setup': doConfirmSetup(); break;
+            case 'forum-restart': doForumRestart(); break;
             case 'wipe-phone': doWipePhone(); break;
             case 'open-profile-picker': navPush({ type: 'settings-profile-picker' }); break;
             case 'pick-profile': doPickProfile(el.dataset.profileId); break;
