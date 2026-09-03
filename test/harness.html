@@ -658,6 +658,8 @@
     // 不必专门为 buildForumUraDigestText 开一个导出口子(照 M11 用真实模块函数/mock 捕获两选一的
     // 惯例,这里选后者:qCallCount 已经是同一个"从 mockGenerate 侧信道回传信息给断言"的先例)。
     let capturedUraUserContent = null;
+    // M12.2(v0.22.2)断言用:裏盖楼(G2)那一路也存一份 userContent——验证材料末尾真的再给了一遍【本帖的主題】。
+    let capturedUraG2UserContent = null;
 
     function mockGenerate(systemPrompt, userContent) {
         if (document.getElementById('fxBroken').checked) return '(不知道你在说什么，我拒绝回答。)';
@@ -730,6 +732,7 @@
         // 之前——PROMPT_G2 自己的措辞也含「续写」二字,且「裏サイト上这个帖子的后续」与 PROMPT_G
         // 的「内部掲示板上这个帖子的后续」不撞,但顺序仍按任务书纪律靠前放,不留隐患。
         if (systemPrompt.includes('裏サイト上这个帖子的后续')) {
+            capturedUraG2UserContent = userContent;
             const body = emptyMore ? { replies: [] } : buildFixtureG2(userContent);
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
@@ -1260,6 +1263,12 @@
             ['myDraft 仍停在回复框里(写了又删的余波保留)', thread.myDraft?.draftId === 'fd_seed'],
             ['residents 数量不变', folded.residents.size === residentsBefore],
             ['模型回复里混入的 authorId 被剥离成纯 anon', !!strippedReply && !!strippedReply.anon && !strippedReply.authorId],
+            // M12.2:材料末尾再给一遍标题+首楼(【本帖的主題】),且排在楼层 digest 之后=离生成点最近
+            ['材料末尾含【本帖的主題】(标题+首楼)且在 digest 之后', (() => {
+                const uc = capturedUraG2UserContent || '';
+                const at = uc.lastIndexOf('【本帖的主題');
+                return at > 0 && at > uc.indexOf('[帖子] 種のスレ') && uc.slice(at).includes('标题:種のスレ') && uc.slice(at).includes('首楼:本文');
+            })()],
         ];
         await store.wipeWorld(wk);
         return out;
