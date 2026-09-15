@@ -138,6 +138,9 @@ export function anonIdFor(threadId, key) {
 /**
  * 账本 fold 成世界状态:{ contacts, groups, threads, worldNow, boards, residents, forumThreads, forumNow,
  *   snsAccounts, tweets, snsNow, searches, visits, browserNow, worldClock }。
+ * groups: groupId -> group payload(+sourceFloor/ts),同 contacts 一样后写覆盖。M14 通讯录登记向
+ *   已有 groupId 补成员时,同 groupId 后写覆盖=补员后的整份成员表(合并去重后的完整 members,不是
+ *   增量),fold 侧逻辑零改动。
  * threads: threadId -> { threadId, kind:'dm'|'group', contactId?, group?, messages:[], summaries:[], unread, lastMessage }
  * dm 的 threadId===contactId;群聊的 threadId===groupId,成员内联在 group.members(不必是通讯录好友)。
  * forumThreads: threadId -> { threadId, side:'omote'|'ura', boardId?, title, authorId?, anon?, body, zh?,

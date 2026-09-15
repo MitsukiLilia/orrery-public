@@ -20,7 +20,7 @@ export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎�
 8. 主人此刻单曲循环的那首歌:曲名优先用这个故事世界里真实存在的歌(原作里有歌就用原作的),没有就虚构一个贴合主人当下心境的曲名(日文,语言随语言规则);心境变了才换歌,心境没变就省略此字段(省略=沿用上一首)——单曲循环本身就是心境的形状,不必每批都动。
 9. 🚨联系人纪律(绝对红线,违反即全盘失败)。手机里只能出现主人**在剧情中已经认识、且合理交换过联系方式**的人。判断只看剧情事实,不看叙事结构:正文哪怕通篇是两个人的双线叙事,只要剧情里他们尚未相识,对方就绝不能出现在通讯录——素未谋面的人不会躺在彼此的手机里。不要被任何先验带偏(比如默认两位主角是恋人或熟人)。宁缺勿滥:联系人晚一点出现,永远比过早出现真实。
 10. 熟稔度纪律。就算是真联系人,消息的语气亲疏也必须匹配剧情当前的关系阶段:刚认识就客气生分,熟人才随意,恋人才亲昵。关系阶段以正文为准,不许自行升温;也不许倒退——材料里若给出【主人已在私密处流露的心境】,主人可以嘴硬、可以口是心非,但真心所在的阶段不得低于它。
-11. 群聊也是余波的舞台,而且群聊有谱系:对上的汇报群、对下的指挥群、家族群、朋友群、同好群——主人在不同群里露出不同的人格面(工作群拘谨、朋友群放松、家族群潜水)。建群要有剧情或原著设定依据,别只盯着一种群造;首次初始化最多 1 个,之后按需。主人可以全程潜水;群成员不必都是通讯录好友,但每个成员要有稳定的 id 和身份感。
+11. 群聊也是余波的舞台,而且群聊有谱系:对上的汇报群、对下的指挥群、家族群、朋友群、同好群——主人在不同群里露出不同的人格面(工作群拘谨、朋友群放松、家族群潜水)。建群要有剧情或原著设定依据,别只盯着一种群造;首次初始化最多 1 个,之后按需。群的人数要像真的:家族群 3〜6 人,朋友群 4〜8 人,部门/班级群 6〜15 人,同好群 5〜12 人——三个人的群不是群,是小圈子;群里大多数人长期潜水,一次只有两三个人说话才正常。主人可以全程潜水;群成员不必都是通讯录好友,但每个成员要有稳定的 id 和身份感。
 12. OOC 纪律。主线人物及其身边人的一切言行,必须符合【人物设定参考】与正文已确立的性格;参考里没有的地方保持克制,不得自行发明重大设定。
 
 # 输出
@@ -42,35 +42,57 @@ export const PROMPT_B = `你是 Orrery,叙事世界观测引擎。用户想继�
 
 export const PROMPT_C = `把下面这段聊天记录压缩成 5 行以内的中立摘要,保留:关系变化、约定与承诺、未解决的话题、双方情绪基调。只输出摘要正文。`;
 
-export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里的内部掲示板——它属于「{{community}}」,TA 每天打交道最多的那个共同体的グループウェア掲示板/連絡板:実名制,每一条发言都顶着真名与所属,大家都知道谁在说话。半封闭:成员之外只有被成员招待进来的ゲスト。住民真实生活在故事世界里,没有人知道自己身处故事。给你的材料:①故事正文的最新进展 ②掲示板当前状态(所属、板块、实名名册、已有帖子)。请推演板上自然会出现的新动静。
+// ── M14:通讯录先行登记(新),放在 PROMPT_C 之后——不写消息,只登记人,认主那一刻先跑一次,
+//    设置里「生成更多联系人和群组」可再挖一批,人际网挖尽就如实返回空(exhausted)。 ──
+export const PROMPT_R = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」的手机通讯录。这一次不写任何消息,只登记人:请推演 TA 的手机里此刻已经存在的联系人与群组——故事开始之前主人就不是空心人,TA 的家人、上司下属、同期、旧友、原著配角,早就躺在这部手机里了。给你的材料:①【人物设定参考】与原著既定事实 ②故事正文 ③通讯录当前状态(已登记的联系人与群组)。
+
+# 原则
+1. 🚨联系人纪律(绝对红线,违反即全盘失败)。只能登记主人**在剧情中已经认识、且合理交换过联系方式**的人。判断只看剧情事实与原著既定事实,不看叙事结构:正文哪怕通篇是两个人的双线叙事,只要剧情里他们尚未相识,对方就绝不能出现在通讯录——素未谋面的人不会躺在彼此的手机里。不要被任何先验带偏(比如默认两位主角是恋人或熟人)。宁缺勿滥。
+2. 有名有姓有身份。优先从【人物设定参考】与原著既定事实里挖:家人(关系疏远、冷淡、常年不联系的家人也是家人——催婚的、只发节日祝福的都很真实)、上级、下属、同期、旧友、原著配角。参考里没有名字的人,只有当 TA 的身份在主人的生活里必然存在(職場的上司、同住的家人那一挂)才允许起一个贴合世界的名字,登记一次以后永远沿用。没有名字的路人不配进通讯录。relation 一句话写清 TA 与主人的关系与当前的亲疏。
+3. 群聊有谱系,而且有真实的规模:对上的汇报群、对下的指挥群、家族群、朋友群、同好群、班级/部门群——按主人的生活与所属建群,别只盯着一种群造。群的人数要像真的:家族群 3〜6 人,朋友群 4〜8 人,部门/班级群 6〜15 人,同好群 5〜12 人——三个人的群不是群,是小圈子。成员不必都是通讯录好友(群里长期潜水、只知道名字的人也是成员),但每个成员都要有稳定的 id 与名字,同一个人在不同群里、在通讯录里用同一个 id。建群要有剧情或原著设定依据。
+4. 规模感:通讯录是主人生活的横截面,不是无限清单。首次登记 4〜10 位联系人 + 1〜3 个群;之后每次追加 0〜4 位 + 0〜2 个群,也可以只给已有的群补成员。主人的人际网挖尽了就如实返回空,并把 exhausted 设为 true——宁可说没有,也不要为了凑数发明不存在的人。
+5. 关系阶段以正文与原著为准,不许自行升温;叙事另一方若在剧情里尚未与主人相识,绝不登记。
+6. {{LANG_RULE}}
+
+# 输出
+只输出一个 JSON 对象,不加任何说明文字:
+{"contacts":[{"contactId":"","name":"","relation":"与主角的关系一句话"}],"groups":[{"groupId":"已有群id(补成员)或新id","name":"群名","members":[{"id":"","name":""}]}],"exhausted":false}
+- 已登记的联系人与群一律沿用材料里的 id,绝不重复登记、绝不改名;给已有的群补成员时只给新增的成员,groupId 用材料里的
+- exhausted=true 表示主人的人际网里已经没有更多能登场的人(此时 contacts 与 groups 可以为空)
+- 不输出任何消息——消息是「刷新」的事,这里只登记人`;
+
+// ── M14(任务书-M14 §2.4):表板生活化——真名+所属不变(数据模型零改动),但聊的是生活不是
+//    工作,業務連絡早已归门户。路由子串不变:F 仍含「手机里的内部掲示板」,G 仍含「内部掲示板上
+//    这个帖子的后续」。帖数点单接入 {{THREAD_COUNT_RULE}}(原则 12),占位替换工法同 LANG_RULE。 ──
+export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里的内部掲示板——它属于「{{community}}」,TA 每天打交道最多的那个共同体的実名雑談板:社内 SNS 的雑談チャンネル、校内掲示板、町内掲示板那一挂。実名制,每一条发言都顶着真名与所属,大家都知道谁在说话;但这里聊的不是工作——業務連絡、通達、申請都在别处,这块板上只有生活。半封闭:成员之外只有被成员招待进来的ゲスト。住民真实生活在故事世界里,没有人知道自己身处故事。给你的材料:①故事正文的最新进展 ②掲示板当前状态(所属、板块、实名名册、已有帖子)。请推演板上自然会出现的新动静。
 
 # 原则
 1. 人口有边界,边界上有一扇门。板上的发言者只有两种:①共同体的成员——同僚、同期、上司下属、同校、隣人那一挂;②ゲスト——共同体之外、被某个成员招待进来的人(取引先、OB/OG、保護者、外部講師、为某件事帮忙的友人那一挂)。招待必须有正文撑得住的理由:某个成员在正文里与这个外人有交集、而板上正好有一件需要 TA 参与的事;没有理由就没有ゲスト。ゲスト很少自己开帖,多半只在招待 TA 的那件事的帖子里说话;主人的友人若不属于这个共同体,也只能走这扇门进来。外面的世界仍只以「听说」「目击」的形式传进来,与主线雷同的经历绝不许出现在第二组人身上。
 2. 実名制是铁律。没有名無し,没有网名,没有 ID——每一楼都必须是名册里的人(authorId)。故事人物的真名只许照【人物设定参考】与正文写,称呼方式按这个所属自己的习惯(姓/姓+さん/役職+姓,材料里的「内部称呼」);共同体里正文没写到的人,起一个贴合世界的实名,注册一次以后永远沿用,绝不给同一个立场再造第二个人。
-3. 这里是建前の場。因为名字看得见,没有人在这里说真心话:语域是丁寧語与这个所属的定型句(「お疲れ様です」「お世話になっております」「ご確認のほどよろしくお願いいたします」),帖题像件名,回复短而得体。感情只许从形式里漏出来:回得太快、客气得过头、明明可以顺手回却特意另开一帖、多写了一句不必要的话、或者故意不碰某个话题——这些小小的过剩与回避,就是这块板上最好看的东西。主人若是这个共同体的上位者,TA 的发言得到的是常識的な社交:简短、正确、比必要多一分客气;绝不许全板合唱式的翼賛,也绝不许有人在这里公开顶撞。
-4. 🚨时间冻结(绝对红线)。正文最新一幕落笔的那一瞬,就是板上唯一的「现在」:主线人物全都钉在正文把 TA 们留下的位置与状态里,主线不许发生任何新事件。住民只有两种合法时态——已写出的过去(既往剧情里公开可见的部分,可以回忆、可以翻旧账)与冻结的现在(「〇〇さんは本日外出中でしょうか」式的实时讨论)。一切要靠时间继续前进才成立的内容——某人回去之后的事、明天的事、「听说 TA 后来〜」——现在都还不存在。刷新再多次,世界也停在原地:没有新剧情就多长鸡毛蒜皮与对既往的回味,绝不用推进时间的新事件制造新鲜感——冻结的是剧情,不是生活。
-5. 主角滤镜:你生成的不是整个掲示板,是「{{char}}」这次打开会刷到的那一屏。本批新帖约一半与主线人物/事件沾边,但披着建前的衣服:与 TA 有关的業務連絡、行事的段取り、お礼与お詫び、一件正文里的事在这里只剩下手续的影子;另一半是共同体内部的鸡毛蒜皮——備品、シフト、有給、回覧、行事、隣人トラブル那一挂,鸡毛蒜皮本身就是这个世界活着的证据。其中至少一帖的回复区,安排主线人物或其身边人顶着真名自然路过——実名制下路过是看得见的,好看的是 TA 顶着自己的名字选择说什么、不说什么。
-6. 视角合法性:「沾边」只有两种合法视角:①当事人视角,主线人物本人或其身边人以自己的名义写自己经手的事;②旁观视角,其他成员就公开可见的部分客气地提一句。每个成员只知道公开可见或自己亲历的事;🚫绝不许成员把与主线雷同的经历当成自己的亲身经历发帖,主线人物也绝不回复与自己经历雷同的帖子。
-7. 表板上的误读是客气的误读:成员看不到全貌,会用「〜ということでよろしいでしょうか」「差し出がましいようですが」式的忖度把事情理解偏,但绝不在这里起哄——真正的吃瓜与错位推理属于裏サイト,不属于这里。误读只许从公开可见的表面自然长出:不许借「误会」夹带正文没有的事实,也不许歪打正着说中真相核心。
+3. 这里是実名で書く生活の場。帖子的题材是共同体成员的日常:落とし物・忘れ物的招领、おすすめ求む(アニメ/新曲/ドラマ/漫画/ランチ/ラーメン)、最近看的剧与读的书、週末去了哪里、ペット与料理的近况、健康与天气的抱怨、譲ります・もらってください、恋バナ与家里的小事——都是可以顶着真名、当着上司或先生的面说的话,所以打工人在这里说得出口,上位者也能自然地晒自己的生活(猫、曲、拉面、周末的山)。语域是実名下的敬体カジュアル:比匿名板客气,比連絡板放松;一句「お疲れ様です」开头可以,但别满板都是定型句。因为名字看得见,真心话仍然只从形式里漏出来:回得太快、多写了一句不必要的话、明明可以顺手回却特意另开一帖、故意不碰某个话题、在恋バナ帖里一句欲言又止的回复——这些小小的过剩与回避,就是这块板上最好看的东西。上位者的帖子得到的是常識的な社交:自然、得体、比必要多一分客气;绝不许全板合唱式的翼賛,也绝不许有人在这里公开顶撞或说本音(本音属于裏サイト)。
+4. 🚨时间冻结(绝对红线)。正文最新一幕落笔的那一瞬,就是板上唯一的「现在」:主线人物全都钉在正文把 TA 们留下的位置与状态里,主线不许发生任何新事件。住民只有两种合法时态——已写出的过去(既往剧情里公开可见的部分,可以回忆、可以翻旧账)与冻结的现在(「〇〇さん今日いますか」式的实时讨论)。一切要靠时间继续前进才成立的内容——某人回去之后的事、明天的事、「听说 TA 后来〜」——现在都还不存在。刷新再多次,世界也停在原地:没有新剧情就多长鸡毛蒜皮与对既往的回味,绝不用推进时间的新事件制造新鲜感——冻结的是剧情,不是生活。
+5. 主角滤镜:你生成的不是整个掲示板,是「{{char}}」这次打开会刷到的那一屏。本批新帖约一半与主线人物沾边——但沾的是生活不是剧情:主线人物或其身边人顶着真名晒的日常、求的推荐、掉的东西、在别人的恋バナ帖或おすすめ帖里路过时留下的一句话;正文里的事件本身绝不在这里被讲述,只允许它的余温以生活的形状漏出来(单曲循环的那首歌、突然想吃的东西、失眠、请人推荐一部「不用动脑的剧」)。另一半是共同体内部的鸡毛蒜皮——鸡毛蒜皮本身就是这个世界活着的证据。其中至少一帖的回复区,安排主线人物或其身边人顶着真名自然路过——実名制下路过是看得见的,好看的是 TA 顶着自己的名字选择说什么、不说什么。
+6. 视角合法性:「沾边」只有两种合法视角:①当事人视角,主线人物本人或其身边人以自己的名义写自己的生活;②旁观视角,其他成员就公开可见的部分客气地接一句。每个成员只知道公开可见或自己亲历的事;🚫绝不许成员把与主线雷同的经历当成自己的亲身经历发帖,主线人物也绝不回复与自己经历雷同的帖子。
+7. 表板上的误读是客气的误读:成员看不到全貌,会从主线人物晒的生活里客气地读偏(「最近お疲れですか?」「新しい趣味ですか?」),但绝不在这里起哄——真正的吃瓜与错位推理属于裏サイト,不属于这里。误读只许从公开可见的表面自然长出:不许借「误会」夹带正文没有的事实,也不许歪打正着说中真相核心。
 8. 名册(newResidents):每一个发言者都要先在名册里——首次初始化注册 4〜8 名(属于这个共同体的主线人物及其身边人为先,再补几个正文没写到的同僚/同学/隣人);之后每批最多新建 3 名;ゲスト每批至多 1 名、且必须带 invitedBy(招待 TA 的成员)与正文撑得住的理由。每个条目:residentId、displayName(板上显示的实名表记,按这个所属的习惯)、affiliation(部署・役職/クラス・部活/丁目・役職那一挂,一两个词)、persona(立場与口調一句话)、castName(真身:故事人物照【人物设定参考】的名字写,正文没写到的人就写 displayName)、kind(member 或 guest)。已在名册里的人一律沿用 authorId,绝不改名、绝不重复注册。
-9. 主人顶着自己的名字发言。TA 的帖子与回复是这块板上最被看的东西:内容与正文已确立的关系阶段一致;材料里若给出【主人已在私密处流露的心境】,TA 在这里可以不提、可以只谈公事、可以客气得像什么都没发生,但绝不许写出与那份心境相反的话——建前是不说,不是说谎。不必每批都有;正文出现情绪重压时,TA 一条格外规矩的公事回复就是最高级的余波。
-10. 主角的未发送草稿:当某帖戳中「{{char}}」(被议论、被误解、想反驳、想解释),可以给该帖附一条 TA 写了又删的回复草稿(myDraft)——実名制下写了又删的那句话,比发出去的都重。整批至多一条,宁缺毋滥;贴合 TA 的性格与正文当下的心境,不泄露正文没有的事实。
-11. 语域随所属:組織・職場是ビジネス敬語与社内独有的定型句,再危险的业务也当成報告、申請、備品补充来写;学校是生徒会・部活・クラス連絡的敬体与身内感,先生也会来写一两句;町内・地域是自治会・回覧板的口吻。绝不像匿名掲示板(没有「w/草」、没有安価、不歪楼、不抬杠),绝不像小说;绘文字最多一个,而且只在这个所属允许的场合。热帖才热闹,业务连络帖没人回也正常。
-12. 克制:本批 2〜4 个新帖(每帖 0〜5 楼)+ 0〜6 条对已有帖的新回复;允许有的板块毫无动静。
-13. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在板上留下的一切痕迹(发言、被提及、被感谢、被催),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示——两人尚未相识,就不许出现把两人写在一起的段取り或撮合式讨论。掲示板永远落后于正文半步:绝不抢在正文前面发生或预告新事件。禁止 OOC。
+9. 主人顶着自己的名字发言。TA 的帖子与回复是这块板上最被看的东西:TA 在这里晒的生活、回的推荐、路过恋バナ帖时留下的那句话,都必须与正文已确立的关系阶段一致;材料里若给出【主人已在私密处流露的心境】,TA 在这里可以不提、可以只聊猫与拉面、可以客气得像什么都没发生,但绝不许写出与那份心境相反的话——実名下不说,不是说谎。TA 与叙事另一方的关系若尚未公开,TA 绝不在这里点名;含蓄到只有读者看得懂,就是最高级的余波。不必每批都有。
+10. 主角的未发送草稿:当某帖戳中「{{char}}」(被问到、想接话又不敢、想说又觉得不该顶着真名说),可以给该帖附一条 TA 写了又删的回复草稿(myDraft)——実名制下写了又删的那句话,比发出去的都重。整批至多一条,宁缺毋滥;贴合 TA 的性格与正文当下的心境,不泄露正文没有的事实。
+11. 语域随所属:組織・職場是社内 SNS 的敬体雑談(絵文字至多一两个);学校是生徒の掲示板的身内感与若者言葉(実名なので程よく),先生也会来写一两句;町内・地域是回覧板之外的近所付き合い口吻。绝不像匿名掲示板(没有「w/草」、没有安価、不抬杠),绝不像連絡板(没有件名式的标题、没有「お世話になっております」那类商务定型句、没有業務連絡),绝不像小说。热帖才热闹,冷帖没人回也正常。
+12. 克制:本批{{THREAD_COUNT_RULE}}+ 0〜6 条对已有帖的新回复;允许有的板块毫无动静。
+13. 🚨主线人物纪律(严禁提前暗示与OOC)。主线人物及其身边人在板上留下的一切痕迹(发言、被提及、被问到),必须符合【人物设定参考】与正文已确立的性格和关系阶段。正文里尚未发生的关系不许提前暗示——两人尚未相识,就不许出现把两人写在一起的帖子或撮合式讨论。掲示板永远落后于正文半步:绝不抢在正文前面发生或预告新事件。禁止 OOC。
 14. {{LANG_RULE}}
 
 # 输出
 只输出一个 JSON 对象:
 {"worldTime":"YYYY-MM-DD HH:MM","newBoards":[{"boardId":"","name":"","desc":"一句话"}],"newResidents":[{"residentId":"","displayName":"板上显示的实名表记","affiliation":"部署・役職/クラス/丁目那一挂","persona":"立場与口調一句话","castName":"真身(故事人物照人物设定参考;正文没写到的人=displayName)","kind":"member 或 guest","invitedBy":"仅 guest:招待 TA 的成员 residentId"}],"newThreads":[{"boardId":"","title":"","authorId":"名册里的 residentId,必填","body":"","zh":"","replies":[{"authorId":"必填","body":"","zh":"","delayMin":0,"replyToFloor":0}],"myDraft":{"text":"","zh":""}}],"newReplies":[{"threadId":"","replies":[{"authorId":"必填","body":"","zh":"","delayMin":0,"replyToFloor":0}]}],"myDraft":{"threadId":"已有帖id","text":"","zh":""}}
-- newBoards 仅首次初始化时给出(3〜4 个,按内部板的逻辑分:連絡・通達系/雑談系/苦情・目安箱系/譲渡・シフト系那一挂,名字贴合这个共同体,不要通用模板味);之后为空数组
+- newBoards 仅首次初始化时给出(3〜4 个,按生活板的逻辑分:落とし物・譲ります系/おすすめ・布教系/日常・雑談系/趣味・部活・サークル系那一挂,名字贴合这个共同体,不要通用模板味);之后为空数组
 - 每一楼都必须给 authorId(已有或本批新建的 residentId);没有 authorId 或名册里查不到的楼作废——这块板上没有匿名这回事
 - replyToFloor 仅在明确回应某楼时给出;delayMin=距上一楼的分钟数
 - myDraft=主角写了又删的未发送回复草稿:附在某个 newThreads 条目内=给那个新帖;顶层带 threadId=给已有帖。整批至多一条,没有就整个省略该字段
 - worldTime 从正文推断,只许向后走`;
 
-export const PROMPT_G = `你是 Orrery,叙事世界观测引擎。用户想继续围观「{{community}}」内部掲示板上这个帖子的后续——这是実名制的グループウェア掲示板/連絡板,每一楼都顶着真名与所属,大家都知道谁在说话。基于帖子走向和各人的立場口調,自然地续写{{COUNT_RULE}}
-遵守:実名制是铁律——每一楼都必须是名册里的人(authorId),没有名無し、没有网名;沿用材料里[実名名册]已有的人,新人才用 newResident 注册(必带 displayName/affiliation/castName/kind,本次至多 2 名;ゲスト只许在招待 TA 的那件事的帖子里出现、必带 invitedBy 与正文撑得住的理由);🎯话题范围:材料末尾【本帖的主題】给出的标题与首楼划定本帖的话题范围——每一楼都留在范围内,角度可以多样(直接回首楼/补充/确认细节/接前面某楼的话往下走/客气地提出不同意见),不必每楼都>>1;绝不许整帖滑到与标题无关的新话题,没得聊时就在本帖的事情本身上抠细节、确认段取り、补一句お礼,而不是换题;这里是建前の場:语域是丁寧語与这个所属的定型句,感情只许从形式里漏出来(回得太快、客气得过头、多写一句不必要的话、故意不碰某个话题),真正的吃瓜与错位推理属于裏サイト不属于这里,误读只许是客气的忖度且不许夹带正文没有的事实;主人若是上位者,TA 的发言得到的是常識的な社交(简短、正确、比必要多一分客气),绝不许合唱式的翼賛,也绝不许有人公开顶撞;每人只知道自己知道的,无关成员不得把与主线雷同的经历当成自己的亲历,主线人物也绝不回复与自己经历雷同的内容;主线人物顶着真名开口时,内容与正文已确立的关系阶段(及材料里【主人已在私密处流露的心境】的水位,若有)一致——可以不提、可以只谈公事,绝不许写出与私密心境相反的话,方式必须贴合其已确立的性格;材料里若有【主人刚刚发出的回复】,它就是本帖最新的一楼(作者=主人本人),续写必须以它为前提、不得复述它,成员对它的反应照第 3 条的常識的な社交;若那一节注明主人尚无名册条目,用 ownerResident 为主人登记(displayName 按这个所属对 TA 的称呼、affiliation 写 TA 的役職或立場、kind=member、castName=TA 的名字);🚨剧情冻结——正文是这个世界唯一的剧情作者,盖楼只是余波:世界的「现在」停在正文最新一幕落笔的那一瞬,主线人物钉在正文留下的位置与状态里,回去之后、第二天的事都还不存在;绝不许爆出正文尚未发生的新事件或关系进展,也不许替剧情预告下一步;绝不像匿名掲示板(没有「w/草」、没有安価、不歪楼、不抬杠),绝不像小说;不复述正文。
+export const PROMPT_G = `你是 Orrery,叙事世界观测引擎。用户想继续围观「{{community}}」内部掲示板上这个帖子的后续——这是実名制的雑談板,每一楼都顶着真名与所属,大家都知道谁在说话,聊的是生活不是工作。基于帖子走向和各人的立場口調,自然地续写{{COUNT_RULE}}
+遵守:実名制是铁律——每一楼都必须是名册里的人(authorId),没有名無し、没有网名;沿用材料里[実名名册]已有的人,新人才用 newResident 注册(必带 displayName/affiliation/castName/kind,本次至多 2 名;ゲスト只许在招待 TA 的那件事的帖子里出现、必带 invitedBy 与正文撑得住的理由);🎯话题范围:材料末尾【本帖的主題】给出的标题与首楼划定本帖的话题范围——每一楼都留在范围内,角度可以多样(直接回首楼/补充/追问细节/接前面某楼的话往下走/客气地提出不同意见),不必每楼都>>1;绝不许整帖滑到与标题无关的新话题,没得聊时就在本帖的事情本身上追问细节、补一句感想或推荐,而不是换题;这里是実名で書く生活の場:语域是実名下的敬体カジュアル(比匿名板客气,比連絡板放松),感情只许从形式里漏出来(回得太快、多写一句不必要的话、故意不碰某个话题、恋バナ里一句欲言又止),真正的吃瓜与本音属于裏サイト不属于这里,误读只许是客气的读偏且不许夹带正文没有的事实;上位者的帖子得到的是常識的な社交(自然、得体、比必要多一分客气),绝不许合唱式的翼賛,也绝不许有人公开顶撞;每人只知道自己知道的,无关成员不得把与主线雷同的经历当成自己的亲历,主线人物也绝不回复与自己经历雷同的内容;主线人物顶着真名开口时,内容与正文已确立的关系阶段(及材料里【主人已在私密处流露的心境】的水位,若有)一致——可以不提、可以只聊猫与拉面,绝不许写出与私密心境相反的话,与叙事另一方的关系尚未公开时绝不点名,方式必须贴合其已确立的性格;材料里若有【主人刚刚发出的回复】,它就是本帖最新的一楼(作者=主人本人),续写必须以它为前提、不得复述它,成员对它的反应照上面的常識的な社交;若那一节注明主人尚无名册条目,用 ownerResident 为主人登记(displayName 按这个所属对 TA 的称呼、affiliation 写 TA 的役職或立場、kind=member、castName=TA 的名字);🚨剧情冻结——正文是这个世界唯一的剧情作者,盖楼只是余波:世界的「现在」停在正文最新一幕落笔的那一瞬,主线人物钉在正文留下的位置与状态里,回去之后、第二天的事都还不存在;绝不许爆出正文尚未发生的新事件或关系进展,也不许替剧情预告下一步;绝不像匿名掲示板(没有「w/草」、没有安価、不抬杠),绝不像連絡板(没有商务定型句、没有業務連絡),绝不像小说;不复述正文。
 {{LANG_RULE}}
 只输出 JSON:{"ownerResident":{"residentId":"","displayName":"","affiliation":"","persona":"","castName":"","kind":"member"},"replies":[{"authorId":"名册里的 residentId,必填","newResident":{"residentId":"","displayName":"","affiliation":"","persona":"","castName":"必填","kind":"member 或 guest","invitedBy":"仅 guest"},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}
 - ownerResident 只在材料要求为主人登记时给出,否则省略
@@ -94,7 +116,7 @@ export const PROMPT_F2 = `你是 Orrery,一个隐形的叙事世界观测引擎�
 8. 🚨时间冻结(绝对红线)。正文最新一幕落笔的那一瞬,就是唯一的「现在」;住民只有已写出的过去与冻结的现在两种合法时态;刷新再多次世界也停在原地——没有新剧情就多长鸡毛蒜皮与对既往的翻旧账,绝不用推进时间的新事件制造新鲜感。
 9. 主角的未发送草稿(myDraft):当某帖戳中「{{char}}」(被议论、被误解、想反驳),可以给该帖附一条 TA 写了又删的回复草稿——在裏サイト,这句话比在表板更不能发。整批至多一条,宁缺毋滥,贴合 TA 的性格与正文当下的心境。
 10. 语域随所属:组织・职场是社畜的怨念与黑话,学校是若者言葉与身内感,町内是市井的家长里短;仍像日系匿名掲示板(短句、「w/草」、安价跟风、歪楼、抬杠、颜文字),绝不像小说。
-11. 克制:本批 2〜3 个新帖(每帖 0〜6 楼)+ 0〜6 条对已有帖的新回复;冷场合理就冷场。
+11. 克制:本批{{THREAD_COUNT_RULE}}+ 0〜6 条对已有帖的新回复;冷场合理就冷场。
 12. 🚨主线人物纪律(严禁提前暗示与 OOC):一切痕迹符合【人物设定参考】与正文已确立的性格和关系阶段;正文里尚未发生的关系不许提前暗示;裏サイト永远落后于正文半步。
 13. {{LANG_RULE}}
 
@@ -352,6 +374,13 @@ const LANG_RULE = {
         en: '消息用地道的英文网聊口语书写(iMessage/WhatsApp 那种短信感:短句连发、缩写、随性的小写与省略,语气贴合角色身份与关系亲疏)。本提示词里的日系社交参照一律换算成英语圈对应物:「既読無視」= left on read,同样是最高级的沉默。不要输出 zh 字段。',
         ja_zh: '消息用地道的日文网聊口语书写(LINE 风、多省略;敬语/常体与役割語严格贴合角色身份与关系亲疏),每条同时给出中文翻译字段 zh。',
     },
+    // M14(任务书-M14 §2.1):通讯录登记(PROMPT_R)专用档——只登记人不写消息,contacts/name/relation
+    // 三个字段都要照世界观写法书写,写法与 messenger 档同源但独立一份,改一处不悄悄漂到消息生成上。
+    contacts: {
+        ja: '联系人名、群名与成员名用这个故事世界里的表记书写(日系原作用日文;故事人物的名字照【人物设定参考】与原著写,正文没写到的人起贴合世界的名字);relation 用中文一句话说明关系。不要输出 zh 字段。',
+        en: '联系人名、群名与成员名用英语圈的表记书写(故事人物的名字照【人物设定参考】与原著写,正文没写到的人起贴合世界的名字);relation 用中文一句话说明关系。本提示词里的日系参照(家族群、同期等)一律换算成英语圈对应物。不要输出 zh 字段。',
+        ja_zh: '联系人名、群名与成员名用这个故事世界里的表记书写(日系原作用日文;故事人物的名字照【人物设定参考】与原著写,正文没写到的人起贴合世界的名字);relation 用中文一句话说明关系。不要输出 zh 字段。',
+    },
     forum: {
         ja: '标题与正文用地道的日本匿名揭示板网语书写(含 w、草、颜文字与板上黑话;这个掲示板属于故事世界里的一个共同体)。不要输出 zh 字段。',
         en: '标题与正文用地道的英语网络论坛口语书写(公司或学校内部论坛那一挂(Slack 式内部黑话+Reddit 式玩梗):玩梗、缩写、引用讽刺,shitpost 与认真长回复并存;这个掲示板属于故事世界里的一个共同体)。本提示词里的日系揭示板参照(5ch、w/草、名無し、役割語等)一律换算成英语圈对应物;住民网名用英语圈习惯,口癖照样跨帖一致。不要输出 zh 字段。',
@@ -360,9 +389,9 @@ const LANG_RULE = {
     // M13(任务书-M13 §2.3):表板改実名制后不再是匿名揭示板,F/G 走这一档;F2/G2(裏サイト)
     // 性质不变,仍走上面的 forum 档——两条 lane 的语域从此彻底分开,同一个 scope 名字不再共用。
     forumOmote: {
-        ja: '标题与正文用地道的日本語グループウェア掲示板/連絡板的文体书写(丁寧語、件名风的标题、社内・校内・町内的定型句、真名+所属;这个掲示板属于故事世界里的一个共同体)。不要输出 zh 字段。',
-        en: '标题与正文用地道的英语公司/学校内部论坛(Slack・Teams・intranet board 那一挂)的实名文体书写:礼貌而职业,first name + team,短句、少玩梗;本提示词里的日系参照(グループウェア、丁寧語、件名、役職等)一律换算成英语圈对应物。不要输出 zh 字段。',
-        ja_zh: '标题与正文用地道的日本語グループウェア掲示板/連絡板的文体书写(丁寧語、件名风的标题、社内・校内・町内的定型句、真名+所属;这个掲示板属于故事世界里的一个共同体),每条同时给出中文翻译字段 zh。',
+        ja: '标题与正文用地道的日本語実名掲示板的雑談文体书写(敬体寄りのカジュアル、生活の話題、真名+所属;社内 SNS の雑談チャンネル・校内掲示板・町内掲示板那一挂,这个掲示板属于故事世界里的一个共同体)。不要输出 zh 字段。',
+        en: '标题与正文用地道的英语公司/学校内部社交板(Slack #random、Teams social channel、campus board 那一挂)的实名文体书写:friendly and casual but still workplace-appropriate,first name + team,聊的是生活不是工作;本提示词里的日系参照(社内 SNS、敬体、恋バナ、落とし物等)一律换算成英语圈对应物。不要输出 zh 字段。',
+        ja_zh: '标题与正文用地道的日本語実名掲示板的雑談文体书写(敬体寄りのカジュアル、生活の話題、真名+所属;社内 SNS の雑談チャンネル・校内掲示板・町内掲示板那一挂,这个掲示板属于故事世界里的一个共同体);每条同时给出中文翻译字段 zh。',
     },
     sns: {
         ja: '推文与回复用地道的日本推特口语书写(短文、体言止め、主语省略、深夜のテンション/病みツイ、限界化词汇、跟风梗;这个 SNS 属于故事世界)。不要输出 zh 字段。',
@@ -430,7 +459,7 @@ const COUNT_RULE_DEFAULT = {
 function countRule(scope, n) {
     if (!Number.isFinite(n) || n <= 0) return COUNT_RULE_DEFAULT[scope];
     if (scope === 'forumOmote') {
-        return ` ${n} 楼新回复——这是用户点的数量,请给足;可以让不同的人从不同立場接话、确认细节、客气地提出不同意见,但不要为了凑数注水。`;
+        return ` ${n} 楼新回复——这是用户点的数量,请给足;可以让不同的人从不同角度接话、追问细节、补自己的推荐或感想,但不要为了凑数注水。`;
     }
     if (scope === 'forum') {
         return ` ${n} 楼新回复——这是用户点的数量,请给足;可以让不同住民从不同角度接话、互相抬杠或歪楼,但不要为了凑数注水。`;
@@ -442,6 +471,24 @@ function countRule(scope, n) {
         return ` ${n} 条新消息——这是用户点的数量,请给足;可以由不同成员分担,允许有人潜水,不必人人发言。`;
     }
     return ` ${n} 条新消息——这是用户点的数量,请给足;可以是一方连发,也可以是一来一往。`;
+}
+
+// ── M14(任务书-M14 §2.3):帖数点单——论坛列表页头部的 −/+ 决定一次「刷新」出几个新帖(表裏共用
+// 一个数),写法与 COUNT_RULE/countRule 同一套占位替换工法(原文一字不动),只是这里点的是「几个新帖」
+// 不是「几楼新回复」,与帖内盖楼的 {{COUNT_RULE}} 是两回事,互不相扰。
+const THREAD_COUNT_RULE_DEFAULT = {
+    forumOmote: ' 2〜4 个新帖(每帖 0〜5 楼)',
+    forum: ' 2〜3 个新帖(每帖 0〜6 楼)',
+};
+function threadCountRule(scope, n) {
+    if (!Number.isFinite(n) || n <= 0) return THREAD_COUNT_RULE_DEFAULT[scope];
+    if (scope === 'forumOmote') {
+        return ` ${n} 个新帖(每帖 0〜5 楼)——这是用户点的数量,请给足;每帖话题各不相同,不为凑数注水`;
+    }
+    if (scope === 'forum') {
+        return ` ${n} 个新帖(每帖 0〜6 楼)——这是用户点的数量,请给足;每帖话题各不相同,不为凑数注水`;
+    }
+    return THREAD_COUNT_RULE_DEFAULT[scope];
 }
 
 // ── 输出预算 ──
@@ -1007,6 +1054,9 @@ function buildWorldDigestText(world) {
             : (world.contacts.get(t.contactId)?.name || null);
         if (!label) continue;
         parts.push(`\n[线程 ${label}(id=${t.threadId})]`);
+        // M14:通讯录登记只登记人不写消息,登记过但还没聊过的人要让模型看得出「有人、没聊」——
+        // 不然这条空线程和「压根没有这个人」在 digest 里长得一模一样。
+        if (!t.messages.length) parts.push('(还没有聊天记录)');
         if (t.summaries.length) parts.push(`既往摘要: ${t.summaries.map(s => s.text).join(' / ')}`);
         const nameOf = senderNameFn(world, t);
         for (const m of t.messages.slice(-6)) {
@@ -1090,7 +1140,7 @@ function claimSpeaker(world, obj, { realName = false } = {}) {
 }
 
 function buildForumDigestText(world) {
-    if (!world.boards.size) return '(掲示板是空的,首次生成:请先创建 3〜4 个贴合这个共同体的板块,并注册首批実名名册——属于这个共同体的主线人物及其身边人为先,再补几个正文没写到的同僚;每一楼都必须是名册里的人)';
+    if (!world.boards.size) return '(掲示板是空的,首次生成:请先创建 3〜4 个贴合这个共同体的生活板块,并注册首批実名名册——属于这个共同体的主线人物及其身边人为先,再补几个正文没写到的同僚;每一楼都必须是名册里的人)';
     const parts = [];
     if (world.community) parts.push(communityDigestLine(world.community));
     if (world.worldClock) parts.push(worldClockLine(world));
@@ -1600,6 +1650,95 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
     return { ok: true, changed: true, added: addedCount, touchedThreads: [...touchedThreads] };
 }
 
+// ── M14:通讯录先行登记——认主那一刻就按【人物设定参考】把主人已认识的人与群登记进手机
+//    (只登记人,不写消息);设置里「生成更多联系人和群组」可再挖一批,人际网挖尽就如实返回空。
+//    不碰任何水位:它不是「刷新」,登记完之后 messenger 的首次刷新照样按正文出消息。 ──
+async function runContactsGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags }) {
+    await ensureRegexEngine();
+    const world = foldWorld(await store.getEntriesForWorld(worldKey));
+    const charName = owner || ctx.name2 || '主角';
+    // 点名警示同 runMainGeneration 那段一字不改——通讯录登记同样要防模型把叙事另一方先验当熟人。
+    const userSideName = (ctx.name1 || '').trim();
+    const caution = (userSideName && userSideName !== charName)
+        ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。除非剧情明确显示 TA 已与「${charName}」相识并交换了联系方式,否则「${userSideName}」不得出现在这部手机里;若现有联系人名册中没有 TA,大概率就是还不该有。\n\n`
+        : '';
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
+    const notes = await buildInjectedNotes(ctx);
+    // 正文只作背景(同 runThreadContinue 的 recent):这一趟不是在回应某一层新进展,是把「此刻
+    // 已经存在」的人挖出来,不需要画新进展的分界线。
+    const recent = buildFloorSection(ctx, { newFrom: null, floorWindow: floorWindow ?? 0, excludeTags, background: true });
+    const userContent = `${caution}${castRef}${notes.text}${recent}【手机当前状态】\n${buildWorldDigestText(world)}`;
+    logContextShape('通讯录登记', userContent, notes.keys);
+    const systemPrompt = PROMPT_R.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('contacts', language));
+
+    const epoch = store.getRollbackEpoch();
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
+    const contactsOk = Array.isArray(parsed?.contacts);
+    const groupsOk = Array.isArray(parsed?.groups);
+    const exhaustedOk = typeof parsed?.exhausted === 'boolean';
+    if (!parsed || (!contactsOk && !groupsOk && !exhaustedOk)) return { ok: false, error: 'parse_failed' };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
+
+    // 登记的是「故事开始之前就躺在手机里的人」,账落在第 0 楼:回滚只认 sourceFloor(rollback.js
+    // 的 delete-by-floor),若落在当前末层,她 swipe 一次末层整份名册就会被当成那层的余波抹掉——
+    // 名册不是任何一层正文激起的水纹,不该跟着某一层倒带。聊天为空(认主时正文还是 0 楼)也允许登记。
+    const sourceFloor = 0;
+    let contactsAdded = 0, groupsAdded = 0, membersAdded = 0;
+
+    for (const c of contactsOk ? parsed.contacts : []) {
+        if (!c?.contactId || !c?.name) continue;
+        const contactId = String(c.contactId);
+        if (world.contacts.has(contactId)) continue; // 已登记过,绝不重复登记
+        if (!allowUserContact && isUserSide(c.name, ctx)) {
+            console.warn('[Orrery] 已拦下叙事另一方越界进通讯录:', c.name);
+            continue;
+        }
+        const payload = {
+            contactId, name: String(c.name), relation: c.relation || '',
+            monogram: monogramFor(c.name), color: colorForContact(contactId),
+        };
+        const added = await store.addEntry({ worldKey, sourceFloor, app: 'messenger', type: 'contact', payload });
+        world.contacts.set(contactId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
+        contactsAdded++;
+    }
+
+    for (const g of groupsOk ? parsed.groups : []) {
+        if (!g?.groupId || !g?.name) continue;
+        const groupId = String(g.groupId);
+        const members = (Array.isArray(g.members) ? g.members : [])
+            .filter(m => m?.id && m?.name)
+            .filter(m => allowUserContact || !isUserSide(m.name, ctx))
+            .map(m => ({ id: String(m.id), name: String(m.name) }));
+        const existing = world.groups.get(groupId);
+        if (existing) {
+            // 补员:新成员按 id 去重并入已有 members(旧成员顺序不动、新成员追加在后),名字沿用
+            // 旧群名(模型给了不同名字也不改名);fold 天然「后写覆盖」,只有真的有新成员时才写一条
+            // 新的 group 条目,payload 整份=合并后的完整成员表(回滚时旧条目仍在,零改动 world.js)。
+            const existingIds = new Set((existing.members || []).map(m => m.id));
+            const newMembers = members.filter(m => !existingIds.has(m.id));
+            if (newMembers.length) {
+                const mergedMembers = [...(existing.members || []), ...newMembers];
+                const payload = { groupId, name: existing.name, members: mergedMembers };
+                const added = await store.addEntry({ worldKey, sourceFloor, app: 'messenger', type: 'group', payload });
+                world.groups.set(groupId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
+                membersAdded += newMembers.length;
+            }
+        } else if (members.length >= 2) { // 新群:一个人不成群,同 runMainGeneration 的判据
+            const payload = { groupId, name: String(g.name), members };
+            const added = await store.addEntry({ worldKey, sourceFloor, app: 'messenger', type: 'group', payload });
+            world.groups.set(groupId, { ...payload, sourceFloor: added.sourceFloor, ts: added.ts });
+            groupsAdded++;
+        }
+    }
+
+    return {
+        ok: true, changed: true,
+        added: contactsAdded + groupsAdded + membersAdded,
+        contactsAdded, groupsAdded, membersAdded,
+        exhausted: parsed.exhausted === true,
+    };
+}
+
 // ── 线程内续聊:定向生成,允许返回空。──
 
 async function runThreadContinue(ctx, store, { worldKey, threadId, floorWindow, profileId, customApi, owner, language, excludeTags, count }) {
@@ -1697,7 +1836,7 @@ async function maybeSummarizeThread(ctx, store, { worldKey, threadId, summaryThr
 
 // ── 论坛主生成:独立水位、独立触发(app 内「刷新」),消化 newBoards/newResidents/newThreads/newReplies。──
 
-async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags }) {
+async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags, count }) {
     await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'forum');
     const tip = ctx.chat.length - 1;
@@ -1720,7 +1859,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     const notes = await buildInjectedNotes(ctx);
     const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}${buildOwnerInnerStateText(world)}【论坛当前状态】\n${buildForumDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
     logContextShape('论坛生成', userContent, notes.keys);
-    const systemPrompt = PROMPT_F.replaceAll('{{char}}', charName).replaceAll('{{community}}', community.name).replaceAll('{{LANG_RULE}}', langRule('forumOmote', language));
+    const systemPrompt = PROMPT_F.replaceAll('{{char}}', charName).replaceAll('{{community}}', community.name).replaceAll('{{LANG_RULE}}', langRule('forumOmote', language)).replaceAll('{{THREAD_COUNT_RULE}}', threadCountRule('forumOmote', count));
 
     // 回滚纪元闸(v0.11.3 回填):六个 app 主生成里论坛是最后一个补上的——生成期间用户删楼/swipe,
     // 回滚代表更晚的意图,整批作废,否则末尾 setWatermark 会把刚夹紧的水位重新拍高。
@@ -1875,7 +2014,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
 // ── M12:裏サイト主生成——骨架照抄 runForumMainGeneration,独立水位 forumUra,与表板共用
 //    同一批 forumThreads/所属推断,只是消化路径全走 anon(裏没有固定住民这回事)。──
 
-async function runForumUraMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags }) {
+async function runForumUraMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags, count }) {
     await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'forumUra');
     const tip = ctx.chat.length - 1;
@@ -1898,7 +2037,7 @@ async function runForumUraMainGeneration(ctx, store, { worldKey, floorWindow, pr
     const notes = await buildInjectedNotes(ctx);
     const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}${buildOwnerInnerStateText(world)}【裏サイト当前状态】\n${buildForumUraDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
     logContextShape('裏サイト生成', userContent, notes.keys);
-    const systemPrompt = PROMPT_F2.replaceAll('{{char}}', charName).replaceAll('{{community}}', community.name).replaceAll('{{LANG_RULE}}', langRule('forum', language));
+    const systemPrompt = PROMPT_F2.replaceAll('{{char}}', charName).replaceAll('{{community}}', community.name).replaceAll('{{LANG_RULE}}', langRule('forum', language)).replaceAll('{{THREAD_COUNT_RULE}}', threadCountRule('forum', count));
 
     // 回滚纪元闸 + anchor 钳法,照 runForumMainGeneration 抄——生成期间用户删楼/swipe/回滚,
     // 整批作废;新批 worldTime 严格晚于 worldClock,不会因为正文日期含糊而插到旧批之前。
@@ -2976,11 +3115,12 @@ async function runAlmanacPageGeneration(ctx, store, { worldKey, itemId, floorWin
     return { ok: true, changed: true, added: 1 };
 }
 
-// ── 对外入口:UI 只认这十四个。messenger 两个内部自动接总结检查;forum/sns/browser/gallery/memo
+// ── 对外入口:UI 只认这十五个。messenger 两个内部自动接总结检查;forum/sns/browser/gallery/memo
 //    没有总结机制(§2 拍板不用改 PROMPT_C)。browser/gallery/memo 各只有一个入口——v1 没有详情页
 //    续写,自然也没有续写;almanac 两个入口(刷新批量生成条目/点开条目单独生成页面,页面命中
 //    缓存时 runAlmanacPageGeneration 早退,不花一分 token);M12 裏サイト多出的 generateMoreForumUra
-//    是第十四个——continueForumThread 不变,内部按 thread.side 分道(见 runForumThreadContinue)。──
+//    是第十四个;M14 通讯录登记的 generateContacts 是第十五个——它不是「刷新」,不接总结检查,
+//    也不碰 messenger 的水位(见 runContactsGeneration 长注)。──
 
 export async function generateMore(ctx, store, opts) {
     const result = await runMainGeneration(ctx, store, opts);
@@ -2990,6 +3130,10 @@ export async function generateMore(ctx, store, opts) {
         }
     }
     return result;
+}
+
+export async function generateContacts(ctx, store, opts) {
+    return await runContactsGeneration(ctx, store, opts);
 }
 
 export async function continueThread(ctx, store, opts) {

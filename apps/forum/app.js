@@ -41,8 +41,9 @@ const THREADS_PER_PAGE = 10;
  * @param seen 「我看过了」水位表:某帖没有记录=她从没点进去过=新帖(挂 NEW),有记录就比对回复数
  * @param justUpdated 刚这一次刷新里新增/被盖楼的 threadId 集合——只用来播一次入场动效
  * @param page 1 起的页码;越界时钳回有效范围(反悔删帖把最后一页删空也不会白屏)
+ * @param threadBatch M14:头部 −/+ 决定一次「刷新」出几个新帖(表裏共用一个数,钳制在 shell 的 doStepper)
  */
-export function renderForumListHtml({ world, busy, side = 'omote', page = 1, seen = {}, justUpdated = null }) {
+export function renderForumListHtml({ world, busy, side = 'omote', page = 1, seen = {}, justUpdated = null, threadBatch = 3 }) {
     const boards = [...world.boards.values()];
     const isUra = side === 'ura';
     const threads = [...world.forumThreads.values()]
@@ -94,10 +95,18 @@ export function renderForumListHtml({ world, busy, side = 'omote', page = 1, see
         <button class="or-forum-page-btn next" data-action="forum-page" data-page="${curPage + 1}" ${curPage >= totalPages ? 'disabled' : ''}>${ICON_BACK}</button>
     </div>` : '';
 
+    // M14:帖数点单——放在「刷新」之前,决定这次「刷新」要出几个新帖(表裏共用一个数)。
+    const batch = `<div class="or-batch">
+        <button data-action="stepper" data-field="forumThreadBatch" data-delta="-1" ${busy ? 'disabled' : ''}>${ICON_MINUS}</button>
+        <span class="or-batch-value">${threadBatch}</span>
+        <button data-action="stepper" data-field="forumThreadBatch" data-delta="1" ${busy ? 'disabled' : ''}>${ICON_PLUS}</button>
+    </div>`;
+
     return `
         <div class="or-header">
             <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
             <span class="or-header-title">${escapeHtml(headerTitle)}</span>
+            ${batch}
             <button class="or-pill-btn small" data-action="forum-refresh" ${busy ? 'disabled' : ''}>${busy ? genSpinnerHtml() : '刷新'}</button>
         </div>
         ${legacyNote}

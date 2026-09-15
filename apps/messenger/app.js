@@ -72,7 +72,7 @@ export function renderThreadListHtml({ world, busy, seen = {}, justUpdated = nul
                 ${unread ? `<div class="or-unread-badge">${unread > 99 ? '99+' : unread}</div>` : ''}
             </button>`;
         }).join('')}</div>`
-        : `<div class="or-empty">还没有联系人。点上面「刷新」,让手机随故事的进展苏醒过来。</div>`;
+        : `<div class="or-empty">还没有联系人。设置里「生成更多联系人和群组」先登记人,或点上面「刷新」让手机随故事的进展苏醒过来。</div>`;
 
     return `
         <div class="or-header">

@@ -442,15 +442,17 @@ export async function deleteForumAll(worldKey) {
 }
 
 /**
- * M13(任务书-M13 §2.4)「论坛重来」:旧世界升级到実名制后,清空表板与裏サイト的帖子、回复、
- * 草稿与名册(type ∈ forum_thread/forum_reply/forum_draft/resident),保留板块(forum_board)与
- * 所属(community)——比 deleteForumAll 窄一圈:那个连板块和所属一起清、要重新推断所属,这个把
- * 「组织的架子」留着,只清「架子里发生过的事」,按実名制从零开始又不必重新烧一次所属推断。
+ * M13(任务书-M13 §2.4)「论坛重来」:清空表板与裏サイト的帖子、回复、草稿、名册与板块
+ * (type ∈ forum_thread/forum_reply/forum_draft/resident/board),保留所属(community)——
+ * 比 deleteForumAll 窄一圈:那个连所属也一起清、要重新推断所属,这个把「这是哪个共同体」
+ * 留着,只清「架子里发生过的事」,不必重新烧一次所属推断。
+ * M14(任务书-M14 §2.5):板块(board)从「保留」改成「一起清」——表板改版后旧板块名
+ * (連絡系那一挂)与新规矩(生活板)不合,重来时一起清,下次「刷新」按新规矩重建板块。
  */
 export async function deleteForumThreadsOnly(worldKey) {
     if (!worldKey) return;
     rollbackEpoch++; // 同其他删除:生成中途被清空,整批作废
-    const CLEAR_TYPES = new Set(['forum_thread', 'forum_reply', 'forum_draft', 'resident']);
+    const CLEAR_TYPES = new Set(['forum_thread', 'forum_reply', 'forum_draft', 'resident', 'board']);
     const db = await openDB();
     await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_LEDGER, 'readwrite');

@@ -125,8 +125,10 @@
                 含「静态快照」→网页快照(M,点开浏览器历史里的条目触发,返回整页 HTML)/
                 含「里点开了一个条目」→门户条目页面(Q,点开条目触发,返回整页 HTML)/
                 含「门户上自然会新增的条目与状态流转」→门户主生成(P,首刷/二刷两版按板块表是否为空自动切换)/
-                含「续写」→消息续聊(B/B_GROUP)/否则→消息主生成(A)。
-                SNS/论坛/消息/浏览器/相册/备忘录/门户这套流程都从手机内点「刷新」「生成更多」/「生成回复」触发,不用额外按钮。<br>
+                含「续写」→消息续聊(B/B_GROUP)/含「手机通讯录」→通讯录登记(R,M14,排在默认档之前的最后一条;
+                按【手机当前状态】digest 内容分三档:首次/追加补员/挖尽,不用计数器,细节见 buildFixtureR)/否则→消息主生成(A)。
+                SNS/论坛/消息/浏览器/相册/备忘录/门户这套流程都从手机内点「刷新」「生成更多」/「生成回复」触发,不用额外按钮;
+                通讯录登记(R)则由「认主」自动触发一次、或设置页「生成更多联系人和群组」按钮触发。<br>
                 语言开关(日本語/English/日中双语)直接在手机「设置」页切——fixture 会读同一份 extensionSettings,
                 切到日中双语后返回的消息/帖子/推文会带 zh 字段。
             </p>
@@ -154,6 +156,12 @@
             <legend>7. M13 断言:表板実名制(照任务书-M13 §5 的七条对应,涉生成/账本的用真实 IndexedDB 加临时 worldKey 跑完即清)</legend>
             <button class="mock-btn" id="runM13AssertBtn">运行全部断言</button>
             <div id="m13AssertResult">(未运行)</div>
+        </fieldset>
+
+        <fieldset>
+            <legend>8. M14 断言:通讯录与生活板(照任务书-M14 §6 的六组对应,涉生成/账本的用真实 IndexedDB 加临时 worldKey 跑完即清)</legend>
+            <button class="mock-btn" id="runM14AssertBtn">运行全部断言</button>
+            <div id="m14AssertResult">(未运行)</div>
         </fieldset>
 
         <fieldset>
@@ -206,6 +214,7 @@
     import { computeWorldKey, inheritedWorldKey, foldWorld, hasUnseenInApp, seenKeyForAlmanac, latestTsOfAlmanac, shortIdFor } from '../core/world.js';
     import { sanitizeSnapshotHtml } from '../apps/browser/app.js';
     import { renderForumListHtml, renderForumThreadHtml } from '../apps/forum/app.js';
+    import { renderThreadListHtml } from '../apps/messenger/app.js';
     import { escapeHtml } from '../core/escape.js';
     import {
         buildForumExportHtml, buildMessengerExportHtml, buildWebExportHtml, buildAlmanacExportHtml,
@@ -312,6 +321,50 @@
         ] };
     }
     const FIXTURE_C = '愛子与主角保持日常联系，语气轻松，暂无未解决话题，情绪基调平稳。';
+
+    // M14:通讯录登记(PROMPT_R)。按【手机当前状态】digest 内容分三档(不用计数器,同 buildFixtureL
+    // 系列首刷/二刷按 digest 文案切换的先例):
+    //   ① 首次(digest 含「手机是空的」):4 位联系人(含一个 c_user_x——ctx.name1 现取,专供
+    //      「user 硬防线」断言用)+ 1 个 6 人的家族群(其中 m_user 同样是 ctx.name1 现取)。
+    //   ② 追加(digest 已含 g_family 但不含 m_itoko):追加 1 位联系人 + 给 g_family 补两个成员
+    //      (m_itoko 是新成员、m_papa 是已有成员——验证「新增按 id 去重、已有的不重复」);故意把
+    //      群名改成「家族(改名テスト)」,验证补员时名字不会被模型的新名字带偏。
+    //   ③ 否则(挖尽):exhausted:true,不再新增任何人。
+    function buildFixtureR(userContent) {
+        const uc = userContent || '';
+        if (uc.includes('手机是空的')) {
+            return {
+                contacts: [
+                    { contactId: 'c_mama', name: '母', relation: '母亲' },
+                    { contactId: 'c_tencho', name: '店長', relation: '打工的店长' },
+                    { contactId: 'c_aiko', name: '愛子', relation: '高中同班同学' },
+                    { contactId: 'c_user_x', name: ctx.name1, relation: '越界テスト' },
+                ],
+                groups: [
+                    { groupId: 'g_family', name: '家族', members: [
+                        { id: 'c_mama', name: '母' },
+                        { id: 'm_papa', name: '父' },
+                        { id: 'm_ane', name: '姉' },
+                        { id: 'm_oba', name: '叔母' },
+                        { id: 'm_jii', name: '祖父' },
+                        { id: 'm_user', name: ctx.name1 },
+                    ] },
+                ],
+                exhausted: false,
+            };
+        }
+        if (uc.includes('g_family') && !uc.includes('m_itoko')) {
+            return {
+                contacts: [{ contactId: 'c_senpai', name: '先輩', relation: '打工时认识的前辈' }],
+                groups: [{ groupId: 'g_family', name: '家族(改名テスト)', members: [
+                    { id: 'm_itoko', name: 'いとこ' },
+                    { id: 'm_papa', name: '父' },
+                ] }],
+                exhausted: false,
+            };
+        }
+        return { contacts: [], groups: [], exhausted: true };
+    }
 
     // 所属コミュニティ推断(PROMPT_O,M5 起论坛/浏览器都要靠它才能生成)。这里从没配过 fixture——
     // 此前一直悄悄落到最后的默认档(buildFixtureA,没有 name 字段),ensureCommunity 每次都拿到
@@ -693,6 +746,10 @@
     let capturedUraUserContent = null;
     // M12.2(v0.22.2)断言用:裏盖楼(G2)那一路也存一份 userContent——验证材料末尾真的再给了一遍【本帖的主題】。
     let capturedUraG2UserContent = null;
+    // M14 断言④(帖数点单)用:表/裏主生成这两路各存一份 systemPrompt——验证 {{THREAD_COUNT_RULE}}
+    // 占位真的被换成了「N 个新帖」,侧信道写法照 capturedUraUserContent。
+    let capturedOmoteSystemPrompt = null;
+    let capturedUraSystemPrompt = null;
 
     function mockGenerate(systemPrompt, userContent) {
         if (document.getElementById('fxBroken').checked) return '(不知道你在说什么，我拒绝回答。)';
@@ -715,14 +772,18 @@
         }
         // M7a:PROMPT_F 已从「匿名论坛」改写成「内部掲示板」(v0.15 起),这里的匹配词早就该跟着换了
         // ——旧词从没命中过,论坛主生成 fixture 一直悄悄落到最后的默认档(buildFixtureA),这次顺手修。
+        // M14 断言④(帖数点单)用:每次都存一份 systemPrompt——侧信道写法照 capturedUraUserContent。
         if (systemPrompt.includes('手机里的内部掲示板')) {
+            capturedOmoteSystemPrompt = systemPrompt;
             const body = buildFixtureF();
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
         // M12:裏サイト主生成(F2)。"请推演裏サイト上自然会出现的新动静"是 PROMPT_F2 独有的措辞,
         // 放在「手机里的内部掲示板」前后都行(两条互不重叠)——顺手把 userContent 存一份供断言⑥用。
+        // M14 断言④用:systemPrompt 也存一份,同上。
         if (systemPrompt.includes('请推演裏サイト上自然会出现的新动静')) {
             capturedUraUserContent = userContent;
+            capturedUraSystemPrompt = systemPrompt;
             const body = buildFixtureF2();
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
@@ -778,6 +839,12 @@
         }
         if (systemPrompt.includes('续写')) {
             const body = emptyMore ? { messages: [] } : buildFixtureB();
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        // M14:通讯录登记(R)。"手机通讯录"是 PROMPT_R 独有的措辞——PROMPT_A 提到的是「手机」与
+        // 「通讯录」两处分开的词,不会撞到这个连写的匹配串。放在默认档之前的最后一条。
+        if (systemPrompt.includes('手机通讯录')) {
+            const body = buildFixtureR(userContent);
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
         const body = buildFixtureA();
@@ -1617,7 +1684,7 @@
     }
 
     // ⑦ 论坛重来:种表帖 + 裏帖 + 住民 + 板块 + 所属后调 deleteForumThreadsOnly,fold 后
-    //    forumThreads/residents 应清空,boards 与 community 应保留,两个水位复位为 -1。
+    //    forumThreads/residents/boards 应清空(M14 起板块一起清),community 应保留,两个水位复位为 -1。
     async function assertForumRestart() {
         const wk = `__m13_assert_restart_${Date.now()}`;
         await store.addEntry({
@@ -1644,7 +1711,7 @@
         const out = [
             ['forumThreads 清空', folded.forumThreads.size === 0],
             ['residents 清空', folded.residents.size === 0],
-            ['boards 仍在', folded.boards.has('b_r')],
+            ['boards 已清空', folded.boards.size === 0],
             ['community 仍在', !!folded.community],
             ['watermark forum 复位为 -1', await store.getWatermark(wk, 'forum') === -1],
             ['watermark forumUra 复位为 -1', await store.getWatermark(wk, 'forumUra') === -1],
@@ -1682,6 +1749,199 @@
         runM13Assertions().catch(err => {
             document.getElementById('m13AssertResult').textContent = `断言运行出错:${err?.message || err}`;
             console.error('[M13 断言]', err);
+        });
+    });
+
+    // ── M14 §6:断言面板。①②共用同一个临时世界(同一世界连调三次:首次登记→追加与补员→挖尽);
+    //    ③新开一个临时世界验证 allowUserContact:true 时 user 硬防线放行;④侧信道捕获
+    //    capturedOmoteSystemPrompt/capturedUraSystemPrompt(同 capturedUraUserContent 的先例);
+    //    ⑤⑥是纯渲染/常量断言,不碰账本。──
+
+    // ①②通讯录初始化 + 追加与补员:同一个临时世界连调三次生成。
+    async function assertContactsInitAndTopup() {
+        const wk = `__m14_assert_contacts_${Date.now()}`;
+        await store.setOwner(wk, 'テスト主人');
+
+        // 第一次:首次登记(allowUserContact:false——c_user_x/m_user 应被 user 硬防线拦下)。
+        const r1 = await generator.generateContacts(ctx, store, {
+            worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false,
+        });
+        const folded1 = foldWorld(await store.getEntriesForWorld(wk));
+        const family1 = folded1.groups.get('g_family');
+        const html1 = renderThreadListHtml({ world: folded1, busy: false, worldNow: null });
+        const initChecks = [
+            ['生成成功', !!r1?.ok],
+            ['contacts 含 c_mama/c_tencho/c_aiko', folded1.contacts.has('c_mama') && folded1.contacts.has('c_tencho') && folded1.contacts.has('c_aiko')],
+            ['不含 c_user_x(user 硬防线默认拦下)', !folded1.contacts.has('c_user_x')],
+            ['g_family 存在、members 长度 5 且没有一个 name===ctx.name1', !!family1 && family1.members.length === 5 && !family1.members.some(m => m.name === ctx.name1)],
+            ['c_mama 线程 messages.length===0', folded1.threads.get('c_mama')?.messages.length === 0],
+            ['messenger 水位仍为 -1(登记不是刷新)', await store.getWatermark(wk, 'messenger') === -1],
+            ['线程列表 HTML 含「(暂无消息)」', html1.includes('(暂无消息)')],
+            ['线程列表 HTML 含「家族(5)」', html1.includes('家族(5)')],
+            ['result.contactsAdded===3', r1?.contactsAdded === 3],
+            ['result.groupsAdded===1', r1?.groupsAdded === 1],
+            ['result.membersAdded===0', r1?.membersAdded === 0],
+        ];
+
+        // 第二次:同一世界再调一次——追加联系人 + 给已有群补员(不改名)。
+        const r2 = await generator.generateContacts(ctx, store, {
+            worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false,
+        });
+        const folded2 = foldWorld(await store.getEntriesForWorld(wk));
+        const family2 = folded2.groups.get('g_family');
+        const topupChecks = [
+            ['生成成功', !!r2?.ok],
+            ['c_senpai 落账', folded2.contacts.has('c_senpai')],
+            ['g_family members 长度 6(m_itoko 追加、m_papa 未重复)', !!family2 && family2.members.length === 6],
+            ['群名仍为「家族」(补员不改名)', family2?.name === '家族'],
+            ['result.membersAdded===1', r2?.membersAdded === 1],
+            ['result.exhausted===false', r2?.exhausted === false],
+        ];
+
+        // 第三次:人际网挖尽——如实返回空,contacts/groups 数量不变。
+        const contactsBefore = folded2.contacts.size, groupsBefore = folded2.groups.size;
+        const r3 = await generator.generateContacts(ctx, store, {
+            worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false,
+        });
+        const folded3 = foldWorld(await store.getEntriesForWorld(wk));
+        topupChecks.push(
+            ['第三次:result.added===0', r3?.added === 0],
+            ['第三次:result.exhausted===true', r3?.exhausted === true],
+            ['第三次:contacts 数量不变', folded3.contacts.size === contactsBefore],
+            ['第三次:groups 数量不变', folded3.groups.size === groupsBefore],
+        );
+
+        await store.wipeWorld(wk);
+        return { initChecks, topupChecks };
+    }
+
+    // ③ user 硬防线开关:新临时世界 allowUserContact:true 首次登记 → c_user_x 落账、g_family members 长度 6。
+    async function assertContactsUserSideAllowed() {
+        const wk = `__m14_assert_contacts_allow_${Date.now()}`;
+        await store.setOwner(wk, 'テスト主人');
+        const result = await generator.generateContacts(ctx, store, {
+            worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: true,
+        });
+        const folded = foldWorld(await store.getEntriesForWorld(wk));
+        const family = folded.groups.get('g_family');
+        const out = [
+            ['生成成功', !!result?.ok],
+            ['c_user_x 落账(allowUserContact:true 时不拦)', folded.contacts.has('c_user_x')],
+            ['g_family members 长度 6', !!family && family.members.length === 6],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
+    // ④ 帖数点单(表/裏):generateMoreForum/generateMoreForumUra 传 count 时 {{THREAD_COUNT_RULE}}
+    //    换成「N 个新帖」,不传时落默认档——各自开临时世界跑,验证完即清。
+    async function assertThreadCountRule() {
+        const out = [];
+
+        const wk1 = `__m14_assert_tc_omote_n_${Date.now()}`;
+        await store.setOwner(wk1, 'テスト主人');
+        capturedOmoteSystemPrompt = null;
+        await generator.generateMoreForum(ctx, store, {
+            worldKey: wk1, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false, count: 5,
+        });
+        const sp1 = capturedOmoteSystemPrompt || '';
+        out.push(['表·count:5 → systemPrompt 含「 5 个新帖」', sp1.includes(' 5 个新帖')]);
+        out.push(['表·count:5 → systemPrompt 不含未替换的 {{', !sp1.includes('{{')]);
+        await store.wipeWorld(wk1);
+
+        const wk2 = `__m14_assert_tc_omote_default_${Date.now()}`;
+        await store.setOwner(wk2, 'テスト主人');
+        capturedOmoteSystemPrompt = null;
+        await generator.generateMoreForum(ctx, store, {
+            worldKey: wk2, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false,
+        });
+        const sp2 = capturedOmoteSystemPrompt || '';
+        out.push(['表·不传 count → systemPrompt 含默认档「2〜4 个新帖」', sp2.includes('2〜4 个新帖')]);
+        await store.wipeWorld(wk2);
+
+        const wk3 = `__m14_assert_tc_ura_n_${Date.now()}`;
+        await store.setOwner(wk3, 'テスト主人');
+        capturedUraSystemPrompt = null;
+        await generator.generateMoreForumUra(ctx, store, {
+            worldKey: wk3, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false, count: 4,
+        });
+        const sp3 = capturedUraSystemPrompt || '';
+        out.push(['裏·count:4 → systemPrompt 含「 4 个新帖」', sp3.includes(' 4 个新帖')]);
+        await store.wipeWorld(wk3);
+
+        const wk4 = `__m14_assert_tc_ura_default_${Date.now()}`;
+        await store.setOwner(wk4, 'テスト主人');
+        capturedUraSystemPrompt = null;
+        await generator.generateMoreForumUra(ctx, store, {
+            worldKey: wk4, floorWindow: 0, profileId: null, customApi: { enabled: false },
+            owner: 'テスト主人', language: 'ja', excludeTags: '', allowUserContact: false,
+        });
+        const sp4 = capturedUraSystemPrompt || '';
+        out.push(['裏·不传 count → systemPrompt 含默认档「2〜3 个新帖」', sp4.includes('2〜3 个新帖')]);
+        await store.wipeWorld(wk4);
+
+        return out;
+    }
+
+    // ⑤ 列表渲染:纯渲染断言,不碰账本——空世界也能渲染出头部的帖数 stepper。
+    function assertForumListThreadBatchRender() {
+        const folded = foldWorld([]);
+        const html = renderForumListHtml({ world: folded, busy: false, threadBatch: 7 });
+        return [
+            ['HTML 含 data-field="forumThreadBatch"', html.includes('data-field="forumThreadBatch"')],
+            ['HTML 含 or-batch-value">7<', html.includes('or-batch-value">7<')],
+        ];
+    }
+
+    // ⑥ 契约与路由:提示词常量断言,不碰账本。
+    function assertPromptContracts() {
+        return [
+            ['PROMPT_F 含「手机里的内部掲示板」', generator.PROMPT_F.includes('手机里的内部掲示板')],
+            ['PROMPT_F 含「実名雑談板」', generator.PROMPT_F.includes('実名雑談板')],
+            ['PROMPT_F 不含「グループウェア」', !generator.PROMPT_F.includes('グループウェア')],
+            ['PROMPT_G 含「内部掲示板上这个帖子的后续」', generator.PROMPT_G.includes('内部掲示板上这个帖子的后续')],
+            ['PROMPT_A 含「家族群 3〜6 人」', generator.PROMPT_A.includes('家族群 3〜6 人')],
+            ['PROMPT_R 含「手机通讯录」', generator.PROMPT_R.includes('手机通讯录')],
+            ['PROMPT_F2 含「{{THREAD_COUNT_RULE}}」', generator.PROMPT_F2.includes('{{THREAD_COUNT_RULE}}')],
+        ];
+    }
+
+    async function runM14Assertions() {
+        const out = document.getElementById('m14AssertResult');
+        out.textContent = '运行中…';
+        const { initChecks, topupChecks } = await assertContactsInitAndTopup();
+        const sections = [
+            ['1. 通讯录初始化(allowUserContact:false)', initChecks],
+            ['2. 追加与补员', topupChecks],
+            ['3. user 硬防线开关(allowUserContact:true)', await assertContactsUserSideAllowed()],
+            ['4. 帖数点单(表/裏)', await assertThreadCountRule()],
+            ['5. 列表渲染(帖数 stepper)', assertForumListThreadBatchRender()],
+            ['6. 契约与路由', assertPromptContracts()],
+        ];
+        let allPass = true;
+        const lines = [];
+        for (const [title, checks] of sections) {
+            lines.push(`<b>${escapeHtml(title)}</b>`);
+            for (const [label, pass] of checks) {
+                if (!pass) allPass = false;
+                lines.push(`  <span class="${pass ? 'pass' : 'fail'}">${pass ? 'PASS' : 'FAIL'}</span> ${escapeHtml(label)}`);
+            }
+        }
+        out.innerHTML = lines.join('\n');
+        log(`M14 断言跑完:${allPass ? '全绿' : '有未过项,见断言面板'}`);
+    }
+
+    document.getElementById('runM14AssertBtn').addEventListener('click', () => {
+        runM14Assertions().catch(err => {
+            document.getElementById('m14AssertResult').textContent = `断言运行出错:${err?.message || err}`;
+            console.error('[M14 断言]', err);
         });
     });
 

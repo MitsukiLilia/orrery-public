@@ -11,7 +11,7 @@ import {
 import * as store from '../core/store.js';
 import * as generator from '../core/generator.js';
 import {
-    generateMore, continueThread, generateMoreForum, generateMoreForumUra, continueForumThread,
+    generateMore, generateContacts, continueThread, generateMoreForum, generateMoreForumUra, continueForumThread,
     generateMoreSns, continueTweetReplies, generateMoreBrowser,
     generateMoreGallery, generateMoreMemo, generateSnsSearch, generateWebSnapshot,
     generateMoreAlmanac, generateAlmanacPage,
@@ -47,6 +47,9 @@ const DEFAULT_SETTINGS = {
     autoRefresh: false, theme: 'seasalt', showFab: true, allowUserContact: false, language: 'ja', excludeTags: '',
     // 帖内/线程内/推文详情「生成」的点单条数(列表页的「刷新」不受此约束,那是世界自己起涟漪,该冷场就冷场)
     threadReplyBatch: 3, forumReplyBatch: 3, snsReplyBatch: 3,
+    // M14:论坛列表页头部的点单条数——决定一次「刷新」出几个新帖(表裏共用一个数,同 forumReplyBatch
+    // 是帖内回复的点单、这个是列表页新帖的点单,两者互不相扰)。
+    forumThreadBatch: 3,
     customApi: { enabled: false, baseUrl: '', apiKey: '', model: '' },
 };
 
@@ -130,7 +133,7 @@ function renderNowPlayingHtml(nowPlaying, theme) {
     </div>`;
 }
 
-function renderSettingsHtml(s, profileLabel, owner) {
+function renderSettingsHtml(s, profileLabel, owner, busy) {
     return `
         <div class="or-header"><button class="or-back-btn" data-action="back">${ICON_BACK}</button><span class="or-header-title">设置</span></div>
         <div class="or-list">
@@ -209,8 +212,12 @@ function renderSettingsHtml(s, profileLabel, owner) {
             <div class="or-field"><label>API Key</label><input type="password" data-capi="apiKey" value="${escapeHtml(s.customApi.apiKey)}"></div>
             <div class="or-field"><label>模型名</label><input type="text" data-capi="model" value="${escapeHtml(s.customApi.model)}" placeholder="例:gemini-2.5-flash" spellcheck="false"></div>
             <div class="or-row with-note">
+                <button class="or-row-main" data-action="generate-contacts" ${busy ? 'disabled' : ''}><span class="or-row-label">${busy ? '登记中…' : '生成更多联系人和群组'}</span></button>
+                <div class="or-row-note">从人物设定与正文里再挖一批主人已经认识的人与群,只登记人、不写消息;也会给已有的群补成员。TA 的人际网挖尽时会提示没有。</div>
+            </div>
+            <div class="or-row with-note">
                 <button class="or-row-main or-danger" data-action="forum-restart"><span class="or-row-label">论坛重来</span></button>
-                <div class="or-row-note">清空表板与裏サイト的帖子、回复、草稿与名册,保留所属与板块;用于让旧世界按実名制重新开始。不可恢复。</div>
+                <div class="or-row-note">清空表板与裏サイト的帖子、回复、草稿、名册与板块,只保留所属;论坛改版后想让旧世界按新规矩重新开始就点它。不可恢复。</div>
             </div>
             <button class="or-row or-danger" data-action="wipe-phone"><span class="or-row-label">抹掉这部手机</span></button>
         </div>`;
@@ -472,6 +479,7 @@ export function createShell(ctx, onExternalChange) {
         } else if (top.type === 'forum-list') {
             screenEl.innerHTML = renderForumListHtml({
                 world, busy: busy.forum, side: top.side || 'omote', page: top.page || 1, seen, justUpdated,
+                threadBatch: settings().forumThreadBatch,
             });
         } else if (top.type === 'forum-thread') {
             const thread = world.forumThreads.get(top.threadId);
@@ -590,7 +598,7 @@ export function createShell(ctx, onExternalChange) {
         } else if (top.type === 'settings') {
             const s = settings();
             const owner = await store.getOwner(currentWorldKey());
-            screenEl.innerHTML = renderSettingsHtml(s, profileLabel(s.profileId), owner);
+            screenEl.innerHTML = renderSettingsHtml(s, profileLabel(s.profileId), owner, busy.messenger);
         } else if (top.type === 'settings-profile-picker') {
             const s = settings();
             const profiles = ctx.ConnectionManagerRequestService?.getSupportedProfiles?.() || [];
@@ -669,6 +677,9 @@ export function createShell(ctx, onExternalChange) {
             const result = await run({ worldKey, owner, s: settings() });
             if (!result) return { skipped: null };
             if (!result.ok) showToast(FAIL_TEXT[result.error] || '观测中断了,请再试一次');
+            // M14:通讯录登记(doGenerateContacts)自己组好文案挂在 result.toast 上——它不是「刷新」,
+            // 不走下面几条为「新动静/没动静」设计的通用文案,只有带 toast 的结果才走这条。
+            else if (result.toast) showToast(result.toast);
             else if (result.changed === false) showToast('还没有新的正文进展');
             else if (!result.added) showToast('这一刻,世界很安静');
             // browser/gallery/memo 的成功文案各自单独一挂(任务书 §1/M4 §1),其余三个 app 仍共用
@@ -707,6 +718,28 @@ export function createShell(ctx, onExternalChange) {
             });
             // 哪几条线程刚有了新动静——列表回来时给它们播一次入场动效,眼睛不用自己去找
             if (result?.ok && result.touchedThreads) justUpdated = new Set(result.touchedThreads);
+            onExternalChange?.();
+            return result;
+        });
+    }
+
+    // M14:通讯录先行登记——认主时自动调一次(见 doConfirmSetup),设置页「生成更多联系人和群组」
+    // 按钮也走它。它不是「刷新」,不碰 messenger 水位、不接总结检查(见 runContactsGeneration 长注),
+    // 但仍借用 runGeneration('messenger', …) 的锁与失败文案,与消息生成共用同一把生成锁。
+    async function doGenerateContacts() {
+        return await runGeneration('messenger', async ({ worldKey, owner, s }) => {
+            const result = await generateContacts(ctx, store, {
+                worldKey, floorWindow: s.floorWindow,
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                excludeTags: s.excludeTags || '',
+                allowUserContact: !!s.allowUserContact,
+            });
+            if (result?.ok) {
+                const { contactsAdded, groupsAdded, membersAdded } = result;
+                result.toast = result.added
+                    ? `通讯录多了 ${contactsAdded} 位联系人、${groupsAdded} 个群组${membersAdded ? `,${membersAdded} 人进了已有的群` : ''}`
+                    : 'TA 的人际网里暂时没有更多能登场的人';
+            }
             onExternalChange?.();
             return result;
         });
@@ -756,6 +789,7 @@ export function createShell(ctx, onExternalChange) {
                 profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
                 excludeTags: s.excludeTags || '',
                 allowUserContact: !!s.allowUserContact,
+                count: s.forumThreadBatch, // M14:列表页头部的 −/+,表裏共用一个数
             });
             if (result?.ok && result.added > 0) {
                 const top = navStack[navStack.length - 1];
@@ -1442,6 +1476,9 @@ export function createShell(ctx, onExternalChange) {
         if (field === 'threadReplyBatch') s.threadReplyBatch = Math.max(1, Math.min(20, (s.threadReplyBatch || 3) + delta));
         if (field === 'forumReplyBatch') s.forumReplyBatch = Math.max(1, Math.min(20, (s.forumReplyBatch || 3) + delta));
         if (field === 'snsReplyBatch') s.snsReplyBatch = Math.max(1, Math.min(20, (s.snsReplyBatch || 3) + delta));
+        // M14:论坛列表页头部的帖数点单,1〜10(单位是「帖」不是「楼」,每帖还带着自己的楼数,
+        // 上限不必跟回复点单一样顶到 20)。
+        if (field === 'forumThreadBatch') s.forumThreadBatch = Math.max(1, Math.min(10, (s.forumThreadBatch || 3) + delta));
         saveSettings();
         render();
     }
@@ -1457,6 +1494,10 @@ export function createShell(ctx, onExternalChange) {
         await store.setOwner(worldKey, name);
         navStack = [{ type: 'grid' }];
         render();
+        // M14:认主那一刻就按人物设定把主人已认识的人与群登记进手机(只登记人,不写消息)——
+        // 不 await:它自己走 runGeneration('messenger', …) 的锁与 toast,失败/无 API 只提示不阻塞认主。
+        showToast('先按人物设定登记通讯录…');
+        doGenerateContacts();
     }
 
     async function doDeleteContact(threadId) {
@@ -1490,14 +1531,15 @@ export function createShell(ctx, onExternalChange) {
         onExternalChange?.();
     }
 
-    // M13(任务书-M13 §2.4)「论坛重来」:旧世界升级到実名制后,设置页里清空表板+裏サイト的帖子/
-    // 回复/草稿/名册,保留所属与板块——同「抹掉这部手机」的确认方式。navStack 里若还停着某个
-    // 已被清空的帖内页(理论上只有从设置以外的路径才可能出现),一并退回列表页,不留悬空引用。
+    // M13(任务书-M13 §2.4)「论坛重来」,M14(任务书-M14 §2.5)起连板块一起清:设置页里清空
+    // 表板+裏サイト的帖子/回复/草稿/名册/板块,只保留所属——同「抹掉这部手机」的确认方式。
+    // navStack 里若还停着某个已被清空的帖内页(理论上只有从设置以外的路径才可能出现),一并退回
+    // 列表页,不留悬空引用。
     async function doForumRestart() {
         const worldKey = currentWorldKey();
         if (!worldKey) return;
         const confirmed = await ctx.callGenericPopup(
-            '论坛重来?清空表板与裏サイト的帖子、回复、草稿与名册(保留所属与板块),不可恢复。确定吗?',
+            '论坛重来?清空表板与裏サイト的帖子、回复、草稿、名册与板块(保留所属),不可恢复。确定吗?',
             ctx.POPUP_TYPE.CONFIRM,
         );
         if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
@@ -1576,6 +1618,7 @@ export function createShell(ctx, onExternalChange) {
             case 'set-theme': { const s = settings(); s.theme = el.dataset.theme; saveSettings(); render(); break; }
             case 'set-language': { const s = settings(); s.language = el.dataset.language; saveSettings(); render(); break; }
             case 'confirm-setup': doConfirmSetup(); break;
+            case 'generate-contacts': doGenerateContacts(); break;
             case 'forum-restart': doForumRestart(); break;
             case 'wipe-phone': doWipePhone(); break;
             case 'open-profile-picker': navPush({ type: 'settings-profile-picker' }); break;
