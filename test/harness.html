@@ -1910,6 +1910,9 @@
             ['PROMPT_A 含「家族群 3〜6 人」', generator.PROMPT_A.includes('家族群 3〜6 人')],
             ['PROMPT_R 含「手机通讯录」', generator.PROMPT_R.includes('手机通讯录')],
             ['PROMPT_F2 含「{{THREAD_COUNT_RULE}}」', generator.PROMPT_F2.includes('{{THREAD_COUNT_RULE}}')],
+            // v0.24.1:续聊要点名对面是谁;刷新不再挖人(挖人归通讯录登记)。
+            ['PROMPT_B 含「{{relation}}」', generator.PROMPT_B.includes('{{relation}}')],
+            ['PROMPT_A 不再写「首次可推断 2〜4 位初始化」', !generator.PROMPT_A.includes('首次可推断')],
         ];
     }
 

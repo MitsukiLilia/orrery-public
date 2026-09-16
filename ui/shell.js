@@ -1497,7 +1497,10 @@ export function createShell(ctx, onExternalChange) {
         // M14:认主那一刻就按人物设定把主人已认识的人与群登记进手机(只登记人,不写消息)——
         // 不 await:它自己走 runGeneration('messenger', …) 的锁与 toast,失败/无 API 只提示不阻塞认主。
         showToast('先按人物设定登记通讯录…');
-        doGenerateContacts();
+        await doGenerateContacts();
+        // v0.24.1(她的话:「初始化后自动刷新聊天列表,以后想要增加人数就去设置里搞」):登记完接着
+        // 自动刷新一次,让登记出来的人按剧情起第一圈涟漪——两步共用 busy.messenger 锁,必须串行。
+        await doGenerateMore();
     }
 
     async function doDeleteContact(threadId) {
