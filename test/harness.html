@@ -1913,6 +1913,10 @@
             // v0.24.1:续聊要点名对面是谁;刷新不再挖人(挖人归通讯录登记)。
             ['PROMPT_B 含「{{relation}}」', generator.PROMPT_B.includes('{{relation}}')],
             ['PROMPT_A 不再写「首次可推断 2〜4 位初始化」', !generator.PROMPT_A.includes('首次可推断')],
+            // v0.24.2:认知只进不退(她真机:第 11 章开的帖到第 20 章续楼,住民还当误会没解开)。
+            ['PROMPT_F2/G2/F/G 都含「认知只进不退」', ['PROMPT_F2', 'PROMPT_G2', 'PROMPT_F', 'PROMPT_G'].every(k => generator[k].includes('认知只进不退'))],
+            ['裏盖楼材料【本帖的主題】带开帖时刻与现在(需先跑 M12 ③)', !capturedUraG2UserContent || (capturedUraG2UserContent.includes('开帖时刻') && capturedUraG2UserContent.includes('现在:'))],
+            ['裏主生成材料不含【主人已在私密处流露的心境】(需先跑 M12)', !capturedUraUserContent || !capturedUraUserContent.includes('主人已在私密处流露的心境')],
         ];
     }
 
