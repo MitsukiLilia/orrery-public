@@ -93,14 +93,14 @@ export function renderBrowserHtml({ world, busy, tab = 'search', seenAt = 0, bro
         ${body}`;
 }
 
-// ── v0.14 网页快照(task-007 她拍板:AI 直出整页 HTML)。渲染前两道闸:①这里的白名单式消毒
+// ── v0.14 网页快照(task-007:AI 直出整页 HTML)。渲染前两道闸:①这里的白名单式消毒
 // (拔脚本/外链/事件属性,href 全改死链)②iframe sandbox=""(空值=全禁,脚本层保险)。
-// 她要的趣味在 <style> 排版自由——消毒只拔危险面,不动样式创意。──
+// 趣味在 <style> 排版自由——消毒只拔危险面,不动样式创意。──
 export function sanitizeSnapshotHtml(html) {
     if (typeof DOMParser === 'undefined') return ''; // 非浏览器环境(冒烟测试)不渲染
     const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
     // ⚠️HTML 解析器会把裸 <style> 收进 <head>,而最终只取 body.innerHTML——不搬回去,页面的
-    // 排版(她拍板的趣味所在)会整个静默丢失(Chrome 实测抓到的坑)。reverse+insertBefore 保原序。
+    // 排版(设计里的趣味所在)会整个静默丢失(Chrome 实测抓到的坑)。reverse+insertBefore 保原序。
     for (const st of [...doc.head.querySelectorAll('style')].reverse()) doc.body.insertBefore(st, doc.body.firstChild);
     doc.querySelectorAll('script, iframe, frame, object, embed, link, meta, base, svg use').forEach(el => el.remove());
     for (const el of doc.body.querySelectorAll('*')) {

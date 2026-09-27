@@ -33,18 +33,19 @@ import { renderBrowserHtml, renderWebPageHtml, BROWSER_SKIN_URL } from '../apps/
 import { renderGalleryListHtml, renderGalleryPhotoHtml, GALLERY_SKIN_URL } from '../apps/gallery/app.js';
 import { renderMemoListHtml, renderMemoNoteHtml, MEMO_SKIN_URL } from '../apps/memo/app.js';
 import { renderAlmanacHomeHtml, renderAlmanacSectionHtml, renderAlmanacItemHtml, ALMANAC_SKIN_URL } from '../apps/almanac/app.js';
+import { chrome, setChromeLanguage } from './chrome.js';
 import { exportWebSnapshot, exportForumThread, exportMessengerThread, exportAlmanacPage } from './exporter.js';
 
 const SHELL_CSS_URL = new URL('./shell.css', import.meta.url).href;
 
 const DEFAULT_SETTINGS = {
-    // floorWindow: 0 = 整本聊天(2026-08-13 她拍板的默认)。见 generator.js buildFloorContextText 的长注:
+    // floorWindow: 0 = 整本聊天(既定默认)。见 generator.js buildFloorContextText 的长注:
     // 酒馆每轮本来就发整本,旧楼层由预设自己的正则按 depth 压成摘要;orrery 只喂尾部一窗时,
     // 那一窗全落在「近消息」档、摘要恰好全被删光,于是永远只能凭最新几层反推关系 → OOC。
     floorWindow: 0, profileId: null, summaryThreshold: 40,
-    // language: ja(全日语,默认)/en(全英文)/ja_zh(日语原文+中文翻译)。2026-08-21 月月拍板改版,旧 zh 档退役——
-    // 「中文+日系翻译腔」与整本日文浓度极高的正文互相拉扯,混杂漂移是结构性的;全日语才是最稳的档。
-    autoRefresh: false, theme: 'seasalt', showFab: true, allowUserContact: false, language: 'ja', excludeTags: '',
+    // language: zh(中文,默认)/ja_zh(日语原文+中文翻译)/en_zh(英语原文+中文翻译)。纯 ja/en 引擎仍认,
+    // 但设置页不再露出,存量在 settings() 里并入对应的双语档(规则文本见 generator.js LANG_RULE)。
+    autoRefresh: false, theme: 'seasalt', showFab: true, allowUserContact: false, language: 'zh', excludeTags: '',
     // 帖内/线程内/推文详情「生成」的点单条数(列表页的「刷新」不受此约束,那是世界自己起涟漪,该冷场就冷场)
     threadReplyBatch: 3, forumReplyBatch: 3, snsReplyBatch: 3,
     // M14:论坛列表页头部的点单条数——决定一次「刷新」出几个新帖(表裏共用一个数,同 forumReplyBatch
@@ -67,7 +68,7 @@ const APPS = [
 
 // escapeHtml 收编进 core/escape.js(带引号转义的安全版,六个 app 共用,注释见彼处)。
 
-// 手机主人=世界的锚点,一经设定不可更改(她 2026-08-11 拍板:唯一不可改的设置)。
+// 手机主人=世界的锚点,一经设定不可更改(既定设计:唯一不可改的设置)。
 // 多人卡({{char}}=世界观名)时,余波视角必须锚在一个具体人物身上,这里就是锚。
 function renderSetupHtml(defaultName) {
     return `
@@ -153,9 +154,9 @@ function renderSettingsHtml(s, profileLabel, owner, busy) {
             <div class="or-row">
                 <span class="or-row-label">语言</span>
                 <div class="or-theme-seg">
-                    <button class="${s.language !== 'ja_zh' && s.language !== 'en' ? 'on' : ''}" data-action="set-language" data-language="ja">日本語</button>
-                    <button class="${s.language === 'en' ? 'on' : ''}" data-action="set-language" data-language="en">English</button>
-                    <button class="${s.language === 'ja_zh' ? 'on' : ''}" data-action="set-language" data-language="ja_zh">日中双语</button>
+                    <button class="${s.language !== 'ja_zh' && s.language !== 'en_zh' ? 'on' : ''}" data-action="set-language" data-language="zh">中文</button>
+                    <button class="${s.language === 'ja_zh' ? 'on' : ''}" data-action="set-language" data-language="ja_zh">中日双语</button>
+                    <button class="${s.language === 'en_zh' ? 'on' : ''}" data-action="set-language" data-language="en_zh">中英双语</button>
                 </div>
             </div>
             <div class="or-row">
@@ -217,7 +218,7 @@ function renderSettingsHtml(s, profileLabel, owner, busy) {
             </div>
             <div class="or-row with-note">
                 <button class="or-row-main or-danger" data-action="forum-restart"><span class="or-row-label">论坛重来</span></button>
-                <div class="or-row-note">清空表板与裏サイト的帖子、回复、草稿、名册与板块,只保留所属;论坛改版后想让旧世界按新规矩重新开始就点它。不可恢复。</div>
+                <div class="or-row-note">清空表板与${chrome('forum.uraSite')}的帖子、回复、草稿、名册与板块,只保留所属;论坛改版后想让旧世界按新规矩重新开始就点它。不可恢复。</div>
             </div>
             <button class="or-row or-danger" data-action="wipe-phone"><span class="or-row-label">抹掉这部手机</span></button>
         </div>`;
@@ -244,11 +245,11 @@ export function createShell(ctx, onExternalChange) {
     let host = null, shadow = null, root = null, screenEl = null, toastEl = null, statusClockEl = null;
     let navStack = [{ type: 'grid' }];
     let lastWorldKey;               // 上次渲染时的世界;变了就把导航栈清回网格(见 render)
-    // 生成锁按 app 分:她的用法是一边等消息生成一边去翻论坛,共用一把锁会把整部手机锁死。
+    // 生成锁按 app 分:常见用法是一边等消息生成一边去翻论坛,共用一把锁会把整部手机锁死。
     // 六个 app 的账、水位、prompt 本来就各走各的,锁也该各管各的
     // (M2 补 sns、M3 补 browser、M4 补 gallery/memo,照 forum 的接法)。
     const busy = { messenger: false, forum: false, sns: false, browser: false, gallery: false, memo: false, almanac: false };
-    // M10 导出:与上面的 LLM 生成锁完全独立(她 2026-09-01 点单「导出与生成互不相扰」)——
+    // M10 导出:与上面的 LLM 生成锁完全独立(需求:导出与生成互不相扰)——
     // 各把各管各,导出中不锁生成,生成中也不挡导出。exporter.js 内部另有自己的「一次只跑一张图」
     // 闸(跨这几把之上的全局闸),这里只管"哪个按钮该转 spinner"这层 UI 状态。
     const exportBusy = { web: false, forum: false, messenger: false, almanac: false };
@@ -266,13 +267,15 @@ export function createShell(ctx, onExternalChange) {
         const cur = ctx.extensionSettings.orrery || {};
         // 一次性迁移:正文范围改成「整本聊天」是 OOC 的正解,但新默认值对老用户无效——
         // 他们的设置里存着旧默认 4,展开顺序 {...DEFAULT, ...cur} 下 cur 永远赢,装了新版也照样 OOC。
-        // 只搬旧默认值那一档(明确调过别的数字的人不动),搬完打标记,之后她想调回窗口就一直有效。
+        // 只搬旧默认值那一档(明确调过别的数字的人不动),搬完打标记,之后用户想调回窗口就一直有效。
         if (cur.floorWindow === 4 && !cur.floorWindowMigrated) {
             cur.floorWindow = 0;
             cur.floorWindowMigrated = true;
         }
-        // 2026-08-21 语言体系改版:zh 档退役,存量一律迁到新默认 ja(无需标记——zh 已不可再被设出来)。
-        if (cur.language === 'zh') cur.language = 'ja';
+        // 语言档重排:设置页只留 中文/中日双语/中英双语。存量的纯 ja/en 并入对应的双语档——原文语言不变,
+        // 只是多一行中文翻译(无需标记:ja/en 已不可再从设置页设出来)。
+        if (cur.language === 'ja') cur.language = 'ja_zh';
+        else if (cur.language === 'en') cur.language = 'en_zh';
         ctx.extensionSettings.orrery = {
             ...DEFAULT_SETTINGS, ...cur,
             customApi: { ...DEFAULT_SETTINGS.customApi, ...(cur.customApi || {}) },
@@ -281,13 +284,13 @@ export function createShell(ctx, onExternalChange) {
     }
     function saveSettings() { ctx.saveSettingsDebounced?.(); }
 
-    // 归一化(含上面那次迁移)必须在扩展加载时就跑一次,不能等她打开 app——
+    // 归一化(含上面那次迁移)必须在扩展加载时就跑一次,不能等用户打开 app——
     // 自动刷新、水位徽标这些路径都在 UI 之外读设置,懒到首次渲染才迁移的话,
     // 「装了新版但一次都没打开过手机」的用户会继续用旧的正文范围生成,而且毫无征兆。
     settings();
     saveSettings();
 
-    // 提纯降级只提醒一次:静默降级=草稿重新混进正文而生成表面照常,必须让她看见
+    // 提纯降级只提醒一次:静默降级=草稿重新混进正文而生成表面照常,必须让用户看见
     let warnedDegraded = false;
     function checkPurificationDegraded() {
         if (generator.textPurificationDegraded && !warnedDegraded) {
@@ -370,7 +373,7 @@ export function createShell(ctx, onExternalChange) {
     }
 
     // ── 滚动位置:整屏 innerHTML 重建会把 scrollTop 抹成 0。不接管的话,酒馆来个事件、
-    // 长按删一条、调一下条数,她正在读的位置就被弹回顶部(她 2026-08-14 报的第 2 点)。
+    // 长按删一条、调一下条数,用户正在读的位置就被弹回顶部(真机反馈过的一个点)。
     // 规则:同一块屏幕重渲染 → 原地保持;刚进屋 / 刚生成完 → 跳到新内容分界线。 ──
     const SCROLLERS = '.or-chat-scroll, .or-forum-scroll, .or-thread-list, .or-forum-list, .or-browser-list, .or-list, .or-home, '
         + '.or-gallery-list, .or-memo-list, .or-gallery-detail-scroll, .or-memo-detail-scroll, .or-sns-list, .or-sns-scroll, .or-aster-list, '
@@ -385,7 +388,7 @@ export function createShell(ctx, onExternalChange) {
         const want = pendingScroll;
         pendingScroll = null;
         if (!scroller) return;
-        // 生成是长事务,期间她完全可能已经退回列表页了——那次跳转的目标屏早就不在眼前,
+        // 生成是长事务,期间用户完全可能已经退回列表页了——那次跳转的目标屏早就不在眼前,
         // 认屏之后就不会把「跳到新回复」错兑现成把联系人列表拉到底。
         if (want && want.key && want.key !== key) { if (keep != null) scroller.scrollTop = keep; return; }
         if (want) {
@@ -407,6 +410,7 @@ export function createShell(ctx, onExternalChange) {
     async function render() {
         if (!screenEl) return;
         applyTheme();
+        setChromeLanguage(settings().language); // 仿真平台的界面词跟随语言档(ui/chrome.js)
         const { worldKey, world, tip, watermarks, seen, starred } = await currentWorld();
         // M7c §1.4:状态栏时钟——worldClock 是世界内时刻(六个 app 共用的现在),不是现实时钟;
         // 静态壳只搭一次(见 mount()),这里每帧按最新 worldClock 刷新文字/显隐。
@@ -442,9 +446,9 @@ export function createShell(ctx, onExternalChange) {
         if (top.type === 'setup') {
             screenEl.innerHTML = renderSetupHtml(ctx.name2 || '');
         } else if (top.type === 'grid') {
-            // 角标 = 有新楼层还没生成余波 ‖ 有生成好但她还没看过的内容(真手机的角标就是后者)。
-            // M12:forum 多一路——裏サイト有没有「新楼待生成」只在她已经开过裏之后才算数
-            // (hasUra 判据同 forumUra 水位:她没开始用裏之前,这个水位永远落后,不能让悬浮球常亮)。
+            // 角标 = 有新楼层还没生成余波 ‖ 有生成好但用户还没看过的内容(真手机的角标就是后者)。
+            // M12:forum 多一路——裏サイト有没有「新楼待生成」只在用户已经开过裏之后才算数
+            // (hasUra 判据同 forumUra 水位:用户没开始用裏之前,这个水位永远落后,不能让悬浮球常亮)。
             const hasUra = [...world.forumThreads.values()].some(t => t.side === 'ura');
             const dots = {
                 messenger: watermarks.messenger < tip || hasUnseenInApp('messenger', world, seen),
@@ -668,7 +672,7 @@ export function createShell(ctx, onExternalChange) {
         busy[app] = true;
         try {
             const worldKey = currentWorldKey();
-            // 这三条早退在手机没开时(自动刷新)完全无声——她报的「自动刷新有时不生效」里,
+            // 这三条早退在手机没开时(自动刷新)完全无声——真机反馈过的「自动刷新有时不生效」里,
             // 有一档就是静默失败。留下控制台线索,排查时不必再靠猜。
             if (!worldKey) { console.info('[Orrery] 生成跳过:当前聊天没有可用的 worldKey(群聊/未选卡)'); return { skipped: 'no_world' }; }
             const owner = await store.getOwner(worldKey);
@@ -853,7 +857,7 @@ export function createShell(ctx, onExternalChange) {
         render();
     }
 
-    // 论坛翻页(2026-08-21 月月点单,参考 Perigee 论坛分成多页):纯本地渲染,不耗生成。
+    // 论坛翻页(参考 Perigee 论坛分成多页):纯本地渲染,不耗生成。
     // 目标页由按钮 data-page 给绝对值(渲染层按当下帖数钳制过),不做相对增减,反悔删帖后不会漂。
     function doForumPage(page) {
         const top = navStack[navStack.length - 1];
@@ -978,7 +982,7 @@ export function createShell(ctx, onExternalChange) {
         return 'omote';
     }
 
-    // ── v0.14 生成双面(task-007 她拍板):搜索结果与网页快照都是「点开才生成一次,入账永久缓存」。──
+    // ── v0.14 生成双面(task-007):搜索结果与网页快照都是「点开才生成一次,入账永久缓存」。──
 
     async function doOpenSnsSearch(word) {
         word = (word || '').trim();
@@ -1020,7 +1024,7 @@ export function createShell(ctx, onExternalChange) {
         render_failed: '导出出错了,请再试一次',
     };
 
-    // exporter.js 内部有自己的「一次只跑一张图」闸,重入直接 return null——这里统一翻译成她
+    // exporter.js 内部有自己的「一次只跑一张图」闸,重入直接 return null——这里统一翻译成用户
     // 能看懂的提示,失败/中止都不弹预览(§4:中止/失败留在选择模式里,不像成功那样自动退出)。
     function handleExportResult(result) {
         if (result === null) { showToast('上一张还在生成'); return null; }
@@ -1030,13 +1034,13 @@ export function createShell(ctx, onExternalChange) {
 
     async function doExportWebPage(visitId) {
         if (!visitId || exportBusy.web) return;
-        const { world } = await currentWorld();
-        const visit = world.visits.get(visitId);
-        const snapshot = world.snapshots.get(visitId);
-        if (!visit || !snapshot) return; // 没内容导不出图(header 按钮本就只在有 snapshot 时才出现)
-        exportBusy.web = true;
-        await render();
+        exportBusy.web = true; // 上锁抢在第一个 await 之前(同 runGeneration):连点两下时第二下不会越过这道闸、再在 finally 里把第一下的锁放掉
         try {
+            const { world } = await currentWorld();
+            const visit = world.visits.get(visitId);
+            const snapshot = world.snapshots.get(visitId);
+            if (!visit || !snapshot) return; // 没内容导不出图(header 按钮本就只在有 snapshot 时才出现)
+            await render();
             const result = await exportWebSnapshot({ visit, snapshot });
             const dataUrl = handleExportResult(result);
             if (dataUrl) showExportPreview(dataUrl, 'web');
@@ -1089,12 +1093,12 @@ export function createShell(ctx, onExternalChange) {
     async function doForumExportRun() {
         const top = navStack[navStack.length - 1];
         if (top.type !== 'forum-thread' || !top.exportMode || exportBusy.forum) return;
-        const { world } = await currentWorld();
-        const thread = world.forumThreads.get(top.threadId);
-        if (!thread) return;
-        exportBusy.forum = true;
-        await render();
+        exportBusy.forum = true; // 上锁抢在第一个 await 之前
         try {
+            const { world } = await currentWorld();
+            const thread = world.forumThreads.get(top.threadId);
+            if (!thread) return;
+            await render();
             const result = await exportForumThread({ thread, world, selectedSeqs: top.exportSel });
             const dataUrl = handleExportResult(result);
             if (dataUrl) {
@@ -1144,12 +1148,12 @@ export function createShell(ctx, onExternalChange) {
     async function doThreadExportRun() {
         const top = navStack[navStack.length - 1];
         if (top.type !== 'messenger-thread' || !top.exportMode || exportBusy.messenger) return;
-        const { world } = await currentWorld();
-        const thread = world.threads.get(top.threadId);
-        if (!thread) return;
-        exportBusy.messenger = true;
-        await render();
+        exportBusy.messenger = true; // 上锁抢在第一个 await 之前
         try {
+            const { world } = await currentWorld();
+            const thread = world.threads.get(top.threadId);
+            if (!thread) return;
+            await render();
             const result = await exportMessengerThread({ thread, world, selectedSeqs: top.exportSel });
             const dataUrl = handleExportResult(result);
             if (dataUrl) {
@@ -1163,7 +1167,7 @@ export function createShell(ctx, onExternalChange) {
     }
 
     // 预览弹层直接挂进 root(Shadow 内,不是 ctx.callGenericPopup 那种 shadow 外的原生弹窗)——
-    // 不走 navStack/render() 管线,原地插入/移除,避免整屏重渲染把她刚看的图冲掉。
+    // 不走 navStack/render() 管线,原地插入/移除,避免整屏重渲染把用户刚看的图冲掉。
     function showExportPreview(dataUrl, kind) {
         closeExportPreview();
         exportPreviewData = { dataUrl, kind };
@@ -1228,7 +1232,7 @@ export function createShell(ctx, onExternalChange) {
     }
 
     /**
-     * 星图页:不属于 char 的手机(主屏没有它的图标,她拍板:主屏多一个 char 不知道的 app 会破坏
+     * 星图页:不属于 char 的手机(主屏没有它的图标,既定设计:主屏多一个 char 不知道的 app 会破坏
      * 沉浸感)——入口在状态栏(仪器面板)与长按任意星标。内容从 world 现查:被反悔删掉的内容
      * 不撒谎,如实显示已消失,星可以就地熄灭。
      */
@@ -1439,14 +1443,14 @@ export function createShell(ctx, onExternalChange) {
 
     async function doExportAlmanacPage(itemId) {
         if (!itemId || exportBusy.almanac) return;
-        const { world } = await currentWorld();
-        const item = world.almanacItems.get(itemId);
-        const page = world.almanacPages.get(itemId);
-        if (!item || !page) return; // 没内容导不出图(header 按钮本就只在有 page 时才出现)
-        const section = world.sections.get(item.sectionId);
-        exportBusy.almanac = true;
-        await render();
+        exportBusy.almanac = true; // 上锁抢在第一个 await 之前
         try {
+            const { world } = await currentWorld();
+            const item = world.almanacItems.get(itemId);
+            const page = world.almanacPages.get(itemId);
+            if (!item || !page) return; // 没内容导不出图(header 按钮本就只在有 page 时才出现)
+            const section = world.sections.get(item.sectionId);
+            await render();
             const result = await exportAlmanacPage({ item, section, page, community: world.community });
             const dataUrl = handleExportResult(result);
             if (dataUrl) showExportPreview(dataUrl, 'almanac');
@@ -1495,10 +1499,10 @@ export function createShell(ctx, onExternalChange) {
         navStack = [{ type: 'grid' }];
         render();
         // M14:认主那一刻就按人物设定把主人已认识的人与群登记进手机(只登记人,不写消息)——
-        // 不 await:它自己走 runGeneration('messenger', …) 的锁与 toast,失败/无 API 只提示不阻塞认主。
+        // 它自己走 runGeneration('messenger', …) 的锁与 toast,失败/无 API 只提示,不会让认主卡住。
         showToast('先按人物设定登记通讯录…');
         await doGenerateContacts();
-        // v0.24.1(她的话:「初始化后自动刷新聊天列表,以后想要增加人数就去设置里搞」):登记完接着
+        // v0.24.1(需求:初始化后自动刷新聊天列表,以后想要增加人数就去设置里搞):登记完接着
         // 自动刷新一次,让登记出来的人按剧情起第一圈涟漪——两步共用 busy.messenger 锁,必须串行。
         await doGenerateMore();
     }
@@ -1542,7 +1546,7 @@ export function createShell(ctx, onExternalChange) {
         const worldKey = currentWorldKey();
         if (!worldKey) return;
         const confirmed = await ctx.callGenericPopup(
-            '论坛重来?清空表板与裏サイト的帖子、回复、草稿、名册与板块(保留所属),不可恢复。确定吗?',
+            `论坛重来?清空表板与${chrome('forum.uraSite')}的帖子、回复、草稿、名册与板块(保留所属),不可恢复。确定吗?`,
             ctx.POPUP_TYPE.CONFIRM,
         );
         if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
@@ -1629,7 +1633,7 @@ export function createShell(ctx, onExternalChange) {
         }
     }
 
-    // 设置页的独立 API 输入框(设置=驾驶舱,不属于小世界的只读面——她 2026-08-11 点单)
+    // 设置页的独立 API 输入框(设置=驾驶舱,不属于小世界的只读面)
     function onFieldChange(e) {
         const input = e.target;
         const s = settings();
@@ -1643,7 +1647,7 @@ export function createShell(ctx, onExternalChange) {
 
     // M10:导出选择模式下,消息行/论坛楼行的长按不该唤出反悔按钮或直接删除——那两个按钮此刻
     // 本就没渲染(让位给复选圈),但长按计时器不认 DOM 有没有画那个按钮,不 guard 的话长按依旧会
-    // 弹出"删除这条/这楼"的确认框,跟她正在做的"选图"这件事完全无关。只读这一屏的顶层导航帧即可
+    // 弹出"删除这条/这楼"的确认框,跟用户正在做的"选图"这件事完全无关。只读这一屏的顶层导航帧即可
     // ——导出模式只存在于 messenger-thread/forum-thread 这两屏,判断用同一个字段。
     function inExportMode() { return !!navStack[navStack.length - 1]?.exportMode; }
 
@@ -1651,7 +1655,7 @@ export function createShell(ctx, onExternalChange) {
     // (后两者跟线程行一样直接弹确认,不走"唤出按钮再点一次"那一步——反悔工法相同,UI 更省一步)。
     function onPointerDown(e) {
         clearTimeout(longPressTimer);
-        // 星标长按=星图副入口(task-007 她拍板两个都要);必须先于行分支——星标嵌在推文行里,
+        // 星标长按=星图副入口(task-007:两个都要);必须先于行分支——星标嵌在推文行里,
         // 落到行分支会变成长按删推。
         const starBtn = e.target.closest('.or-star');
         if (starBtn) {
@@ -1860,11 +1864,11 @@ export function createShell(ctx, onExternalChange) {
     function open() {
         if (!host) mount();
         host.style.display = 'block';
-        // 导航状态跨开合保留(她 2026-08-14 点单):她是边聊边刷、靠悬浮球频繁开合的用法,
+        // 导航状态跨开合保留:常见用法是边聊边刷、靠悬浮球频繁开合,
         // 每次重开都弹回网格,等于每次都要重走「消息→点进那个人」。换聊天时才清,见 render()。
         requestAnimationFrame(() => {
             root.classList.add('open');
-            // 开机一瞬的星尘散落(v0.7.2 特色 C 案,月月选星尘流派):跨次元投影落定的痕迹。
+            // 开机一瞬的星尘散落(v0.7.2 特色 C 案,星尘流派):跨次元投影落定的痕迹。
             // 一次性、极淡、0.55s 自灭;点色走 --or-salt-deep,三主题免配(海盐=蓝/墨白=灰/月夜=粉)。
             const phone = root.querySelector('.or-phone');
             if (phone && !phone.querySelector('.or-stardust')) {
@@ -1893,7 +1897,7 @@ export function createShell(ctx, onExternalChange) {
     /**
      * 自动刷新入口(index.js 防抖后调):手机没开也能跑——render/toast 自带空目标保护。
      *
-     * ⚠️撞上生成锁时**排队**,不是丢弃——她 2026-08-14 真机复现的「自动刷新有时不生效」就死在这里:
+     * ⚠️撞上生成锁时**排队**,不是丢弃——真机复现过的「自动刷新有时不生效」就死在这里:
      * 连发两条,第一条触发的生成要跑四十几秒,第二条的自动刷新在这期间撞锁。旧版直接静默丢弃,
      * 那层楼从此没人管(除非又来新楼层);按次数重试也不行,重试窗口比一次生成还短,数完就放弃。
      * 改成挂个标记,由 runGeneration 的 finally 在锁刚释放时补跑——生成多慢都等得到。

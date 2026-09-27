@@ -27,7 +27,7 @@
     --or-photo-ph: #E4E7EC;
 }
 
-/* 魔導書主题(第四主题·2026-08-23 她圈选方向1「羊皮纸烫金」):羊皮纸底+鎏金+深褐墨,
+/* 魔導書主题(第四主题·方向1「羊皮纸烫金」):羊皮纸底+鎏金+深褐墨,
    给 HP 那类西幻 IP 用。色板采样自方向探针再为整屏 UI 提亮;salt-deep=古金(担当未读点/
    开关/选中态——蜡封红会和危险操作的红撞语义,故用金)。波点浪花置 none(羊皮纸自己就是质感)。 */
 .or-root[data-theme="magic"] {
@@ -200,7 +200,7 @@
     object-fit: cover; z-index: 2; display: block;
 }
 /* 未读角标:必须住在 or-app-icon 的外面——那个容器为了给生图图标裁圆角开着 overflow:hidden,
-   角标塞在里面会被圆角切成不规则的深色残片,读起来像图标上的脏点而不是通知(她 2026-08-22 报的
+   角标塞在里面会被圆角切成不规则的深色残片,读起来像图标上的脏点而不是通知(真机反馈过的
    「右上角黑点」就是它)。挪出来贴在 .or-app 上,完整的小圆+奶油环才有角标的样子。
    横向定位不用 right(格子是整列宽,图标 58px 居中):锚 50% 再往右偏出图标半宽附近。 */
 .or-app-badge {
@@ -434,7 +434,7 @@
 }
 .or-new-sep span { flex-shrink: 0; letter-spacing: .04em; }
 
-/* ── 底栏点单条数(消息/论坛共用):她点几条就生成几条,不再由模型自己决定要不要开口。 ── */
+/* ── 底栏点单条数(消息/论坛共用):用户点几条就生成几条,不再由模型自己决定要不要开口。 ── */
 .or-batch { display: flex; align-items: center; gap: 6px; }
 .or-batch button {
     width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--or-cocoa-light);

@@ -129,8 +129,8 @@
                 按【手机当前状态】digest 内容分三档:首次/追加补员/挖尽,不用计数器,细节见 buildFixtureR)/否则→消息主生成(A)。
                 SNS/论坛/消息/浏览器/相册/备忘录/门户这套流程都从手机内点「刷新」「生成更多」/「生成回复」触发,不用额外按钮;
                 通讯录登记(R)则由「认主」自动触发一次、或设置页「生成更多联系人和群组」按钮触发。<br>
-                语言开关(日本語/English/日中双语)直接在手机「设置」页切——fixture 会读同一份 extensionSettings,
-                切到日中双语后返回的消息/帖子/推文会带 zh 字段。
+                语言开关(中文/中日双语/中英双语)直接在手机「设置」页切——fixture 会读同一份 extensionSettings,
+                切到任一双语档后返回的消息/帖子/推文会带 zh 字段。
             </p>
         </fieldset>
 
@@ -213,7 +213,8 @@
     import * as generator from '../core/generator.js';
     import { computeWorldKey, inheritedWorldKey, foldWorld, hasUnseenInApp, seenKeyForAlmanac, latestTsOfAlmanac, shortIdFor } from '../core/world.js';
     import { sanitizeSnapshotHtml } from '../apps/browser/app.js';
-    import { renderForumListHtml, renderForumThreadHtml } from '../apps/forum/app.js';
+    import { renderForumListHtml, renderForumThreadHtml, authorLabel } from '../apps/forum/app.js';
+    import { chrome, setChromeLanguage } from '../ui/chrome.js';
     import { renderThreadListHtml } from '../apps/messenger/app.js';
     import { escapeHtml } from '../core/escape.js';
     import {
@@ -291,7 +292,7 @@
     // ── LLM fixture:按 systemPrompt 内容分流到 A/B/C/F/G 五套返回,受面板开关控制 ──
     // 语言开关读同一份 ctx.extensionSettings(手机「设置」页与这里是同一个对象引用),
     // ja_zh 档时给消息/帖子/回复挂 zh 字段,模拟"模型确实照 {{LANG_RULE}} 输出译文"。
-    function langIsJaZh() { return ctx.extensionSettings?.orrery?.language === 'ja_zh'; }
+    function langIsJaZh() { const l = ctx.extensionSettings?.orrery?.language; return l === 'ja_zh' || l === 'en_zh'; }
     function withZh(text) { return langIsJaZh() ? { text, zh: `（中译）${text}` } : { text }; }
     // 论坛用:字段名是 body 不是 text,单独给一个,别复用 withZh 撞错字段名。
     function withZhBody(body) { return langIsJaZh() ? { body, zh: `（中译）${body}` } : { body }; }
@@ -1034,6 +1035,7 @@
     async function runM10Assertions() {
         const out = document.getElementById('m10AssertResult');
         out.textContent = '运行中…';
+        setChromeLanguage('ja_zh'); // 断言里的界面词期望按日文档写;手机下次渲染时会按设置改回去
         const sections = [
             ['①论坛跳选插「(略)」+ 原始楼号', assertM10Forum()],
             ['②消息在选中子集上重算 meta', assertM10Messenger()],
@@ -1240,6 +1242,7 @@
     async function runM11Assertions() {
         const out = document.getElementById('m11AssertResult');
         out.textContent = '运行中…';
+        setChromeLanguage('ja_zh'); // 断言里的界面词期望按日文档写;手机下次渲染时会按设置改回去
         const flow = await assertAlmanacBatchFlow();
         const sections = [
             ['1. modeRule/applyMode 二态切换', assertModeRule()],
@@ -1456,6 +1459,7 @@
     async function runM12Assertions() {
         const out = document.getElementById('m12AssertResult');
         out.textContent = '运行中…';
+        setChromeLanguage('ja_zh'); // 断言里的界面词期望按日文档写;手机下次渲染时会按设置改回去
         const sections = [
             ['1. 真路径裏首刷', await assertForumUraMainFlow()],
             ['2. fold:表/裏各自过滤正确', assertForumSideFilterAndTag()],
@@ -1723,6 +1727,7 @@
     async function runM13Assertions() {
         const out = document.getElementById('m13AssertResult');
         out.textContent = '运行中…';
+        setChromeLanguage('ja_zh'); // 断言里的界面词期望按日文档写;手机下次渲染时会按设置改回去
         const sections = [
             ['1. 表主生成(実名制)', await assertForumOmoteRealNameMain()],
             ['2. user 硬防线(ゲスト)', await assertUserSideHardLineOnGuest()],
@@ -1913,16 +1918,43 @@
             // v0.24.1:续聊要点名对面是谁;刷新不再挖人(挖人归通讯录登记)。
             ['PROMPT_B 含「{{relation}}」', generator.PROMPT_B.includes('{{relation}}')],
             ['PROMPT_A 不再写「首次可推断 2〜4 位初始化」', !generator.PROMPT_A.includes('首次可推断')],
-            // v0.24.2:认知只进不退(她真机:第 11 章开的帖到第 20 章续楼,住民还当误会没解开)。
+            // v0.24.2:认知只进不退(真机上出现过:第 11 章开的帖到第 20 章续楼,住民还当误会没解开)。
             ['PROMPT_F2/G2/F/G 都含「认知只进不退」', ['PROMPT_F2', 'PROMPT_G2', 'PROMPT_F', 'PROMPT_G'].every(k => generator[k].includes('认知只进不退'))],
             ['裏盖楼材料【本帖的主題】带开帖时刻与现在(需先跑 M12 ③)', !capturedUraG2UserContent || (capturedUraG2UserContent.includes('开帖时刻') && capturedUraG2UserContent.includes('现在:'))],
             ['裏主生成材料不含【主人已在私密处流露的心境】(需先跑 M12)', !capturedUraUserContent || !capturedUraUserContent.includes('主人已在私密处流露的心境')],
         ];
     }
 
+    // ⑦ 界面词跟随语言档(ui/chrome.js):zh→中文、ja_zh→日文、en_zh→英文;未知值同生成侧落到中文。
+    function assertChromeFollowsLanguage() {
+        const probe = (lang) => {
+            setChromeLanguage(lang);
+            return {
+                following: chrome('sns.following'), read: chrome('msg.read'), updates: chrome('alm.updates'),
+                guest: authorLabel({ residents: new Map([['r_x', { residentId: 'r_x', displayName: '外部の友人', affiliation: '取引先', kind: 'guest' }]]) }, { authorId: 'r_x' }, 't_x'),
+                tabs: renderForumListHtml({ world: foldWorld([]), busy: false, threadBatch: 3 }),
+            };
+        };
+        const zh = probe('zh'), ja = probe('ja_zh'), en = probe('en_zh'), unknown = probe('xx'), pureJa = probe('ja'), pureEn = probe('en');
+        setChromeLanguage('ja_zh');
+        return [
+            ['zh:关注中/已读/更新记录', zh.following === '关注中' && zh.read === '已读' && zh.updates === '更新记录'],
+            ['zh:ゲスト 标记显示为「访客」', zh.guest.endsWith(' · 访客')],
+            ['zh:论坛表裏切换含「里」、不含「裏」', zh.tabs.includes('>里<') && !zh.tabs.includes('>裏<')],
+            ['ja_zh:フォロー中/既読/更新履歴', ja.following === 'フォロー中' && ja.read === '既読' && ja.updates === '更新履歴'],
+            ['ja_zh:ゲスト 标记不变', ja.guest.endsWith(' · ゲスト')],
+            ['en_zh:Following/Read/Update history', en.following === 'Following' && en.read === 'Read' && en.updates === 'Update history'],
+            ['en_zh:ゲスト 标记显示为 Guest', en.guest.endsWith(' · Guest')],
+            ['引擎里保留的纯 ja/en 与对应双语档同词', pureJa.following === ja.following && pureEn.following === en.following],
+            ['未知语言值落到中文', unknown.following === '关注中'],
+            ['表里没有的 key 原样返回', chrome('no.such.key') === 'no.such.key'],
+        ];
+    }
+
     async function runM14Assertions() {
         const out = document.getElementById('m14AssertResult');
         out.textContent = '运行中…';
+        setChromeLanguage('ja_zh'); // 断言里的界面词期望按日文档写;手机下次渲染时会按设置改回去
         const { initChecks, topupChecks } = await assertContactsInitAndTopup();
         const sections = [
             ['1. 通讯录初始化(allowUserContact:false)', initChecks],
@@ -1931,6 +1963,7 @@
             ['4. 帖数点单(表/裏)', await assertThreadCountRule()],
             ['5. 列表渲染(帖数 stepper)', assertForumListThreadBatchRender()],
             ['6. 契约与路由', assertPromptContracts()],
+            ['7. 界面词跟随语言档', assertChromeFollowsLanguage()],
         ];
         let allPass = true;
         const lines = [];

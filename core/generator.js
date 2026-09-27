@@ -1,8 +1,9 @@
 // 余波生成:组 prompt → 调 LLM → 宽容解析 → 入账。SYSTEM 提示词(A/B/B_GROUP/C/F/G)基底逐字来自任务书 §5。
 // M1 拍板:A/B/B_GROUP 原本写死的语言原则行,改成 {{LANG_RULE}} 占位,运行时按全局语言开关(zh/ja_zh)替换。
 // 2026-08-16 日系氛围强化落地(评审+圈选轨迹见 docs/2026-08-16-提示词日系强化.md);此外仍只做 {{占位符}} 替换。
-// 2026-08-21 语言体系改版(月月拍板):ja(默认)/en/ja_zh 三档,zh 档退役;网感文化圈随语言档切换,细节以世界观为准。
-// 2026-08-31 时间冻结硬约束(她真机抓到消息/论坛把余波写成「这一幕之后」——人物还没退场,板上已出现回去之后的目击):
+// 2026-08-21 语言体系改版:ja/en/ja_zh 三档;网感文化圈随语言档切换,细节以世界观为准。
+// 2026-09-27 语言档重排:设置页三档=zh(中文,默认)/ja_zh(中日双语)/en_zh(中英双语);纯 ja/en 留在引擎里不露出。
+// 2026-08-31 时间冻结硬约束(真机上出现过消息/论坛把余波写成「这一幕之后」——人物还没退场,板上已出现回去之后的目击):
 // A/B/B_GROUP/F/G 与二刷 hint 立「世界的现在=正文最新一幕落笔的那一瞬,人物钉在正文留下的位置上;论坛只有
 // 两种合法时态=已写出的过去+冻结的现在;未来只许被谈论不许被发生;冻结的是剧情不是生活」。A/F 原则由此改号。
 import { foldWorld, uncoveredMessages, monogramFor, colorForContact, resolveSender, GALLERY_TONES, anonIdFor } from './world.js';
@@ -17,10 +18,10 @@ export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎�
 5. 消息像真人用 LINE:短句连发、口语、省略主语,贴合各人身份与关系亲疏。颜文字与表情符号是调味不是主食——是否使用、用多少,必须贴合角色性格:冷淡寡言的角色几乎不用,活泼的角色才多用,性格永远优先于氛围。不写小说腔,不用书面语转述剧情。
 6. {{LANG_RULE}}
 7. 克制与规模感:本次共 2〜8 条消息,分布在 1〜3 个线程。刷新是让已有的人际网按剧情起涟漪,不是挖人:通讯录里已登记的人(包括还没有聊天记录的)优先——谁会在此刻发来一条、哪个群里有人冒泡、已读不回的那条有没有下文。新联系人或新群只在正文里主人**刚刚**新认识了某人并合理交换了联系方式时才建,一次最多 1 位/1 个,而且必须有名有姓有身份;把主人既有的人际网(家人、上司下属、旧友、原著配角)挖出来登记是通讯录登记的事,不是刷新的事。没有名字的路人不配进通讯录。
-8. 主人此刻单曲循环的那首歌:曲名优先用这个故事世界里真实存在的歌(原作里有歌就用原作的),没有就虚构一个贴合主人当下心境的曲名(日文,语言随语言规则);心境变了才换歌,心境没变就省略此字段(省略=沿用上一首)——单曲循环本身就是心境的形状,不必每批都动。
+8. 主人此刻单曲循环的那首歌:曲名优先用这个故事世界里真实存在的歌(原作里有歌就用原作的),没有就虚构一个贴合主人当下心境的曲名(语言随语言规则);心境变了才换歌,心境没变就省略此字段(省略=沿用上一首)——单曲循环本身就是心境的形状,不必每批都动。
 9. 🚨联系人纪律(绝对红线,违反即全盘失败)。手机里只能出现主人**在剧情中已经认识、且合理交换过联系方式**的人。判断只看剧情事实,不看叙事结构:正文哪怕通篇是两个人的双线叙事,只要剧情里他们尚未相识,对方就绝不能出现在通讯录——素未谋面的人不会躺在彼此的手机里。不要被任何先验带偏(比如默认两位主角是恋人或熟人)。宁缺勿滥:联系人晚一点出现,永远比过早出现真实。
 10. 熟稔度纪律。就算是真联系人,消息的语气亲疏也必须匹配剧情当前的关系阶段:刚认识就客气生分,熟人才随意,恋人才亲昵。关系阶段以正文为准,不许自行升温;也不许倒退——材料里若给出【主人已在私密处流露的心境】,主人可以嘴硬、可以口是心非,但真心所在的阶段不得低于它。
-11. 群聊也是余波的舞台,而且群聊有谱系:对上的汇报群、对下的指挥群、家族群、朋友群、同好群——主人在不同群里露出不同的人格面(工作群拘谨、朋友群放松、家族群潜水)。建群要有剧情或原著设定依据,别只盯着一种群造;首次初始化最多 1 个,之后按需。群的人数要像真的:家族群 3〜6 人,朋友群 4〜8 人,部门/班级群 6〜15 人,同好群 5〜12 人——三个人的群不是群,是小圈子;群里大多数人长期潜水,一次只有两三个人说话才正常。主人可以全程潜水;群成员不必都是通讯录好友,但每个成员要有稳定的 id 和身份感。
+11. 群聊也是余波的舞台,而且群聊有谱系:对上的汇报群、对下的指挥群、家族群、朋友群、同好群——主人在不同群里露出不同的人格面(工作群拘谨、朋友群放松、家族群潜水)。建群的条件见原则 7,要有剧情或原著设定依据,别只盯着一种群造。群的人数要像真的:家族群 3〜6 人,朋友群 4〜8 人,部门/班级群 6〜15 人,同好群 5〜12 人——三个人的群不是群,是小圈子;群里大多数人长期潜水,一次只有两三个人说话才正常。主人可以全程潜水;群成员不必都是通讯录好友,但每个成员要有稳定的 id 和身份感。
 12. OOC 纪律。主线人物及其身边人的一切言行,必须符合【人物设定参考】与正文已确立的性格;参考里没有的地方保持克制,不得自行发明重大设定。
 
 # 输出
@@ -109,7 +110,7 @@ export const PROMPT_F2 = `你是 Orrery,一个隐形的叙事世界观测引擎�
 1. 大前提:「ここは上に見られていない」。这里是打工人/生徒/住民背着上面的人说真话的地方——对上司、组织、制度、通達的抱怨、怨念、黑话、恶趣味的隐语绰号,语域比表板低一档,粗口与自嘲都可以。建前留在表板,本音全在这里。
 2. 匿名是铁律,而且比表板更彻底:没有固定住民、没有コテハン,发言者一律用 anon(name 是带所属味的默认名,key 是帖内短标记,同帖同 key=同一人,不同帖之间 key 不复用、ID 每帖重抽)。一切称呼只用隐语与绰号,任何情况下都不写出真名,也不写可对号入座的役職+姓——役職本身可以叫,役職+姓才是禁区。主线人物及其身边人也可以在这里说话,但同样匿名,只靠口癖与措辞让读者觉得「像但不明说」,绝不自曝。材料里[表板の実名メンバー]是表板上顶着真名说话的人——在这里 TA 们全都是名無し:这张名册里的任何人都可能正在某一楼匿名说话,只许用立場、口癖与「只有当事人才知道的细节」让读者觉得「表のあの人では?」,绝不许写出名册上的名字、所属+姓,也绝不许自曝或互相点破。名册上标了 ゲスト 的是共同体之外的人,TA 们进不来这里,只能被议论(「例の外部の人」那种气质)——外人被招进表板本身就是一件值得嘀咕的事。
 3. 察し在这里反转。表板上「察觉高位者就噤声」的本能在这里不成立——大家默认这里没有上面的人,所以也没有翼賛;取而代之的是偶尔的疑神疑鬼:某楼突然「ここ見られてないよね?」「消しとけ」,引发一小阵自我审查,然后照旧吐槽。没有人会写出是谁在看。
-4. 主人是潜水者。主人在这里只看不说;TA 若是这个共同体的上位者,更是绝对不会开口——TA 的名字与任何小号绝不出现在发言者里。主人若是普通成员,TA 的吐槽可以匿名混在其中,只靠口癖透出。
+4. 主人是潜水者。主人在这里只看不说,永远不会开口——TA 的名字与任何小号绝不出现在发言者里,也没有哪一楼是 TA 匿名写的;TA 若是这个共同体的上位者更是如此。TA 在这里留下的唯一痕迹,是写了又删的草稿(见 9)。
 5. 回响。材料里给出[表板最近的话题]与[最近的通達]:表板上被建前淹没的话题、刚下发的通達与公示,在这里长出真正的本音——通達越冷酷,这里越热闹。谁顶着真名在表板写了什么、回得多快、客气得多过头,在这里都能被拿出来嘀咕,但一律用隐语——「例の課長」「あの人」「〇〇の人」。正文事件只以旁观视角吃瓜(目击、听说、公开可见的部分),用隐语得出歪的推论(错位推理:歪的只许是事实与因果,不许是感情的重量——已确立的关系温度任何视角都只许围观,不许降格)。🧭认知只进不退:正文里已经公开发生或公开解决的事(误会已解开、事情已有结果),住民的认知就停在最新状态——可以翻旧账地回味「あの時はまだ…」,绝不许把已经解开的误会当成还没解开、把已有结果的事当成悬而未决;旧帖里当时的推论若已被后来公开的事实推翻,新帖与续楼都按现在的认知说话,材料里每帖标的开帖时刻就是用来分辨新旧的。
 6. 自演与安価。有人为了洗清嫌疑或带节奏,同一帖里换 key 自问自答——留下的痕迹是口吻相似的两个 key 一唱一和,绝不点破;安価(>>N に従う)只用来决定鸡毛蒜皮的小事。这两样是裏サイト的调味,不是主菜,不必每批都有。
 7. 人口有边界:只有这个共同体的成员;外面的世界只以「听说」「目击」传进来;主线人物若不属于这个共同体,只能被议论,绝不登场。视角合法性同表板:每个成员只知道公开可见或自己亲历的事,🚫绝不许把与主线雷同的经历当成自己的亲身经历。
@@ -233,10 +234,11 @@ export const PROMPT_L = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - 备忘录是完全无声的独处空间——没有读者,主人也不会对自己演戏`;
 
 // ── 全局语言开关:{{LANG_RULE}} 运行时按档替换。──
-// 2026-08-21 改版(月月拍板):ja(默认)/en/ja_zh 三档,旧 zh 档退役——「中文书写+日系翻译腔」
-// 是指令与材料互相拉扯的档位(风格词全在往日文拉),混杂漂移是结构性的;全日语反而是最稳的档。
-// en 档同时承担文化圈换算:提示词基底的日系参照(LINE/揭示板/日推)换算成英语圈对应物。
-// ── v0.14 生成双面(task-007 她拍板):M=网页快照(Astrolabe 点开浏览记录),N=Pulsar 搜索结果。──
+// 五档:zh(中文,默认)/ja_zh(日语原文+中文翻译)/en_zh(英语原文+中文翻译),以及不在设置页露出的纯 ja/en。
+// zh 档的稳定性靠两件事:①每个 scope 都明说「一律用中文书写」,不再让语言跟着正文走;②ZH_NOTE 把
+// 提示词基底里的日文词定性为「对行为与气质的描述」,要的是它的中文译本,不是照抄——旧 zh 档的中日混杂
+// 就出在这两处都没说死。en/en_zh 档同时承担文化圈换算:日系参照(LINE/揭示板/日推)换算成英语圈对应物。
+// ── v0.14 生成双面(task-007):M=网页快照(Astrolabe 点开浏览记录),N=Pulsar 搜索结果。──
 
 export const PROMPT_M = `你是 Orrery,一个隐形的叙事世界观测引擎。主人「{{char}}」的浏览器历史里有一条记录,用户点开了它——请把那个页面完整地呈现出来:这是故事世界里一张真实存在的网页的静态快照。
 
@@ -256,8 +258,8 @@ export const PROMPT_M = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - url=这张页面的完整网址:域名贴合站名,路径贴合站型的技术栈(/thread/、/article/、.php 那一挂),但不得使用现实世界真实存在的网站域名`;
 
 // ── M11:门户「Almanac」提示词(与 PROMPT_M 相邻放置),任务书-M11 §2 逐字嵌入,一个字都不许改写。──
-// M9 内网 lane(内网页首次生成/追記两条提示词与常驻三卡槽位表)已随本次改版整体撤除——她 2026-09-02 真机反馈「内网和浏览器
-// 混在一起,和内网分开的初衷落空」;三板块(常驻内网卡/浏览器/论坛公告)重合的问题一并收进这个新 app。
+// M9 内网 lane(内网页首次生成/追記两条提示词与常驻三卡槽位表)已随本次改版整体撤除——真机反馈内网页和浏览器
+// 混在一起,和内网分开的初衷落空;三板块(常驻内网卡/浏览器/论坛公告)重合的问题一并收进这个新 app。
 
 // MODE_RULE 与 modeRule(kind):与 LANG_RULE 同工法(占位替换,原文一字不动)。二态由现成的
 // world.community.kind 决定——org/school(社内イントラ/学校ポータル那一挂)→ portal;local(地域ニュース/
@@ -370,82 +372,114 @@ export const PROMPT_O = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 const LANG_RULE = {
     messenger: {
+        zh: '消息一律用中文书写:像日系 LINE 聊天的中文译本——短句连发、口语、多省略;敬语与常体的落差、各人的说话习惯,用中文的称谓与语气分寸表现,严格贴合角色身份与关系亲疏。不要输出 zh 字段。',
         ja: '消息用地道的日文网聊口语书写(LINE 风、多省略;敬语/常体与役割語严格贴合角色身份与关系亲疏)。不要输出 zh 字段。',
         en: '消息用地道的英文网聊口语书写(iMessage/WhatsApp 那种短信感:短句连发、缩写、随性的小写与省略,语气贴合角色身份与关系亲疏)。本提示词里的日系社交参照一律换算成英语圈对应物:「既読無視」= left on read,同样是最高级的沉默。不要输出 zh 字段。',
         ja_zh: '消息用地道的日文网聊口语书写(LINE 风、多省略;敬语/常体与役割語严格贴合角色身份与关系亲疏),每条同时给出中文翻译字段 zh。',
+        en_zh: '消息用地道的英文网聊口语书写(iMessage/WhatsApp 那种短信感:短句连发、缩写、随性的小写与省略,语气贴合角色身份与关系亲疏)。本提示词里的日系社交参照一律换算成英语圈对应物:「既読無視」= left on read,同样是最高级的沉默。每条同时给出中文翻译字段 zh。',
     },
     // M14(任务书-M14 §2.1):通讯录登记(PROMPT_R)专用档——只登记人不写消息,contacts/name/relation
     // 三个字段都要照世界观写法书写,写法与 messenger 档同源但独立一份,改一处不悄悄漂到消息生成上。
+    // 名字没有「译文」一说,双语档与对应的单语档同文。
     contacts: {
+        zh: '联系人名、群名与成员名用中文读者读得懂的写法:故事人物的名字照【人物设定参考】与正文里的写法写,正文没写到的人起贴合世界的名字(汉字名直接写,假名或外文名用通行的中文音译);群名用中文;relation 用中文一句话说明关系。不要输出 zh 字段。',
         ja: '联系人名、群名与成员名用这个故事世界里的表记书写(日系原作用日文;故事人物的名字照【人物设定参考】与原著写,正文没写到的人起贴合世界的名字);relation 用中文一句话说明关系。不要输出 zh 字段。',
         en: '联系人名、群名与成员名用英语圈的表记书写(故事人物的名字照【人物设定参考】与原著写,正文没写到的人起贴合世界的名字);relation 用中文一句话说明关系。本提示词里的日系参照(家族群、同期等)一律换算成英语圈对应物。不要输出 zh 字段。',
         ja_zh: '联系人名、群名与成员名用这个故事世界里的表记书写(日系原作用日文;故事人物的名字照【人物设定参考】与原著写,正文没写到的人起贴合世界的名字);relation 用中文一句话说明关系。不要输出 zh 字段。',
+        en_zh: '联系人名、群名与成员名用英语圈的表记书写(故事人物的名字照【人物设定参考】与原著写,正文没写到的人起贴合世界的名字);relation 用中文一句话说明关系。本提示词里的日系参照(家族群、同期等)一律换算成英语圈对应物。不要输出 zh 字段。',
     },
     forum: {
+        zh: '标题与正文一律用中文书写:像日本匿名揭示板帖子的中文译本——短句、跟风、抬杠、自嘲,「草」「w」量级的口癖与颜文字可以保留;名無し系的默认名、隐语与绰号同样用中文写(这个掲示板属于故事世界里的一个共同体)。不要输出 zh 字段。',
         ja: '标题与正文用地道的日本匿名揭示板网语书写(含 w、草、颜文字与板上黑话;这个掲示板属于故事世界里的一个共同体)。不要输出 zh 字段。',
         en: '标题与正文用地道的英语网络论坛口语书写(公司或学校内部论坛那一挂(Slack 式内部黑话+Reddit 式玩梗):玩梗、缩写、引用讽刺,shitpost 与认真长回复并存;这个掲示板属于故事世界里的一个共同体)。本提示词里的日系揭示板参照(5ch、w/草、名無し、役割語等)一律换算成英语圈对应物;住民网名用英语圈习惯,口癖照样跨帖一致。不要输出 zh 字段。',
         ja_zh: '标题与正文用地道的日本匿名揭示板网语书写(含 w、草、颜文字与板上黑话;这个掲示板属于故事世界里的一个共同体),每条同时给出中文翻译字段 zh。',
+        en_zh: '标题与正文用地道的英语网络论坛口语书写(公司或学校内部论坛那一挂(Slack 式内部黑话+Reddit 式玩梗):玩梗、缩写、引用讽刺,shitpost 与认真长回复并存;这个掲示板属于故事世界里的一个共同体)。本提示词里的日系揭示板参照(5ch、w/草、名無し、役割語等)一律换算成英语圈对应物;住民网名用英语圈习惯,口癖照样跨帖一致。每条同时给出中文翻译字段 zh。',
     },
     // M13(任务书-M13 §2.3):表板改実名制后不再是匿名揭示板,F/G 走这一档;F2/G2(裏サイト)
     // 性质不变,仍走上面的 forum 档——两条 lane 的语域从此彻底分开,同一个 scope 名字不再共用。
     forumOmote: {
+        zh: '板块名、标题与正文一律用中文书写:像日本実名掲示板雑談帖的中文译本——客气而放松的口吻,聊的是生活,真名+所属;displayName 与 affiliation 照【人物设定参考】与正文里的写法,正文没写到的人用中文读者读得懂的写法(社内 SNS 的闲聊频道・校内掲示板・町内掲示板那一挂,这个掲示板属于故事世界里的一个共同体)。不要输出 zh 字段。',
         ja: '标题与正文用地道的日本語実名掲示板的雑談文体书写(敬体寄りのカジュアル、生活の話題、真名+所属;社内 SNS の雑談チャンネル・校内掲示板・町内掲示板那一挂,这个掲示板属于故事世界里的一个共同体)。不要输出 zh 字段。',
         en: '标题与正文用地道的英语公司/学校内部社交板(Slack #random、Teams social channel、campus board 那一挂)的实名文体书写:friendly and casual but still workplace-appropriate,first name + team,聊的是生活不是工作;本提示词里的日系参照(社内 SNS、敬体、恋バナ、落とし物等)一律换算成英语圈对应物。不要输出 zh 字段。',
         ja_zh: '标题与正文用地道的日本語実名掲示板的雑談文体书写(敬体寄りのカジュアル、生活の話題、真名+所属;社内 SNS の雑談チャンネル・校内掲示板・町内掲示板那一挂,这个掲示板属于故事世界里的一个共同体);每条同时给出中文翻译字段 zh。',
+        en_zh: '标题与正文用地道的英语公司/学校内部社交板(Slack #random、Teams social channel、campus board 那一挂)的实名文体书写:friendly and casual but still workplace-appropriate,first name + team,聊的是生活不是工作;本提示词里的日系参照(社内 SNS、敬体、恋バナ、落とし物等)一律换算成英语圈对应物。每条同时给出中文翻译字段 zh。',
     },
     sns: {
+        zh: '推文与回复一律用中文书写:像日本推特的中文译本——短文、省略主语、跟风,深夜的情绪推与失去词汇量的崩溃短推都用中文的节奏写出来;displayName、bio 与搜索词同样用中文,handle 仍是英数字(这个 SNS 属于故事世界)。不要输出 zh 字段。',
         ja: '推文与回复用地道的日本推特口语书写(短文、体言止め、主语省略、深夜のテンション/病みツイ、限界化词汇、跟风梗;这个 SNS 属于故事世界)。不要输出 zh 字段。',
         en: '推文与回复用地道的英文推特口语书写(短文、小写化、缩写与梗、vague-posting;这个 SNS 属于故事世界)。本提示词里的日推参照一律换算成英语圈对应物:裏垢= priv/alt 小号文化,「FF外から失礼します」= 陌生人搭话的客套开场,限界化=崩溃到失去词汇量的短推("i cant"、"no bc")。不要输出 zh 字段。',
         ja_zh: '推文与回复用地道的日本推特口语书写(短文、体言止め、主语省略、深夜のテンション/病みツイ、限界化词汇、跟风梗;这个 SNS 属于故事世界),每条同时给出中文翻译字段 zh。',
+        en_zh: '推文与回复用地道的英文推特口语书写(短文、小写化、缩写与梗、vague-posting;这个 SNS 属于故事世界)。本提示词里的日推参照一律换算成英语圈对应物:裏垢= priv/alt 小号文化,「FF外から失礼します」= 陌生人搭话的客套开场,限界化=崩溃到失去词汇量的短推("i cant"、"no bc")。每条同时给出中文翻译字段 zh。',
     },
     // M3 浏览器「Astrolabe」(任务书-M3 §3 逐字):检索词是"真实网页产物",语式与聊天/帖子完全不同——
-    // 日文是关键词并列式,英文是口语搜索式,不是完整句。走同一个 langRule() 拿 ja 默认与世界观兜底。
+    // 日文是关键词并列式,英文是口语搜索式,不是完整句。走同一个 langRule() 拿默认档与世界观兜底。
     browser: {
+        zh: '检索词一律用中文书写,保持真人搜索的语式——关键词并列、空格隔开(「头痛 好不了 原因」式),不是完整句;页面标题与站名用中文,保留日本网页标题的腔调(问答/汇总/攻略 wiki/商品页那一挂)。不要输出 zh 字段。',
         ja: '检索词用地道的日文检索语式书写——关键词并列式(「頭痛 治らない 原因」),不是完整句;页面标题用地道的日文网页标题腔(Q&A/まとめ/攻略 wiki/商品页那一挂)。不要输出 zh 字段。',
         en: '检索词用地道的英文搜索语式书写("how to apologize without making it weird" 式的口语搜索或关键词并列);页面标题用英语圈网页标题腔(Q&A/论坛帖/wiki/评测那一挂)。本提示词里的日系检索参照一律换算成英语圈对应物。不要输出 zh 字段。',
         ja_zh: '检索词用地道的日文检索语式书写——关键词并列式(「頭痛 治らない 原因」),不是完整句;页面标题用地道的日文网页标题腔(Q&A/まとめ/攻略 wiki/商品页那一挂),每条同时给出中文翻译字段 zh。',
+        en_zh: '检索词用地道的英文搜索语式书写("how to apologize without making it weird" 式的口语搜索或关键词并列);页面标题用英语圈网页标题腔(Q&A/论坛帖/wiki/评测那一挂)。本提示词里的日系检索参照一律换算成英语圈对应物。每条同时给出中文翻译字段 zh。',
     },
-    // v0.14 网页快照(task-007):整页 HTML 的语言档。zh 档给的是「大意」不是整页翻译——
+    // v0.14 网页快照(task-007):整页 HTML 的语言档。双语档给的是「大意」不是整页翻译——
     // 整页翻译又贵又破坏排版,大意小字挂在页面下方即可。
     webpage: {
+        zh: '页面上所有可见文字一律用中文书写(标题、正文、导航、按钮小字、广告位、素材说明文字都是);版式与站型气质照旧按上面的要求来,只是文字是它的中文译本。不要输出 zh 字段。',
         ja: '页面全文用地道的日文网页文体书写(标题腔、正文、按钮小字都像真实的日本网页)。不要输出 zh 字段。',
         en: '页面全文用地道的英文网页文体书写;本提示词里的日系站型参照一律换算成英语圈对应物。不要输出 zh 字段。',
         ja_zh: '页面全文用地道的日文网页文体书写(标题腔、正文、按钮小字都像真实的日本网页);同时给出 zh 字段=页面主要内容的两三句中文大意(不是整页翻译)。',
+        en_zh: '页面全文用地道的英文网页文体书写;本提示词里的日系站型参照一律换算成英语圈对应物;同时给出 zh 字段=页面主要内容的两三句中文大意(不是整页翻译)。',
     },
     // M4 相册/备忘录(任务书-M4 §三逐字):gallery/memo 两个新 scope。
     gallery: {
+        zh: '照片的 label 与 desc 一律用中文书写:label 是一两个词(「天空」「便当」式);desc 是干净的镜头描述文,短句、名词收尾为主,像图注不像小说。不要输出 zh 字段。',
         ja: '照片的 label 与 desc 用日文书写:label 是一两个词(「空」「弁当」式);desc 是干净的镜头描述文,体言止め为主,像图注不像小说。不要输出 zh 字段。',
         en: 'label 与 desc 用英文书写:label 是一两个词("sky"、"lunch" 式);desc 是干净的镜头描述文,像图注不像小说。本提示词里的日系参照一律换算成英语圈对应物。不要输出 zh 字段。',
         ja_zh: '照片的 label 与 desc 用日文书写:label 是一两个词(「空」「弁当」式);desc 是干净的镜头描述文,体言止め为主,像图注不像小说;desc 同时给出中文翻译字段 zh。',
+        en_zh: 'label 与 desc 用英文书写:label 是一两个词("sky"、"lunch" 式);desc 是干净的镜头描述文,像图注不像小说。本提示词里的日系参照一律换算成英语圈对应物。desc 同时给出中文翻译字段 zh。',
     },
     memo: {
+        zh: '备忘一律用中文书写:只言片语、名词收尾、清单式换行;写给自己的备忘不会客气,也不会向自己解释。不要输出 zh 字段。',
         ja: '备忘用地道的日文メモ体书写:片言隻句、体言止め、清单式换行;写给自己的备忘里不会出现敬语。不要输出 zh 字段。',
         en: '备忘用地道的英文便签体书写:碎片短语、清单式换行、随性的小写,notes-to-self 的省略语气。本提示词里的日系参照一律换算成英语圈对应物。不要输出 zh 字段。',
         ja_zh: '备忘用地道的日文メモ体书写:片言隻句、体言止め、清单式换行;写给自己的备忘里不会出现敬语,每条同时给出中文翻译字段 zh。',
+        en_zh: '备忘用地道的英文便签体书写:碎片短语、清单式换行、随性的小写,notes-to-self 的省略语气。本提示词里的日系参照一律换算成英语圈对应物。每条同时给出中文翻译字段 zh。',
     },
     // M5 所属コミュニティ推断(任务书-M5 §2):name/officialName 是原著专名,照抄写法;desc 与
-    // worldBrief(M7b §2.5 新增)是给观测者看的说明文字,不必跟着语言档走——这点上 ja_zh 与 ja 同档。
+    // worldBrief(M7b §2.5 新增)是给观测者看的说明文字,不必跟着语言档走——双语档与对应的单语档同文。
     community: {
+        zh: 'name、officialName 与 titles 照【人物设定参考】与正文里的写法书写(役職与称呼用中文读者读得懂的写法),desc 与 worldBrief 用中文。',
         ja: 'name、officialName 与 titles 用日文原著写法,desc 与 worldBrief 用中文。',
         en: 'name、officialName 与 titles 用英文原著写法,desc 与 worldBrief 用中文。',
         ja_zh: 'name、officialName 与 titles 用日文原著写法,desc 与 worldBrief 用中文。',
+        en_zh: 'name、officialName 与 titles 用英文原著写法,desc 与 worldBrief 用中文。',
     },
     // M11 门户「Almanac」(任务书-M11 §2.4):PROMPT_P 用;PROMPT_Q 沿用 webpage 档(整页 HTML 的语言档,同网页快照)。
     almanac: {
+        zh: '板块名、件名、摘要、署名、状态与备注一律用中文书写:内部门户是公文腔(件名带【】式标记、名词收尾的一行摘要、部门署名),地域新闻是标题腔与导语。不要输出 zh 字段。',
         ja: '件名、摘要、署名与备注用地道的日文告知文体书写:内部门户是公文腔(件名带【】式标记、体言止め的一行摘要、部署名署名),地域新闻是見出し腔与リード文。不要输出 zh 字段。',
         en: '件名、摘要、署名与备注用地道的英文书写:内部门户是企业内网/校园门户的通知腔(subject line、一行摘要、部门署名),地域新闻是地方新闻的 headline 与 lede。本提示词里的日系参照一律换算成英语圈对应物。不要输出 zh 字段。',
         ja_zh: '件名、摘要、署名与备注用地道的日文告知文体书写:内部门户是公文腔(件名带【】式标记、体言止め的一行摘要、部署名署名),地域新闻是見出し腔与リード文;每条同时给出中文翻译字段 zh。',
+        en_zh: '件名、摘要、署名与备注用地道的英文书写:内部门户是企业内网/校园门户的通知腔(subject line、一行摘要、部门署名),地域新闻是地方新闻的 headline 与 lede。本提示词里的日系参照一律换算成英语圈对应物。每条同时给出中文翻译字段 zh。',
     },
 };
+// zh 档通用尾注:提示词基底里的日文词是在描述行为与气质,要的是它的中文译本。
+const ZH_NOTE = '本提示词里出现的日文词(文体名、网络用语、版式名、示例句)是在描述那种行为与气质,不是要你照抄日文:按含义用自然的中文写出来,读起来像日文原文的高水准中文译本——人名、地名、组织名、作品专名照【人物设定参考】与正文里的写法;称呼与敬语的落差用中文的称谓和语气分寸译出;严禁简中特有的网络流行语与内娱粉圈词。除专名外不夹杂日文——无论正文与手机里已有的记录是什么语言,新写的内容都用中文。';
 // 世界观兜底(全档通用):哪天用日语玩 HP、或用英语玩日系原作,氛围细节听世界观的,别硬套黑话。
 const WORLDVIEW_NOTE = '若原作世界观的地域文化与上述语言圈明显不一致,网络氛围的细节以世界观为准——住民聊的是那个世界的生活,不硬套不属于那个世界的网络黑话。';
+const LANGUAGES = ['zh', 'ja_zh', 'en_zh', 'ja', 'en'];
+const DEFAULT_LANGUAGE = 'zh';
+function normalizeLanguage(language) {
+    return LANGUAGES.includes(language) ? language : DEFAULT_LANGUAGE; // 未知值一律落到默认档
+}
+/** 双语档(原文+中文翻译字段 zh)。 */
+function isBilingual(language) { return language === 'ja_zh' || language === 'en_zh'; }
 function langRule(scope, language) {
-    const lang = (language === 'ja_zh' || language === 'en') ? language : 'ja'; // 存量 zh 及未知值一律落到默认 ja
-    return `${LANG_RULE[scope][lang]}${WORLDVIEW_NOTE}`;
+    const lang = normalizeLanguage(language);
+    return `${LANG_RULE[scope][lang]}${lang === 'zh' ? ZH_NOTE : ''}${WORLDVIEW_NOTE}`;
 }
 
 // ── 点单条数:{{COUNT_RULE}} 同 LANG_RULE 的工法(占位替换,原文一字不动)。──
-// 「刷新」是世界自己起涟漪,该冷场就冷场;但帖内/线程内的「生成」是用户按下的,她点 5 条就是想要 5 条——
+// 「刷新」是世界自己起涟漪,该冷场就冷场;但帖内/线程内的「生成」是用户按下的,点 5 条就是想要 5 条——
 // 这时再让模型自由决定「今天没人想说话」,按钮就成了掷骰子。默认档保持任务书原文,点单档才收紧。
 const COUNT_RULE_DEFAULT = {
     dm: ' 0〜5 条新消息。沉默合理时就沉默(返回空 messages)。',
@@ -462,7 +496,7 @@ function countRule(scope, n) {
         return ` ${n} 楼新回复——这是用户点的数量,请给足;可以让不同的人从不同角度接话、追问细节、补自己的推荐或感想,但不要为了凑数注水。`;
     }
     if (scope === 'forum') {
-        return ` ${n} 楼新回复——这是用户点的数量,请给足;可以让不同住民从不同角度接话、互相抬杠或歪楼,但不要为了凑数注水。`;
+        return ` ${n} 楼新回复——这是用户点的数量,请给足;可以让不同住民从不同角度接话、互相抬杠,但不要为了凑数注水。`;
     }
     if (scope === 'sns') {
         return ` ${n} 条新回复——这是用户点的数量,请给足;可以让不同账号从不同角度接话、跟风或歪楼,但不要为了凑数注水。`;
@@ -498,10 +532,10 @@ function threadCountRule(scope, n) {
 // 长度仍由 prompt 里的条数规模约束(每次 2〜8 条之类),不靠预算卡。
 const RESPONSE_BUDGET = 65500;
 
-// zh 净化:LLM 见字段就填,中文档会把原文抄一遍进 zh(她真机踩中「翻译段重复」)。
+// zh 净化:LLM 见字段就填,单语档会把原文抄一遍进 zh(表现为翻译段与原文重复)。
 // 只有双语档、且译文确实不同于原文时才入账。
 function cleanZh(zh, body, language) {
-    if (language !== 'ja_zh') return undefined;
+    if (!isBilingual(language)) return undefined;
     const z = String(zh || '').trim();
     if (!z || z === String(body || '').trim()) return undefined;
     return z;
@@ -514,7 +548,7 @@ function clampCount(n) {
 }
 
 // @handle 反查兜底(forum 住民/sns 账号共用):模型偶尔拿 handle 当 id 用,此前一律按查无此人
-// 整条静默丢弃——她真机上「刷新一条都刷不出来」的一部分来源。名册就在手里,反查是零成本的宽恕。
+// 整条静默丢弃——真机上出现过「刷新一条都刷不出来」,这是其中一部分来源。名册就在手里,反查是零成本的宽恕。
 function resolveByHandle(map, id, idKey) {
     if (!id) return null;
     const s = String(id);
@@ -563,10 +597,10 @@ function stripHtml(text) {
 }
 
 // ── 正文提纯:镜像酒馆自己的做法,本扩展不认识任何预设的标签名 ──
-// 她的诘问(真机实测:草稿混进正文):写死 <content>/<draft> 就成了某预设专用,换预设即废。
+// 真机实测(草稿混进正文):写死 <content>/<draft> 就成了某预设专用,换预设即废。
 // 酒馆的答案是——它也不认识标签。送聊天记录进 LLM 前只做两件事(核实于 script.js:4337 coreChat 映射):
 //   ① getRegexedString(mes, USER_INPUT|AI_OUTPUT, {isPrompt:true, depth}) —— 跑正则脚本的 isPrompt 档,
-//      也就是预设自己声明的「进提示词时该删什么」(她的规矩:净化类双开、美化类单开 markdownOnly)
+//      也就是预设自己声明的「进提示词时该删什么」(约定:净化类双开、美化类单开 markdownOnly)
 //   ② 思维链不走正文,而是按 Reasoning 设置里声明的 prefix/suffix 摘出去(add_to_prompts=false 时不回灌)
 // 两者都是预设/用户声明的配置,不是硬编码。orrery 照抄这套:预设换了,提纯规则自动跟着换。
 // 残留由用户在设置里兜(见 settings.excludeTags),默认空——扩展永远不猜标签。
@@ -575,7 +609,7 @@ let regexEngine; // undefined=未加载 / null=不可用 / 对象=可用
 
 // 降级必须可见:引擎是酒馆的非公开模块,路径不保证跨版本稳定。一旦引入失败,提纯静默退回
 // 「只去标签壳」——草稿/思维链会重新混进正文,而生成表面照常成功,是最难自查的一类回归。
-// 故用 live binding 把降级状态透出去,由 shell 弹一次提示(她才知道该去填「额外剔除标签」兜底)。
+// 故用 live binding 把降级状态透出去,由 shell 弹一次提示(用户才知道该去填「额外剔除标签」兜底)。
 export let textPurificationDegraded = false;
 
 export async function ensureRegexEngine() {
@@ -597,7 +631,7 @@ export async function ensureRegexEngine() {
 }
 
 // 思维链:只认 Reasoning 设置里的 prefix/suffix,不认标签名。
-// 宽容一格:前缀常被预设写进 assistant prefill(她的用法),不出现在消息体里——
+// 宽容一格:前缀常被预设写进 assistant prefill(常见用法),不出现在消息体里——
 // 这时只要后缀在前半段出现,就把它之前的整段当思维链切掉。
 function stripReasoning(ctx, text) {
     const r = ctx.powerUserSettings?.reasoning;
@@ -613,8 +647,8 @@ function stripReasoning(ctx, text) {
     return text;
 }
 
-// 用户兜底:她可在设置里列出自家预设的元信息标签(逗号分隔),整块连内容一起删。
-// 默认空 = 完全跟随酒馆。填了也只影响她自己这套,不写进代码。
+// 用户兜底:可在设置里列出自家预设的元信息标签(逗号分隔),整块连内容一起删。
+// 默认空 = 完全跟随酒馆。填了也只影响用户自己这套,不写进代码。
 function dropExcludedTags(text, excludeTags) {
     const tags = String(excludeTags || '').split(/[,，\s]+/).map(t => t.trim().replace(/^<|>$/g, '')).filter(t => /^[A-Za-z_][\w-]*$/.test(t));
     let s = text;
@@ -636,7 +670,7 @@ export function cleanMessageText(ctx, msg, depth, excludeTags) {
     return stripHtml(s);
 }
 
-// ── 世界时刻:LLM 从正文推断的叙事内时间(她拍板:时间戳按正文推算,不锚现实时钟)。──
+// ── 世界时刻:LLM 从正文推断的叙事内时间(既定设计:时间戳按正文推算,不锚现实时钟)。──
 
 function parseWorldTime(s) {
     if (!s || typeof s !== 'string') return null;
@@ -720,12 +754,12 @@ async function callCustomApi(customApi, systemPrompt, userContent, responseLengt
 
 // ── 裸调用防污染卫兵 ──
 // generateRaw 并不裸:发送前会广播 CHAT_COMPLETION_PROMPT_READY(dryRun:false,核实于
-// script.js:3891),记忆表格等插件监听该事件向一切 CC 请求注入自家指令(她真机实锤:表格
+// script.js:3891),记忆表格等插件监听该事件向一切 CC 请求注入自家指令(真机实锤:表格
 // insertRow 教学挤进 orrery 的 prompt,Gemini 3.1 把预算烧在表格上,输出 <tableEdit> 而非
 // JSON)。Profile/独立 API 通道不过这个事件、天然干净;裸通道靠这里自卫——发前 makeLast
 // 挂监听(保证排在注入插件之后),按首 80 字前缀认领本次请求的 system/user 两条消息,
 // 把别家塞进来的剔掉。认不满两条就不动(fail-open:宁可脏,绝不误伤别人的生成)。
-// ⚠️必须是集合不是单例:消息与论坛现在各持一把生成锁(她 2026-08-14 点单「刷消息时还能去看论坛」),
+// ⚠️必须是集合不是单例:消息与论坛现在各持一把生成锁(需求:刷消息时还能去看论坛),
 // 两路裸调用可以真的同时在飞。单例的话,后发的那次会覆盖先发的认领前缀,而先回来的那次
 // finally 又把它清成 null——两边一起失去防注入保护,且完全无声。
 const rawGuards = new Set();
@@ -812,7 +846,7 @@ async function liteBookEntries(ctx, bookName, scanTexts) {
 // ⚠️不能图省事拿 ctx.maxContext:那是 kobold/textgen/novel 那一侧的 max_context,聊天补全用户根本没在用它
 // (真机上它是 8192,而这台机器实际的 openai_max_context 是 2000000——照 8192 算等于没修)。
 // 照抄酒馆自己的 getMaxContextSize(script.js:5763):openai 档走 openai_max_context - openai_max_tokens,
-// 其余档走 max_context。任一环节取不到就给个足够大的数,让预算不再是瓶颈(她拍板:提示词长没关系)。
+// 其余档走 max_context。任一环节取不到就给个足够大的数,让预算不再是瓶颈(既定设计:提示词长没关系)。
 function maxContextSize(ctx) {
     if (ctx.mainApi === 'openai') {
         const cc = ctx.chatCompletionSettings || {};
@@ -823,7 +857,7 @@ function maxContextSize(ctx) {
 }
 
 // 人物设定参考:三节有来源标签的材料,主人节永远在前。
-// v0.6.7 真机翻车根因(她后台抓包实锤):getWorldInfoPrompt 的激活串不分来源,persona 书条目与
+// v0.6.7 真机翻车根因(后台抓包实锤):getWorldInfoPrompt 的激活串不分来源,persona 书条目与
 // char 书条目混成一串再被截断——主流卡写法(卡面留空、设定全在绑定世界书)下 char 设定被挤出参考,
 // 「权威人物设定」里只剩 user 的过去条目,手机主人身份直接被 user 顶掉。
 // 现在:char 绑定书与 persona 绑定书分别经 ctx.loadWorldInfo 直读并各归各节;getWorldInfoPrompt
@@ -833,7 +867,7 @@ export async function buildCastReference(ctx, floorTexts, ownerName) {
     const ch = ctx.characters?.[ctx.characterId];
     const charBook = ch?.data?.extensions?.world;
 
-    // 她的点子:orrery 的整个提示词都是「XX 的手机」,主人的名字必然在自己身份条目的关键词里——
+    // orrery 的整个提示词都是「XX 的手机」,主人的名字必然在自己身份条目的关键词里——
     // 把名字并进扫描文本,身份条目就不再依赖最近几层正文碰巧提到它(纯关键词卡也能稳定激活)。
     // 各归各扫:char 书配主人名,persona 书配 user 名,免得两边互相激活对方的条目。
     const charNames = [ch?.name, ctx.name2, ownerName].filter(Boolean);
@@ -868,7 +902,7 @@ export async function buildCastReference(ctx, floorTexts, ownerName) {
     const ownerLabel = (ownerName || '').trim() || cardName || ctx.name2 || '主角';
     const userName = (ctx.name1 || '').trim();
 
-    // ⚠️2026-08-13 拆掉了这三节原有的字符截断(2400/700/1400)。她真机实测拍板:酒馆每轮本来就发这么多,
+    // ⚠️2026-08-13 拆掉了这三节原有的字符截断(2400/700/1400)。真机实测:酒馆每轮本来就发这么多,
     // 输入长对成本与延迟影响都不大(还吃缓存),而截断砍掉的恰恰是「关系走到哪一步」这类最防 OOC 的材料。
     const sections = [];
     if (ownerParts.length) {
@@ -923,7 +957,7 @@ export async function buildInjectedNotes(ctx) {
     return { text, keys };
 }
 
-// 上下文自报:她真机验收时得能一眼看出「摘要到底进来了没有」。
+// 上下文自报:真机验收时得能一眼看出「摘要到底进来了没有」。
 // 这个项目在静默失败上栽过太多次(线程整批丢弃、提纯降级、预算被吃),凡是「看起来成功了但材料不对」
 // 的失败模式,都要在控制台留下可对账的一行。
 function logContextShape(tag, userContent, noteKeys) {
@@ -931,8 +965,8 @@ function logContextShape(tag, userContent, noteKeys) {
     console.info(`[Orrery] ${tag} 上下文 — 正文 ${floors} 层 / 注记 [${noteKeys.join(', ') || '无'}] / 合计 ${userContent.length} 字符`);
 }
 
-// user 侧硬防线:提示词纪律 Gemini 屡教不改(她真机三抓),消化层直接拒收名字匹配叙事另一方的
-// 联系人/群成员/住民小号。剧情真到相识时,设置里「允许叙事另一方登场」手动解禁——导演权在她。
+// user 侧硬防线:提示词纪律 Gemini 屡教不改(真机三抓),消化层直接拒收名字匹配叙事另一方的
+// 联系人/群成员/住民小号。剧情真到相识时,设置里「允许叙事另一方登场」手动解禁——导演权在用户。
 function isUserSide(name, ctx) {
     const u = (ctx.name1 || '').trim();
     if (!u || !name) return false;
@@ -1081,7 +1115,7 @@ const COMMUNITY_KIND_LABEL = { org: '组织·职场', school: '学校·身内', 
 function communityKindLabel(kind) {
     return COMMUNITY_KIND_LABEL[kind] || COMMUNITY_KIND_LABEL.org; // 非法值一律归 org(任务书-M5 §1.1)
 }
-// 所属一行(论坛主生成/盖楼共用):带「内部称呼」——她真机抓到的串味(主线里另一个组织的役職叫法
+// 所属一行(论坛主生成/盖楼共用):带「内部称呼」——真机抓到的串味(主线里另一个组织的役職叫法
 // 被借到主人所属的板上),治法是把本所属自己的称呼体系明写进材料,提示词匿名铁律那条再立「不借别家叫法」。
 function communityDigestLine(c) {
     return `[主人的所属] ${c.name}(${communityKindLabel(c.kind)}):${c.desc || ''}${c.titles ? `|内部称呼:${c.titles}` : ''}`;
@@ -1152,7 +1186,7 @@ function buildForumDigestText(world) {
     // world.residents(旧楼照旧按 handle 渲染),只是不再被列进这里,自然沉底。
     parts.push('[実名名册(板上每一楼都必须是这里的人;沿用为先,新人才注册)]');
     for (const r of world.residents.values()) if (r.castName) parts.push(residentRosterLine(r, world));
-    // 近 10 帖带一楼摘要(2026-08-21 月月点单):此前只给 5 帖、且只有标题,模型看不见一楼在聊什么,
+    // 近 10 帖带一楼摘要:此前只给 5 帖、且只有标题,模型看不见一楼在聊什么,
     // 撞话题是必然。更早的旧帖不再进上下文=自然沉底,newReplies 也只许指向这 10 帖——和真论坛一样。
     const recentThreads = [...world.forumThreads.values()]
         .filter(t => t.title)
@@ -1452,18 +1486,27 @@ function deriveNewFrom(watermark, tip, floorWindow) {
 
 /**
  * 二刷:楼层没有新进展时,刷新退化为「再涨一批」——同一扇正文窗口再看一圈涟漪
- * (她的用法:反复测试/想在同层多长内容——家人线程、新群、新帖)。靠世界状态差异+明示 hint 防重复。
+ * (常见用法:反复测试/想在同层多长内容——家人线程、新群、新帖)。靠世界状态差异+明示 hint 防重复。
  * 返回 { newFrom, batchFloor, hint };真空聊天 batchFloor 为 null。
  */
-function pendingOrRegrow(watermark, tip, floorWindow) {
+function pendingOrRegrow(watermark, tip, floorWindow, scope = 'messenger') {
     if (tip < 0) return { newFrom: null, batchFloor: null, hint: '' };
     const newFrom = deriveNewFrom(watermark, tip, floorWindow);
     if (newFrom !== null) return { newFrom, batchFloor: tip, hint: '' };
+    // 消息以外的 app 走通用档:下面那段消息专用的措辞(线程/群/newContact)对论坛、SNS、相册等没有意义,
+    // 「叙事另一方绝对不许出现」更与相册/备忘录/浏览器里「相识之后对方可以入镜、可以被记下」的原则相左——
+    // 叙事另一方的规矩各 app 自有 caution 与提示词原则管着,这里只重申不放松。
+    if (scope !== 'messenger') {
+        return {
+            newFrom: null, batchFloor: tip,
+            hint: '(正文自上次生成后没有新进展。请基于同样的进展,让这里继续自然生长:已有的话题有没有余温、与主线无关的日常有没有继续流动。纪律照旧且最优先:上面关于叙事另一方的要求一条都不放松;不要为了新而新,不要重复已有内容。另外,刷新不代表时间前进——世界仍冻结在正文落幕的那一瞬,绝不许生出这之后才会发生的事件;没有新剧情,就往永远撞不上下一章的方向长:此刻的心情、对既往的回味、对未来的打算、与主线无关的日常——未来只许被谈论,不许被发生。)\n\n',
+        };
+    }
     return {
         newFrom: null, batchFloor: tip,
         // v0.24.1:此前这段明写「优先自问还有谁没登场、有人选就让 TA 登场」——通讯录登记(M14)接手挖人之后,
-        // 二刷再这么写,右上角的「刷新」在她的固定测试世界(水位早已到顶,每次都是二刷)里就变成了添人按钮。
-        // 她的话:「右上角刷新还是希望像以前那样,是根据剧情自动刷新聊天;想要增加人数就去设置里搞」。
+        // 二刷再这么写,右上角的「刷新」在固定测试世界(水位早已到顶,每次都是二刷)里就变成了添人按钮。
+        // 刷新=按剧情起涟漪;添人走设置页的通讯录登记。
         hint: '(正文自上次生成后没有新进展。请基于同样的进展,让已有的线程继续自然生长:通讯录里已登记的人(包括还没有聊天记录的)谁会在此刻发来一条、哪个群里有人冒泡、已读不回的那条有没有下文、上次的话题有没有余温。不要新建联系人或群——添人是通讯录登记的事,不是刷新的事,newContact/newGroup 一律留空。纪律照旧且最优先:叙事另一方仍然绝对不许出现;不要为了新而新,不要重复已有内容。另外,刷新不代表时间前进——世界仍冻结在正文落幕的那一瞬,绝不许生出这之后才会发生的事件;没有新剧情,就把已有的话题聊得更深:此刻的心情、对既往剧情的回味、对未来的打算——未来只许被谈论,不许被发生。)\n\n',
     };
 }
@@ -1527,7 +1570,7 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
     const charName = owner || ctx.name2 || '主角';
     // 点名警示:酒馆正文永远是双人叙事结构,模型极易先验地把 user 侧当成主人的恋人/熟人,
-    // 哪怕剧情里两人素未谋面(她真机实测踩中)。指名道姓比抽象原则有效。
+    // 哪怕剧情里两人素未谋面(真机实测踩中)。指名道姓比抽象原则有效。
     const userSideName = (ctx.name1 || '').trim();
     const caution = (userSideName && userSideName !== charName)
         ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。除非剧情明确显示 TA 已与「${charName}」相识并交换了联系方式,否则「${userSideName}」不得出现在这部手机里;若现有联系人名册中没有 TA,大概率就是还不该有。\n\n`
@@ -1585,10 +1628,12 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
 
         if (t.newGroup?.groupId && t.newGroup?.name && !world.groups.has(String(t.newGroup.groupId))) {
             const groupId = String(t.newGroup.groupId);
+            const seenIds = new Set(); // 批内同 id 只收第一遍(同 runContactsGeneration)
             const members = (Array.isArray(t.newGroup.members) ? t.newGroup.members : [])
                 .filter(m => m?.id && m?.name)
                 .filter(m => allowUserContact || !isUserSide(m.name, ctx))
-                .map(m => ({ id: String(m.id), name: String(m.name) }));
+                .map(m => ({ id: String(m.id), name: String(m.name) }))
+                .filter(m => (seenIds.has(m.id) ? false : (seenIds.add(m.id), true)));
             if (members.length >= 2) { // 一个人不成群
                 const payload = { groupId, name: String(t.newGroup.name), members };
                 const added = await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'messenger', type: 'group', payload });
@@ -1642,7 +1687,7 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
                 delayMin: Number.isFinite(m.delayMin) ? m.delayMin : 0, read: !(m.read === false || m.read === 'false'),
                 worldTime: times[i],
             };
-            { const z = cleanZh(m.zh, m.text, language); if (z) payload.zh = z; } // ja_zh 档才要求 LLM 给,zh 档天然缺失,渲染层容错
+            { const z = cleanZh(m.zh, m.text, language); if (z) payload.zh = z; } // 双语档才要求 LLM 给,单语档天然缺失,渲染层容错
             await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'messenger', type: 'chat_message', payload });
             addedCount++;
         }
@@ -1683,7 +1728,7 @@ async function runContactsGeneration(ctx, store, { worldKey, floorWindow, profil
     if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
 
     // 登记的是「故事开始之前就躺在手机里的人」,账落在第 0 楼:回滚只认 sourceFloor(rollback.js
-    // 的 delete-by-floor),若落在当前末层,她 swipe 一次末层整份名册就会被当成那层的余波抹掉——
+    // 的 delete-by-floor),若落在当前末层,用户 swipe 一次末层整份名册就会被当成那层的余波抹掉——
     // 名册不是任何一层正文激起的水纹,不该跟着某一层倒带。聊天为空(认主时正文还是 0 楼)也允许登记。
     const sourceFloor = 0;
     let contactsAdded = 0, groupsAdded = 0, membersAdded = 0;
@@ -1708,10 +1753,13 @@ async function runContactsGeneration(ctx, store, { worldKey, floorWindow, profil
     for (const g of groupsOk ? parsed.groups : []) {
         if (!g?.groupId || !g?.name) continue;
         const groupId = String(g.groupId);
+        // 同一批里模型把同一个人列两遍(同 id)时只收第一遍——下面的去重只对着已入账的成员,管不到批内重复。
+        const seenIds = new Set();
         const members = (Array.isArray(g.members) ? g.members : [])
             .filter(m => m?.id && m?.name)
             .filter(m => allowUserContact || !isUserSide(m.name, ctx))
-            .map(m => ({ id: String(m.id), name: String(m.name) }));
+            .map(m => ({ id: String(m.id), name: String(m.name) }))
+            .filter(m => (seenIds.has(m.id) ? false : (seenIds.add(m.id), true)));
         const existing = world.groups.get(groupId);
         if (existing) {
             // 补员:新成员按 id 去重并入已有 members(旧成员顺序不动、新成员追加在后),名字沿用
@@ -1770,10 +1818,10 @@ async function runThreadContinue(ctx, store, { worldKey, threadId, floorWindow, 
             .replaceAll('{{LANG_RULE}}', langRule('messenger', language))
             .replaceAll('{{COUNT_RULE}}', countRule('dm', count));
     // 续聊此前只有【人物设定参考】+ 线程记录,连正文和摘要都看不到——比主生成还盲,
-    // 于是「点进去续几句」永远停在关系的原点(她 2026-08-13 报的 OOC,这条路是重灾区)。
+    // 于是「点进去续几句」永远停在关系的原点(真机反馈过的 OOC,这条路是重灾区)。
     // 现在与主生成同一套底料:设定 → 摘要注记 → 正文近况,最后才是这条线程自己的上下文。
     // v0.24.1:对面是谁要点名。通讯录登记(M14)之后线程可以是空的——没有一条记录给模型当锚,
-    // 正文又是双人叙事,模型顺手就把对面当成叙事另一方(她真机:「char 永远会把对面当成 user」)。
+    // 正文又是双人叙事,模型顺手就把对面当成叙事另一方(真机上的症状:char 永远会把对面当成 user)。
     // 主生成早有这段点名警示,续聊一直没有;现在补上,并把对面的名字与关系写进材料抬头。
     const userSideName = (ctx.name1 || '').trim();
     const whoLine = isGroup
@@ -1859,7 +1907,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'forum');
     const tip = ctx.chat.length - 1;
-    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow, 'generic');
     if (batchFloor === null) return { ok: true, changed: false };
 
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
@@ -2037,7 +2085,7 @@ async function runForumUraMainGeneration(ctx, store, { worldKey, floorWindow, pr
     await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'forumUra');
     const tip = ctx.chat.length - 1;
-    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow, 'generic');
     if (batchFloor === null) return { ok: true, changed: false };
 
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
@@ -2056,7 +2104,7 @@ async function runForumUraMainGeneration(ctx, store, { worldKey, floorWindow, pr
     const notes = await buildInjectedNotes(ctx);
     // v0.24.2:裏サイト不再喂【主人已在私密处流露的心境】——那块材料是给「主人开口时真心不倒退」当水位的,
     // 而主人在裏永远只潜水(M12.1),它在这里唯一的作用就是把主人的私密情绪漏给吃瓜的名無し,
-    // 她真机的观感「论坛里 char 的情绪比正文极端」有一半来自这里。
+    // 真机上的观感——论坛里 char 的情绪比正文极端——有一半来自这里。
     const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}【裏サイト当前状态】\n${buildForumUraDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
     logContextShape('裏サイト生成', userContent, notes.keys);
     const systemPrompt = PROMPT_F2.replaceAll('{{char}}', charName).replaceAll('{{community}}', community.name).replaceAll('{{LANG_RULE}}', langRule('forum', language)).replaceAll('{{THREAD_COUNT_RULE}}', threadCountRule('forum', count));
@@ -2172,8 +2220,10 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWin
     // ⚠️只许单向包含(castName 含整个 charName):身边人常与主人同姓,若反过来让「charName 含 castName」
     // 也算命中,一个 castName 只写了姓的亲戚小号就会被当成主人,草稿发到别人名下。宁可多注册一个
     // 主人小号,不可把主人的话安到亲戚头上。
-    const ownerRes = (draft && !isUra) ? [...world.residents.values()].find(r => r.castName
-        && (r.castName === charName || r.castName.includes(charName))) : null;
+    // 全等优先于包含:名册里先注册了一个 castName 只是「含」主人名字的人时,不能让 TA 抢在主人本人前面命中。
+    const residentList = (draft && !isUra) ? [...world.residents.values()] : [];
+    const ownerRes = residentList.find(r => r.castName === charName)
+        || residentList.find(r => r.castName && r.castName.includes(charName)) || null;
 
     // {{community}}:盖楼不重新推断(那是主生成的活),world.community 缺失时按任务书-M5 §4
     // 用「この掲示板」兜底——不阻塞盖楼(旧世界/推断失败之后仍能继续围观已有帖子)。裏帖走 G2。
@@ -2192,7 +2242,7 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWin
     // 草稿本身不进 buildForumThreadDigestText(住民看不见未发送的东西),只在这里额外告诉模型
     // 「主人马上要发出这一楼」,让续写的住民能对它自然产生反应——放在 digest 末尾,同 regrowHint
     // 的位置哲学(临时指令贴着输出更有效,不挤占前面稳定材料的缓存)。
-    // M12.1(她 2026-09-03 拍板):裏帖的草稿永远发不出去——领导在裏一开口,打工人的嗅觉马上把这块地
+    // M12.1:裏帖的草稿永远发不出去——领导在裏一开口,打工人的嗅觉马上把这块地
     // 也毁了,里版就再也听不到实话。草稿本身留着当「写了又删」的余波(buildOwnerInnerStateText 已把草稿
     // 喂进感情棘轮),但不再作为「刚刚发出的回复」告诉模型,住民也就永远看不见它。
     const draftNote = (draft?.text && !isUra)
@@ -2200,7 +2250,7 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWin
         : '';
     // v0.22.2:标题+首楼在材料末尾再给一遍——长帖里首楼离生成点太远,模型只顾接上一楼就忘了首楼在问什么;
     // 对照 Perigee 论坛的做法:首楼逐字给两遍,后一遍紧贴生成指令,配合 G/G2 里的「话题范围」条。
-    // v0.24.2:开帖时刻与现在并排给出(她真机:第 11 章开的帖到第 20 章续楼,住民还当误会没解开)——
+    // v0.24.2:开帖时刻与现在并排给出(真机上出现过:第 11 章开的帖到第 20 章续楼,住民还当误会没解开)——
     // 【本帖的主題】把话题锚在开帖那一刻,却没告诉模型那一刻已经过去多久;续楼的人活在现在,
     // 开帖之后公开发生的事 TA 们都知道。楼层数只是相对刻度(不是章节),够模型看出「之后又发生了很多」。
     const tipFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
@@ -2315,7 +2365,7 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
     await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'sns');
     const tip = ctx.chat.length - 1;
-    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow, 'generic');
     if (batchFloor === null) return { ok: true, changed: false };
 
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
@@ -2344,7 +2394,7 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
 
     let addedCount = 0;
 
-    // ── newAccounts:同 accountId 重发=更新(改 bio/改名文化,月月拍板收);ownerRole 全世界 omote/ura
+    // ── newAccounts:同 accountId 重发=更新(改 bio/改名文化,既定设计);ownerRole 全世界 omote/ura
     //    各至多一个,重复出现按 ownerRole 归并到已有 accountId,别让主人长出两个表垢。 ──
     for (const a of Array.isArray(parsed.newAccounts) ? parsed.newAccounts : []) {
         if (!a?.accountId || !a?.handle) continue;
@@ -2497,7 +2547,7 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
     return { ok: true, changed: true, added: addedCount };
 }
 
-// ── v0.14:Pulsar 搜索结果生成(task-007 她的翻转:「猜你想搜索」——词条是主人侧生成的,观测者
+// ── v0.14:Pulsar 搜索结果生成(task-007,反转:「猜你想搜索」——词条是主人侧生成的,观测者
 //    只点选看哪条,与「继续围观」同构,零输入铁律无伤)。同词只生成一次,之后永远读缓存。──
 
 async function runSnsSearchGeneration(ctx, store, { worldKey, word, floorWindow, profileId, customApi, owner, language, allowUserContact, excludeTags }) {
@@ -2566,7 +2616,7 @@ async function runSnsSearchGeneration(ctx, store, { worldKey, word, floorWindow,
     return { ok: true, changed: true, added };
 }
 
-// ── v0.14:网页快照生成(task-007 她拍板:AI 直出整页 HTML,不用预置模板;点开才生成一次,
+// ── v0.14:网页快照生成(task-007:AI 直出整页 HTML,不用预置模板;点开才生成一次,
 //    入账永久缓存;消毒与沙箱渲染在 UI 层,这里存原始 html)。──
 
 async function runBrowserPageGeneration(ctx, store, { worldKey, visitId, floorWindow, profileId, customApi, owner, language, excludeTags }) {
@@ -2618,7 +2668,7 @@ async function runBrowserPageGeneration(ctx, store, { worldKey, visitId, floorWi
         visitId, url: String(parsed.url || '').slice(0, 300), html: String(parsed.html),
         worldTime: visit.worldTime,
     };
-    if (language === 'ja_zh' && parsed.zh) payload.zh = String(parsed.zh); // 大意不是整页翻译,cleanZh 的等值判断不适用
+    if (isBilingual(language) && parsed.zh) payload.zh = String(parsed.zh); // 大意不是整页翻译,cleanZh 的等值判断不适用
     await store.addEntry({ worldKey, sourceFloor, app: 'browser', type: 'web_snapshot', payload });
     return { ok: true, changed: true, added: 1 };
 }
@@ -2698,7 +2748,7 @@ async function runBrowserMainGeneration(ctx, store, { worldKey, floorWindow, pro
     await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'browser');
     const tip = ctx.chat.length - 1;
-    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow, 'generic');
     if (batchFloor === null) return { ok: true, changed: false };
 
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
@@ -2794,7 +2844,7 @@ async function runGalleryMainGeneration(ctx, store, { worldKey, floorWindow, pro
     await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'gallery');
     const tip = ctx.chat.length - 1;
-    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow, 'generic');
     if (batchFloor === null) return { ok: true, changed: false };
 
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
@@ -2858,7 +2908,7 @@ async function runMemoMainGeneration(ctx, store, { worldKey, floorWindow, profil
     await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'memo');
     const tip = ctx.chat.length - 1;
-    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow, 'generic');
     if (batchFloor === null) return { ok: true, changed: false };
 
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
@@ -2964,7 +3014,7 @@ async function runAlmanacMainGeneration(ctx, store, { worldKey, floorWindow, pro
     await ensureRegexEngine();
     const watermark = await store.getWatermark(worldKey, 'almanac');
     const tip = ctx.chat.length - 1;
-    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow);
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow, 'generic');
     if (batchFloor === null) return { ok: true, changed: false };
 
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
@@ -2974,7 +3024,7 @@ async function runAlmanacMainGeneration(ctx, store, { worldKey, floorWindow, pro
     if (!community) return { ok: false, error: 'community_failed' };
     world.community = community; // 首次生成时是刚写入的新条目,folded world 还没见过它,手动同步一次
 
-    // 门户/新闻两态共用同一句(她拍板两态都要挡叙事另一方越界,措辞不必分叉)。
+    // 门户/新闻两态共用同一句(两态都要挡叙事另一方越界,措辞不必分叉)。
     const userSideName = (ctx.name1 || '').trim();
     const caution = (userSideName && userSideName !== charName)
         ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。条目与页面绝不许以「${userSideName}」的视角书写;TA 若不属于这个共同体、也不是公开人物,提到 TA 至多用模糊的关联写法(相手方、関係者那一挂),两人尚未相识时连名字都不许出现。\n\n`
@@ -3140,7 +3190,7 @@ async function runAlmanacPageGeneration(ctx, store, { worldKey, itemId, floorWin
         itemId, url: String(parsed.url || '').slice(0, 300), html: String(parsed.html),
         worldTime: item.worldTime, // 反悔按时间线扫到它时与条目同生同灭(任务书 §1.3)
     };
-    if (language === 'ja_zh' && parsed.zh) payload.zh = String(parsed.zh);
+    if (isBilingual(language) && parsed.zh) payload.zh = String(parsed.zh);
     await store.addEntry({ worldKey, sourceFloor: tip, app: 'almanac', type: 'almanac_page', payload });
     return { ok: true, changed: true, added: 1 };
 }

@@ -4,6 +4,7 @@
 // 旧世界没有 displayName 的老住民才退回 world.shortIdFor 的短 ID,不暴露真名。
 import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_STAR, ICON_STAR_FILL, ICON_SEND, ICON_EXPORT, ICON_CHECK } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
+import { chrome } from '../../ui/chrome.js';
 import { shortIdFor, seenKeyForForumThread, newReplyCountOfForumThread, starKeyForForumThread, anonIdFor } from '../../core/world.js';
 import { formatRelativeTime } from '../../core/worldtime.js';
 
@@ -27,18 +28,18 @@ function genSpinnerHtml() {
 export function authorLabel(world, item, threadId) {
     if (item.anon) return `${item.anon.name} ID:${anonIdFor(threadId, item.anon.key)}`;
     const r = world.residents.get(item.authorId);
-    if (r?.displayName) return `${r.displayName}${r.affiliation ? ` · ${r.affiliation}` : ''}${r.kind === 'guest' ? ' · ゲスト' : ''}`;
+    if (r?.displayName) return `${r.displayName}${r.affiliation ? ` · ${r.affiliation}` : ''}${r.kind === 'guest' ? ` · ${chrome('forum.guest')}` : ''}`;
     return r ? `${r.handle} #${shortIdFor(item.authorId)}` : String(item.authorId);
 }
 
-// 每页帖数(2026-08-21 月月点单分页,参考 Perigee 论坛):翻页纯本地渲染,不耗生成。
+// 每页帖数(分页参考 Perigee 论坛):翻页纯本地渲染,不耗生成。
 const THREADS_PER_PAGE = 10;
 
 /**
  * 帖子列表(论坛首屏,按 lastActiveTs 倒序 + 分页;M12 起板块 chip 过滤降级为表裏 tab 切换——
- * 她从不按板块看帖,都是直接开首页,板块只留在每行的小标签上当帖子的属性)。
+ * 用户从不按板块看帖,都是直接开首页,板块只留在每行的小标签上当帖子的属性)。
  * @param side 'omote'(表,缺省)| 'ura'(裏サイト)——过滤态,同旧 boardId 的哲学,不入导航栈
- * @param seen 「我看过了」水位表:某帖没有记录=她从没点进去过=新帖(挂 NEW),有记录就比对回复数
+ * @param seen 「我看过了」水位表:某帖没有记录=用户从没点进去过=新帖(挂 NEW),有记录就比对回复数
  * @param justUpdated 刚这一次刷新里新增/被盖楼的 threadId 集合——只用来播一次入场动效
  * @param page 1 起的页码;越界时钳回有效范围(反悔删帖把最后一页删空也不会白屏)
  * @param threadBatch M14:头部 −/+ 决定一次「刷新」出几个新帖(表裏共用一个数,钳制在 shell 的 doStepper)
@@ -64,19 +65,19 @@ export function renderForumListHtml({ world, busy, side = 'omote', page = 1, see
     // M12:表裏切换条,样式照 apps/browser/skin.css 的 .or-browser-tabs 两钮切换,独立一份
     // (不复用同一个类名——两个 app 的 tab 语义不同,改一处不该悄悄漂到另一处)。
     const tabs = `<div class="or-forum-tabs">
-        <button class="${!isUra ? 'on' : ''}" data-action="forum-select-side" data-side="omote">表</button>
-        <button class="${isUra ? 'on' : ''}" data-action="forum-select-side" data-side="ura">裏</button>
+        <button class="${!isUra ? 'on' : ''}" data-action="forum-select-side" data-side="omote">${chrome('forum.omote')}</button>
+        <button class="${isUra ? 'on' : ''}" data-action="forum-select-side" data-side="ura">${chrome('forum.ura')}</button>
     </div>`;
 
     const body = threads.length
         ? `<div class="or-forum-list${isUra ? ' ura' : ''}">${pageThreads.map(t => {
             const board = world.boards.get(t.boardId);
             const seenTs = seen[seenKeyForForumThread(t.threadId)];
-            const neverOpened = seenTs === undefined;              // 一次都没点进去过 = 这帖对她来说是新的
+            const neverOpened = seenTs === undefined;              // 一次都没点进去过 = 这帖对用户来说是新的
             const newReplies = neverOpened ? 0 : newReplyCountOfForumThread(t, seenTs);
             const cls = ['or-forum-row', justUpdated?.has(t.threadId) ? 'just-arrived' : ''].filter(Boolean).join(' ');
             // 裏帖没有板块——标签位换成固定的「裏」小标(与板块名同一个视觉位置,风格另加 ura 修饰类)。
-            const tag = isUra ? '<span class="or-forum-tag ura">裏</span>' : (board ? `<span class="or-forum-tag">${escapeHtml(board.name)}</span>` : '');
+            const tag = isUra ? `<span class="or-forum-tag ura">${chrome('forum.ura')}</span>` : (board ? `<span class="or-forum-tag">${escapeHtml(board.name)}</span>` : '');
             return `<button class="${cls}" data-action="open-forum-thread" data-thread-id="${escapeHtml(t.threadId)}">
                 <div class="or-forum-row-tags">
                     ${tag}
@@ -86,7 +87,7 @@ export function renderForumListHtml({ world, busy, side = 'omote', page = 1, see
                 <div class="or-forum-meta">${escapeHtml(authorLabel(world, t, t.threadId))} · ${t.replyCount} 回复 · ${formatRelativeTime(t.lastActiveTs, world.worldClock)}${newReplies ? `<span class="or-forum-newreply">+${newReplies} 新回复</span>` : ''}</div>
             </button>`;
         }).join('')}</div>`
-        : `<div class="or-empty">${isUra ? '裏サイト还是空的。点「刷新」——这里没有上面的人。' : '论坛还是空的,点「刷新」按主人的所属建板。'}</div>`;
+        : `<div class="or-empty">${isUra ? `${chrome('forum.uraSite')}还是空的。点「刷新」——这里没有上面的人。` : '论坛还是空的,点「刷新」按主人的所属建板。'}</div>`;
 
     // 分页条:单页时不占地方;prev/next 给绝对页码,shell 侧不做相对运算
     const pager = totalPages > 1 ? `<div class="or-forum-pager">
@@ -169,7 +170,7 @@ export function renderForumThreadHtml({
     // 没有草稿就是空占位符;生成按钮的文案由它决定(有草稿=先发出再续写)。
     const d = thread.myDraft;
     const hasDraft = !!d?.text;
-    // M12.1(她 2026-09-03 拍板):裏帖的草稿永远发不出去——回复框里照样显示「写了又删」的那句话
+    // M12.1:裏帖的草稿永远发不出去——回复框里照样显示「写了又删」的那句话
     // 与光标(余波本体),但发送图标不点亮、按钮只剩「生成回复」;领导在裏一开口,打工人的嗅觉会把
     // 这块地也毁掉,里版从此听不到实话。
     const canSend = hasDraft && thread.side !== 'ura';
@@ -181,10 +182,10 @@ export function renderForumThreadHtml({
         </div>
         ${hasDraft && d.zh && d.zh !== d.text ? `<div class="or-forum-composer-zh">${escapeHtml(d.zh)}</div>` : ''}`;
 
-    // M12:裏サイト的帖子在作者行前挂一枚「裏サイト」小标——她进屏第一眼就知道自己在哪个 lane,
+    // M12:裏サイト的帖子在作者行前挂一枚「裏サイト」小标——用户进屏第一眼就知道自己在哪个 lane,
     // 不必回头看列表页的表裏切换条。
     const opBody = `<div class="or-forum-op-title">${escapeHtml(thread.title)}</div>
-                ${thread.side === 'ura' ? '<span class="or-forum-tag ura">裏サイト</span>' : ''}
+                ${thread.side === 'ura' ? `<span class="or-forum-tag ura">${chrome('forum.uraSite')}</span>` : ''}
                 <div class="or-forum-op-author">${escapeHtml(authorLabel(world, thread, thread.threadId))} · ${formatRelativeTime(thread.worldTime, forumNow)}${exportMode ? '' : starBtn}</div>
                 <div class="or-forum-op-body">${escapeHtml(thread.body)}${thread.zh && thread.zh !== thread.body ? `<div class="or-zh">${escapeHtml(thread.zh)}</div>` : ''}</div>`;
     const opHtml = exportMode

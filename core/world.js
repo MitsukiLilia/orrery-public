@@ -34,7 +34,7 @@ export function computeWorldKey(ctx) {
  * 酒馆的分支/检查点会把父聊天的 chat_metadata 整份抄进新文件(script.js saveChat:
  * `{ ...chat_metadata, ...withMetadata }`,withMetadata 只多一个 main_chat=父聊天名)——冻结在里面的
  * orrery_world_id 也跟着被抄走,于是两个聊天共用一个世界:分支里能看到父线后半段的余波,分支里 swipe/
- * 删楼还会按 sourceFloor 砍掉父线的账(她 2026-08-30 开分支玩不同走向时撞上)。
+ * 删楼还会按 sourceFloor 砍掉父线的账(真机实测撞上:开分支玩不同走向时会命中此坑)。
  * 识别条件:main_chat 存在,且当前 id 恰好等于「父聊天的 legacy key」——说明这把钥匙是抄来的,不是
  * 自己冻的。改名/导入不会命中(main_chat 不变、id 也不等于新名字的 legacy);分支再分支同样命中
  * (中间那层已分叉成自己的 id,再往下抄走的正是它)。
@@ -73,7 +73,7 @@ export async function forkBranchWorld(ctx, store) {
             const r = await store.forkWorld(from, to, tip);
             console.info(`[Orrery] 分支世界已分叉:复制 ${r.copied} 条余波(≤第${tip}层)${r.skipped ? '(目标已有内容,跳过复制)' : ''}`);
         } catch (err) {
-            // 失败不能只留控制台一行:分支从此是空世界,她在手机里看到的只是「什么都没有」,得让她知道是分叉炸了。
+            // 失败不能只留控制台一行:分支从此是空世界,用户在手机里看到的只是「什么都没有」,得让用户知道是分叉炸了。
             console.error('[Orrery] 分支世界分叉失败,改用空世界', err);
             globalThis.toastr?.error?.('分支世界分叉失败,这个分支从空世界开始(详见控制台)', 'Orrery');
         }
@@ -434,7 +434,7 @@ export function foldWorld(entries) {
 
 // ── 「我看过了」水位:用户视角的未读,与 payload.read 是两回事,不许混。 ──
 // payload.read 是**叙事内**的已读(模型用它演已读不回,主角在故事里看没看到);
-// 下面这套是**用户**有没有亲眼看过——刷新完新长出来的东西,她没点进去就是新的。
+// 下面这套是**用户**有没有亲眼看过——刷新完新长出来的东西,用户没点进去就是新的。
 // 两者互不干涉:既読照常由模型演,红点/NEW 只认 seen 水位(每线程/每帖一个入账 ts)。
 // 记 ts(入账序号)而不是 displayTs(世界时间):世界时间是模型编的,同一批生成里可能落在过去。
 
@@ -529,7 +529,7 @@ export function latestTsOfAlmanac(world) {
     return max;
 }
 
-/** 某个 app 里还有没有她没看过的东西——真手机的图标角标就是这个语义(有未读就亮)。 */
+/** 某个 app 里还有没有用户没看过的东西——真手机的图标角标就是这个语义(有未读就亮)。 */
 export function hasUnseenInApp(app, world, seen) {
     if (app === 'messenger') {
         for (const t of world.threads.values()) {

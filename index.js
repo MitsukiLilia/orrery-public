@@ -17,7 +17,7 @@ function waitForExtensionsMenu(cb) {
 
 // 自报家门:排查「更新了却在跑旧码」(酒馆本地/全局双副本、静默 pull 失败)时,
 // 让实际加载的这份代码自己在控制台亮明版本——比对扩展管理器显示的版本号即知真伪。
-export const ORRERY_VERSION = '0.24.2';
+export const ORRERY_VERSION = '0.25.0';
 console.info(`[Orrery] v${ORRERY_VERSION} 已加载 · 输出预算 65500`);
 
 function main() {
@@ -35,7 +35,7 @@ function main() {
     /**
      * 只问「有没有还没生成过余波的楼层」——自动刷新用这个。
      * ⚠️不能拿下面的 hasNewRipples 代劳:那个把「有未读」也算进去了,而未读绝不该触发生成
-     * (她刷完不点开,自动刷新就会一轮轮重复生成,白烧额度)。两者语义必须分开。
+     * (用户刷完不点开,自动刷新就会一轮轮重复生成,白烧额度)。两者语义必须分开。
      */
     async function hasPendingFloors() {
         const worldKey = computeWorldKey(ctx);
@@ -60,8 +60,8 @@ function main() {
         const tip = ctx.chat.length - 1;
         if (tip < 0) return false;
         if (await hasPendingFloors()) return true;
-        // 楼层都已生成过余波,还要问一句:生成出来的东西她看了没有?真手机的角标本来就是「有未读」,
-        // 只认水位的话,自动刷新替她生成完一批,红点当场就灭了——她永远不知道有新消息躺在里面。
+        // 楼层都已生成过余波,还要问一句:生成出来的东西用户看了没有?真手机的角标本来就是「有未读」,
+        // 只认水位的话,自动刷新替用户生成完一批,红点当场就灭了——用户永远不知道有新消息躺在里面。
         // 基线没打过则跳过:那时整个账本还没被认领,旧内容会被整批误判成未读(见 store.initSeenBaseline)。
         if (!(await store.hasSeenBaseline(worldKey))) return false;
         const [entries, seen] = await Promise.all([
@@ -82,7 +82,7 @@ function main() {
         if (fabDot) fabDot.style.display = show;
     }
 
-    // 悬浮球:主入口(她真机首反馈:光有魔杖菜单项找不到)。竖向可拖、右侧贴边、位置记忆;设置里可关。
+    // 悬浮球:主入口(真机首反馈:光有魔杖菜单项找不到)。竖向可拖、右侧贴边、位置记忆;设置里可关。
     function ensureFab() {
         const s = ctx.extensionSettings.orrery || {};
         const show = s.showFab !== false; // 默认开
@@ -123,10 +123,10 @@ function main() {
 
     const shell = createShell(ctx, refreshBadge);
 
-    // 自动刷新:开着时,楼层事件安定 1.6s 后自动跑一次主生成(一次调用刷一批;她 2026-08-11 点单)。
+    // 自动刷新:开着时,楼层事件安定 1.6s 后自动跑一次主生成(一次调用刷一批)。
     // 生成完 pending 清空,后续 onWorldChanged 不会再触发——天然防循环。
     // ⏱ 判据用 hasPendingFloors 而不是 hasNewRipples——后者含「有未读」,拿它当触发器
-    // 会在她刷完不点开时一轮轮重复生成。
+    // 会在用户刷完不点开时一轮轮重复生成。
     // 撞上生成锁的那一档不在这里补,交给 shell 的 autoQueued(锁一释放就补跑),
     // 因为一次生成可能要四十几秒,在这里数着次数重试永远赶不上。
     let autoTimer = null;

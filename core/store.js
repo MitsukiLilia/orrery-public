@@ -286,7 +286,7 @@ export async function deleteTweetRepliesFrom(worldKey, tweetId, fromTs) {
  * 的全删(任务书 §2)。工法同 deleteTweetRepliesFrom(游标扫世界、条件命中就删),但比对字段是
  * worldTime 不是 ts——两 tab 按世界时间混排展示,长按定位到的是"这一条在时间轴上的位置",反悔边界
  * 也该按这条线切,而不是各型各自的入账序号(检索与它带出的浏览往往同一批入账、ts 挨得很近但
- * worldTime 才是她在屏幕上认出来的那条时间线)。缺 worldTime 的畸形条目保守地一并删掉(同
+ * worldTime 才是用户在屏幕上认出来的那条时间线)。缺 worldTime 的畸形条目保守地一并删掉(同
  * deleteThreadFrom 的先例)。
  * ⚠️isBrowserType 仍列着 'web_snapshot_append'——M9 常驻卡与内网追記已随 M11 一并撤除(fold 不再
  * 消化这两型),但旧世界的账本里可能还躺着这些条目,倒带扫过它们时理应一并清掉,不留孤儿数据;
@@ -525,7 +525,7 @@ async function writeMeta(meta) {
 // 一次性搬进 watermarks.messenger,forum/sns 从 -1 起(旧数据里论坛/SNS 这回事根本不存在)。
 // 旧 pendingFloors 字段直接丢弃——M1 已废除该机制,pending 完全靠水位推导(见 generator.js)。
 // M12:forumUra 是裏サイト自己的水位(与表板的 forum 各存各的,同 messenger/forum 分家的先例)——
-// 她没开始用裏之前这个键永远是 -1,不会让悬浮球角标常亮(见 ui/shell.js 网格红点的 hasUra 判据)。
+// 用户没开始用裏之前这个键永远是 -1,不会让悬浮球角标常亮(见 ui/shell.js 网格红点的 hasUra 判据)。
 function normalizeWatermarks(meta) {
     if (meta.watermarks && typeof meta.watermarks === 'object') {
         return { messenger: -1, forum: -1, forumUra: -1, sns: -1, browser: -1, gallery: -1, memo: -1, almanac: -1, ...meta.watermarks };
@@ -584,7 +584,7 @@ export async function markSeen(worldKey, key, ts) {
 
 /**
  * 基线打过没有。手机外面那颗红点要靠它判断「未读」这件事此刻算不算数——
- * 基线未打时整个账本都还没被认领过,任何未读判断都会把她早看过的旧内容误报成新的。
+ * 基线未打时整个账本都还没被认领过,任何未读判断都会把用户早看过的旧内容误报成新的。
  */
 export async function hasSeenBaseline(worldKey) {
     if (!worldKey) return false;
@@ -593,7 +593,7 @@ export async function hasSeenBaseline(worldKey) {
 
 /**
  * 基线:seen 是新机制,老世界一条记录都没有——不打基线的话,升级后一开手机满屏未读和 NEW,
- * 而那些内容她早就看过了。首次把当时已有的一切一次性记成看过,此后长出来的才算新。
+ * 而那些内容用户早就看过了。首次把当时已有的一切一次性记成看过,此后长出来的才算新。
  * @param {Array<[string, number]>} pairs [seenKey, 该线程/帖子当前最新 ts]
  * @returns {Promise<boolean>} 是否真的打了基线(已打过返回 false)
  */

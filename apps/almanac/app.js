@@ -3,6 +3,7 @@
 // 三层结构:首页(板块入口 + 新着)→ 板块(条目一览)→ 条目(点开才生成的一整张页面,可导出)。
 import { ICON_BACK, ICON_APP_ALMANAC, ICON_EXPORT } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
+import { chrome } from '../../ui/chrome.js';
 import { formatClock, formatFullTime } from '../../core/worldtime.js';
 import { sanitizeSnapshotHtml, withDateSeps } from '../browser/app.js'; // 消毒管线与日分隔工法的正本,不复制一份
 
@@ -17,8 +18,8 @@ function genSpinnerHtml() {
 // kind 不认识时按 org(イントラネット)兜底——同 core/generator.js modeRule() 的兜底哲学,两处各自实现
 // 不共用一个函数(apps 与 core 之间零共享格式化函数,同 browser 的先例)。
 function almanacModeLabel(community) {
-    if (!community) return '観測待ち';
-    const tag = community.kind === 'local' ? '地域ニュース' : (community.kind === 'school' ? 'ポータル' : 'イントラネット');
+    if (!community) return chrome('alm.pending');
+    const tag = chrome(community.kind === 'local' ? 'alm.local' : (community.kind === 'school' ? 'alm.school' : 'alm.org'));
     return `${community.name}|${tag}`;
 }
 
@@ -35,7 +36,7 @@ function sectionBadgeCount(world, section, seenAt) {
 }
 
 // 条目行:首页「新着」区与板块页列表共用同一个组件(任务书-M11 §6.1)。
-// isNew 判据同 sectionBadgeCount——ts(入账序号)不是 worldTime,新旧看的是「她看过了没有」不是「世界时刻」。
+// isNew 判据同 sectionBadgeCount——ts(入账序号)不是 worldTime,新旧看的是「用户看过了没有」不是「世界时刻」。
 function almanacRowHtml(item, section, seenAt) {
     const isNew = seenAt > 0 && (item.ts > seenAt || item.updates.some(u => u.ts > seenAt));
     const zhLine = item.zh && item.zh !== item.title ? `<div class="or-zh">${escapeHtml(item.zh)}</div>` : '';
@@ -157,7 +158,7 @@ export function renderAlmanacItemHtml({ item, section, page, community, busy, ex
     }
 
     const updatesHtml = item.updates.length ? `<div class="or-alm-updates">
-        <div class="or-alm-updates-title">更新履歴</div>
+        <div class="or-alm-updates-title">${chrome('alm.updates')}</div>
         ${item.updates.map(u => `<div class="or-alm-update-row">
             <div class="or-alm-update-head">
                 <span class="or-alm-update-time">${escapeHtml(formatFullTime(u.worldTime))}</span>

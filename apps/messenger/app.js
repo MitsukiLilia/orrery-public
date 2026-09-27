@@ -2,6 +2,7 @@
 // 既読渲染只认 payload.read,不做"最后一条 AI 消息之前都算已读"那套推导(与 Perigee 的差异点)。
 import { ICON_BACK, ICON_UNDO, ICON_MINUS, ICON_PLUS, ICON_EXPORT, ICON_CHECK } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
+import { chrome } from '../../ui/chrome.js';
 import {
     resolveSender, monogramFor, colorForContact,
     seenKeyForThread, unreadCountOfThread,
@@ -56,7 +57,7 @@ export function renderThreadListHtml({ world, busy, seen = {}, justUpdated = nul
             const avatar = isGroup
                 ? groupAvatarHtml(t.group)
                 : `<div class="or-avatar" style="background-color:${world.contacts.get(t.contactId).color}">${escapeHtml(world.contacts.get(t.contactId).monogram)}</div>`;
-            // 未读数=她没看过的「别人发来的」消息;t.unread(模型演的既読)只影响气泡上的「既読」二字,不进这里
+            // 未读数=用户没看过的「别人发来的」消息;t.unread(模型演的既読)只影响气泡上的「既読」二字,不进这里
             const unread = unreadCountOfThread(t, seen[seenKeyForThread(t.threadId)]);
             const fresh = justUpdated?.has(t.threadId);
             const cls = ['or-thread-row', unread ? 'unread' : '', fresh ? 'just-arrived' : ''].filter(Boolean).join(' ');
@@ -138,13 +139,13 @@ export function renderThreadHtml({
 
         let meta = '';
         if (showTime) {
-            const readTag = !isGroup && isMe && m.read ? '<span>既読</span>' : '';
+            const readTag = !isGroup && isMe && m.read ? `<span>${chrome('msg.read')}</span>` : '';
             meta = `<div class="or-msg-meta">${readTag}<span>${formatClock(m.displayTs)}</span></div>`;
         }
 
         // 行内三层:发送者名 / 头像+气泡那一行 / 时间。名字和时间**必须在气泡行之外**——
         // 它们此前都塞在同一个 flex 行里,头像按 align-items 贴的是整行的底,于是被时间行拽到
-        // 气泡下方;同一人连发时,第一行的底又正好落在两个气泡中间(她真机截图指出)。
+        // 气泡下方;同一人连发时,第一行的底又正好落在两个气泡中间(真机截图可见此问题)。
         // 摘出去之后,头像只与气泡对齐(顶对齐),气泡多长都不影响。
         const avatar = !isMe
             ? (showAvatar

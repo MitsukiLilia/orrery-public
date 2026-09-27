@@ -13,6 +13,7 @@
 // 2026-09-01);iframe 的 contentDocument.body 它能正常截。因此三个模板必须完全自包含:自带
 // <style>,不依赖手机壳 shadow 里的 skin.css;颜色/字体值都是从 skin.css/shell.css 抄来的具体值。
 import { escapeHtml } from '../core/escape.js';
+import { chrome } from './chrome.js';
 import { resolveSender } from '../core/world.js';
 import { isSameDay, formatClock, formatFullTime } from '../core/worldtime.js';
 import { sanitizeSnapshotHtml } from '../apps/browser/app.js';
@@ -22,7 +23,7 @@ import { isSameMinute } from '../apps/messenger/app.js';
 const VENDOR_URL = new URL('./vendor/modern-screenshot.umd.js', import.meta.url).href;
 const FONT_STACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif';
 // 三套 --or-* token 的具体值:字面抄自 ui/shell.css 的默认(海盐巧克力)主题——导出图不跟随
-// 她当下选的手机皮肤,统一走这一套底色(任务书没有要求导出跟随主题,若以后要跟随,颜色值
+// 用户当下选的手机皮肤,统一走这一套底色(任务书没有要求导出跟随主题,若以后要跟随,颜色值
 // 从这里改起,别的地方不用动)。
 const TOKENS_CSS = '--or-cream:#F4EFE4;--or-cream-2:#ECE4D4;--or-white:#FBF9F4;--or-salt:#C7D7E1;'
     + '--or-cocoa:#6E5A50;--or-cocoa-light:#8B7568;';
@@ -68,7 +69,7 @@ export function buildForumExportHtml({ thread, world, selectedSeqs }) {
     const board = world.boards?.get(thread.boardId);
     // M12:裏サイト的帖子没有板块——boardName 为空时用「裏サイト」替代,boardHead/footer 两处
     // 板名位天然一起换上(下面都是读 boardName 这一个变量,不必分两处判断 thread.side)。
-    const boardName = board?.name || (thread.side === 'ura' ? '裏サイト' : '');
+    const boardName = board?.name || (thread.side === 'ura' ? chrome('forum.uraSite') : '');
     const includeOp = selectedSeqs === null || selectedSeqs.has('op');
 
     const boardHead = boardName ? `<div class="or-export-forum-board">${escapeHtml(boardName)}</div>` : '';
@@ -178,7 +179,7 @@ export function buildMessengerExportHtml({ thread, world, selectedSeqs }) {
 
         let meta = '';
         if (showTime) {
-            const readTag = !isGroup && isMe && m.read ? '<span>既読</span>' : '';
+            const readTag = !isGroup && isMe && m.read ? `<span>${chrome('msg.read')}</span>` : '';
             meta = `<div class="or-msg-meta">${readTag}<span>${escapeHtml(formatClock(m.displayTs))}</span></div>`;
         }
         const avatar = !isMe
@@ -233,11 +234,11 @@ export function buildAlmanacExportHtml({ item, section, page, community }) {
     const clean = sanitizeSnapshotHtml(page?.html);
     const updates = item?.updates || [];
     const updatesHtml = updates.length ? `<div class="or-export-alm-updates">
-<div class="or-export-alm-updates-title">更新履歴</div>
+<div class="or-export-alm-updates-title">${chrome('alm.updates')}</div>
 ${updates.map(u => `<div class="or-export-alm-update-row">
 <span class="or-export-alm-update-time">${escapeHtml(formatFullTime(u.worldTime))}</span>
 ${u.status ? `<span class="or-export-alm-update-status">${escapeHtml(u.status)}</span>` : ''}
-<div class="or-export-alm-update-note">${escapeHtml(u.note || '')}</div>
+<div class="or-export-alm-update-note">${escapeHtml(u.note || '')}${u.zh && u.zh !== u.note ? `<div class="or-zh">${escapeHtml(u.zh)}</div>` : ''}</div>
 </div>`).join('')}
 </div>` : '';
     const footerParts = [page?.url || '', Number.isFinite(item?.worldTime) ? `世界时刻 ${formatFullTime(item.worldTime)}` : ''].filter(Boolean);
@@ -254,6 +255,7 @@ ${u.status ? `<span class="or-export-alm-update-status">${escapeHtml(u.status)}<
 .or-export-alm .or-export-alm-update-time{font-size:11px;color:var(--or-cocoa-light);}
 .or-export-alm .or-export-alm-update-status{margin-left:8px;font-size:10.5px;font-weight:700;color:var(--or-cocoa);background:var(--or-salt);padding:1px 8px;border-radius:999px;}
 .or-export-alm .or-export-alm-update-note{font-size:13px;color:var(--or-cocoa);line-height:1.55;margin-top:4px;white-space:pre-wrap;word-break:break-word;}
+.or-export-alm .or-zh{font-size:12px;color:var(--or-cocoa-light);margin-top:3px;line-height:1.5;}
 .or-export-alm .or-export-footer{padding:8px 14px;font-size:11.5px;color:var(--or-cocoa-light);border-top:1px solid var(--or-cream-2);background:var(--or-cream);}
 </style>
 <div class="or-export-alm-body">${clean}</div>
@@ -265,7 +267,7 @@ ${footer ? `<div class="or-export-footer">${escapeHtml(footer)}</div>` : ''}
 // ── 以下才碰 DOM:vendor 懒加载 + 离屏渲染管线,只在真实浏览器里跑。 ──
 
 let vendorPromise = null;
-// 懒加载策略(任务书 §1):①window.modernScreenshot 已存在(她装了 html2canvas-pro 扩展)直接用,
+// 懒加载策略(任务书 §1):①window.modernScreenshot 已存在(用户装了 html2canvas-pro 扩展)直接用,
 // 不注入自己的副本;②否则注入 vendor 副本,onload 后取全局,10s 超时保护。失败不缓存死——
 // 网络抖一下不该让往后每一次导出都直接判死刑,vendorPromise 在失败时清空,下次导出会重新尝试。
 function ensureVendor() {

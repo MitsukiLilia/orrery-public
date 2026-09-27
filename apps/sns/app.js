@@ -3,6 +3,7 @@
 // castName 只活在 core/世界数据层,这个文件从不读它——账号条目与住民条目一视同仁,UI 只用 handle/displayName/locked。
 import { ICON_BACK, ICON_MINUS, ICON_PLUS, ICON_LOCK, ICON_CAMERA, ICON_REPLY_SM, ICON_RT_SM, ICON_MOON, ICON_STAR, ICON_STAR_FILL, ICON_SEARCH_SM, ICON_OFFICIAL_BADGE } from '../../ui/icons.js';
 import { escapeHtml } from '../../core/escape.js';
+import { chrome } from '../../ui/chrome.js';
 import { monogramFor, colorForContact, seenKeyForTweet, newReplyCountOfTweet, starKeyForTweet } from '../../core/world.js';
 import { formatRelativeTime } from '../../core/worldtime.js';
 
@@ -17,7 +18,7 @@ function genSpinnerHtml() {
     return '<span class="or-orrery-spinner"></span>'; // 天象仪加载演出,样式在 ui/shell.css
 }
 
-// [写真:描述] 占位图框(月月拍板:灰色小图框)。⚠️XSS 纪律:先 escapeHtml 整段正文,再对转义后的
+// [写真:描述] 占位图框(灰色小图框)。⚠️XSS 纪律:先 escapeHtml 整段正文,再对转义后的
 // 安全文本做替换——描述已经是转义后的文本,不会二次引入风险。zh 译文行调用同一个函数处理占位符。
 function renderBodyHtml(body) {
     const escaped = escapeHtml(body);
@@ -25,7 +26,7 @@ function renderBodyHtml(body) {
         `<span class="or-photo-ph">${ICON_CAMERA}<span class="or-photo-ph-desc">${desc}</span></span>`);
 }
 
-// 统计行(v0.7.1 图标化,月月拍板):回复气泡/RT/月相三枚小图标+数字,真推特的图标行形态;
+// 统计行(v0.7.1 图标化):回复气泡/RT/月相三枚小图标+数字,真推特的图标行形态;
 // 月相代 いいね——星星撞 fav 收藏语义,月相是 Pulsar 世界自己的「共感」符号。纯展示,零交互。
 function statsHtml(tweet) {
     return `<span class="or-sns-stat">${ICON_REPLY_SM}${tweet.replyCount || 0}</span><span class="or-sns-stat">${ICON_RT_SM}${tweet.retweets || 0}</span><span class="or-sns-stat">${ICON_MOON}${tweet.likes || 0}</span>`;
@@ -39,7 +40,7 @@ function starBtnHtml(tweetId, starred) {
     return `<button class="or-star ${on ? 'on' : ''}" data-action="toggle-star" data-star-key="${escapeHtml(key)}" title="${on ? '从星图移除' : '加入星图'}">${on ? ICON_STAR_FILL : ICON_STAR}</button>`;
 }
 
-// 版头 banner(task-007 她点单「像推特那样的版头」):纯前端派生零 token——底色=头像同源色,
+// 版头 banner(task-007,仿推特版头样式):纯前端派生零 token——底色=头像同源色,
 // 星点按 accountId 哈希撒(同一账号永远同一片星空;无渐变纪律:纯色底+SVG 星点)。
 function bannerHtml(account) {
     const id = String(account?.accountId || '?');
@@ -61,7 +62,7 @@ function lockIconHtml(account) {
 
 // M6 公式账号徽标(任务书-M6 §4):bio 下方不加任何文字,只在 displayName 旁挂一枚小徽标。
 function officialBadgeHtml(account) {
-    return account?.official ? '<span class="or-sns-official" title="公式アカウント">' + ICON_OFFICIAL_BADGE + '</span>' : '';
+    return account?.official ? '<span class="or-sns-official" title="' + escapeHtml(chrome('sns.official')) + '">' + ICON_OFFICIAL_BADGE + '</span>' : '';
 }
 
 function avatarHtml(account, size) {
@@ -73,7 +74,7 @@ function avatarHtml(account, size) {
 function renderRetweetBlockHtml(tweet, world) {
     const orig = world.tweets.get(tweet.retweetOf);
     if (!orig || !orig.accountId) {
-        return `<div class="or-sns-rt-tag">RT</div><div class="or-sns-rt-quote deleted">元のポストは削除されました</div>`;
+        return `<div class="or-sns-rt-tag">RT</div><div class="or-sns-rt-quote deleted">${chrome('sns.deleted')}</div>`;
     }
     const acc = world.snsAccounts.get(orig.accountId);
     const preview = escapeHtml((orig.body || '').slice(0, 60));
@@ -109,7 +110,7 @@ function renderTweetRowHtml(tweet, world, { snsNow, seen = {}, starred = {}, jus
 }
 
 /**
- * 底部导航(task-007 她点单):时间线/我的 两 tab——真推特的骨架。TL=表账号能刷到的面;
+ * 底部导航(task-007):时间线/我的 两 tab——真推特的骨架。TL=表账号能刷到的面;
  * 「我的」=主人的主页,表/裏切换住在那边(裏垢入口从 TL 顶栏迁走,切过去=锁着的号的主页展开)。
  */
 function tabbarHtml(tab) {
@@ -125,8 +126,8 @@ function tabbarHtml(tab) {
  */
 function tlModeTabsHtml(tlMode) {
     return `<div class="or-sns-tlmode">
-        <button class="${tlMode !== 'recommend' ? 'on' : ''}" data-action="sns-tl-mode" data-mode="following">フォロー中</button>
-        <button class="${tlMode === 'recommend' ? 'on' : ''}" data-action="sns-tl-mode" data-mode="recommend">おすすめ</button>
+        <button class="${tlMode !== 'recommend' ? 'on' : ''}" data-action="sns-tl-mode" data-mode="following">${chrome('sns.following')}</button>
+        <button class="${tlMode === 'recommend' ? 'on' : ''}" data-action="sns-tl-mode" data-mode="recommend">${chrome('sns.recommend')}</button>
     </div>`;
 }
 
@@ -163,8 +164,8 @@ export function renderSnsTlHtml({ world, busy, seen = {}, starred = {}, justUpda
     }
 
     const emptyText = tlMode === 'recommend'
-        ? 'おすすめ静悄悄。点「刷新」。'
-        : 'フォロー中还没有动静。去「おすすめ」看看,或点「刷新」。';
+        ? `${chrome('sns.recommend')}静悄悄。点「刷新」。`
+        : `${chrome('sns.following')}还没有动静。去「${chrome('sns.recommend')}」看看,或点「刷新」。`;
     const body = tweets.length
         ? `<div class="or-sns-list">${tweets.map(t => renderTweetRowHtml(t, world, { snsNow: world.worldClock, seen, starred, justUpdated })).join('')}</div>`
         : `<div class="or-empty">${emptyText}</div>`;
@@ -224,7 +225,7 @@ export function renderSnsMyPageHtml({ world, busy, myRole = 'omote', seen = {}, 
             <div class="or-sns-profile-name">${escapeHtml(current.displayName)}${lockIconHtml(current)}${officialBadgeHtml(current)}</div>
             <div class="or-sns-profile-handle">@${escapeHtml(current.handle)}</div>
             ${current.bio ? `<div class="or-sns-profile-bio">${escapeHtml(current.bio)}</div>` : ''}
-            <button class="or-sns-follow-count" data-action="open-sns-follow-list" data-role="${escapeHtml(current.ownerRole)}">フォロー ${followCount}</button>
+            <button class="or-sns-follow-count" data-action="open-sns-follow-list" data-role="${escapeHtml(current.ownerRole)}">${chrome('sns.followCount')} ${followCount}</button>
         </div>
         ${body}
         ${tabbarHtml('me')}`;
@@ -317,7 +318,7 @@ export function renderSnsProfileHtml({ account, world, snsNow, seen = {}, starre
             ${avatarHtml(account, 'lg')}
             <div class="or-sns-profile-name">${escapeHtml(account.displayName)}${lockIconHtml(account)}${officialBadgeHtml(account)}</div>
             <div class="or-sns-profile-handle">@${escapeHtml(account.handle)}</div>
-            ${followed ? `<span class="or-sns-followed-tag">フォロー中</span>` : ''}
+            ${followed ? `<span class="or-sns-followed-tag">${chrome('sns.following')}</span>` : ''}
             ${account.bio ? `<div class="or-sns-profile-bio">${escapeHtml(account.bio)}</div>` : ''}
         </div>
         ${body}`;
@@ -344,13 +345,13 @@ export function renderSnsFollowListHtml({ world, role = 'omote' }) {
     return `
         <div class="or-header">
             <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
-            <span class="or-header-title">フォロー中</span>
+            <span class="or-header-title">${chrome('sns.following')}</span>
         </div>
         ${body}`;
 }
 
 /**
- * 搜索页(task-007 她的翻转「猜你(char)想搜索」):搜索框是只读装饰,词条是主人此刻会搜的词
+ * 搜索页(task-007,反转「猜你(char)想搜索」):搜索框是只读装饰,词条是主人此刻会搜的词
  * (随每批主生成更新,搭便车零调用)——观测者只点选看哪一条,与「继续围观」同构,零输入铁律无伤。
  */
 export function renderSnsSearchHtml({ world }) {
@@ -366,7 +367,7 @@ export function renderSnsSearchHtml({ world }) {
             <button class="or-back-btn" data-action="back">${ICON_BACK}</button>
             <span class="or-header-title">搜索</span>
         </div>
-        <div class="or-sns-searchbox">${ICON_SEARCH_SM}<span class="or-sns-searchbox-ph">検索</span></div>
+        <div class="or-sns-searchbox">${ICON_SEARCH_SM}<span class="or-sns-searchbox-ph">${chrome('sns.search')}</span></div>
         ${list}`;
 }
 

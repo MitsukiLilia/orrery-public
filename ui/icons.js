@@ -11,7 +11,7 @@ export const ICON_MINUS = '<svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19"
 export const ICON_PLUS = '<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
 export const ICON_UNDO = '<svg viewBox="0 0 24 24"><path d="M7 8H4V5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 8c2-3 5-5 9-5 5.5 0 9.5 4 9.5 9s-4 9-9.5 9c-3.8 0-7-2-8.6-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
-// v0.7.1 SNS 统计行图标化(月月拍板):回复气泡/RT 循环箭头/⭐月相代 いいね——
+// v0.7.1 SNS 统计行图标化:回复气泡/RT 循环箭头/⭐月相代 いいね——
 // 心形太地球,星星撞 fav 收藏语义,月相既贴 Pulsar 的天文名又是这个世界自己的「共感」符号
 export const ICON_REPLY_SM = '<svg viewBox="0 0 24 24"><path d="M20 6.5v6a2.5 2.5 0 0 1-2.5 2.5H10l-4 3.3V15h.5A2.5 2.5 0 0 1 4 12.5v-6A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
 export const ICON_RT_SM = '<svg viewBox="0 0 24 24"><path d="M6.5 15.5V8A2.5 2.5 0 0 1 9 5.5h6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="m12.7 3 2.8 2.5-2.8 2.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M17.5 8.5V16a2.5 2.5 0 0 1-2.5 2.5H9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="m11.3 16-2.8 2.5 2.8 2.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
