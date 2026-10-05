@@ -121,6 +121,7 @@
                 含「内部掲示板上这个帖子的后续」→论坛盖楼(G)/
                 含「浏览器「Astrolabe」」→浏览器主生成(J,没有续写入口,只有这一条)/
                 含「手机里的相册」→相册主生成(K,没有续写入口,只有这一条)/
+                含「购物 app「Libra」」→购物主生成(S,M15,没有续写入口;首刷/二刷两版按【Libra 当前状态】是否报「Libra 还是空的」自动切换;PROMPT_S 不含续写/手机通讯录等既有路由词,路由放在相册之前);
                 含「手机里的备忘录」→备忘录主生成(L,首刷/二刷两版按账本是否已有备忘自动切换,二刷会对首刷第一条清单做一次改写)/
                 含「静态快照」→网页快照(M,点开浏览器历史里的条目触发,返回整页 HTML)/
                 含「里点开了一个条目」→门户条目页面(Q,点开条目触发,返回整页 HTML)/
@@ -162,6 +163,12 @@
             <legend>8. M14 断言:通讯录与生活板(照任务书-M14 §6 的六组对应,涉生成/账本的用真实 IndexedDB 加临时 worldKey 跑完即清)</legend>
             <button class="mock-btn" id="runM14AssertBtn">运行全部断言</button>
             <div id="m14AssertResult">(未运行)</div>
+        </fieldset>
+
+        <fieldset>
+            <legend>9. M15 断言:Libra 购物(照任务书-M15 §六对应,涉生成/账本的用真实 IndexedDB 加临时 worldKey 跑完即清)</legend>
+            <button class="mock-btn" id="runM15AssertBtn">运行全部断言</button>
+            <div id="m15AssertResult">(未运行)</div>
         </fieldset>
 
         <fieldset>
@@ -211,10 +218,11 @@
     // ── mock 最小酒馆环境:先于 index.js 执行(同为 module script,按文档顺序保证)。 ──
     import * as store from '../core/store.js';
     import * as generator from '../core/generator.js';
-    import { computeWorldKey, inheritedWorldKey, foldWorld, hasUnseenInApp, seenKeyForAlmanac, latestTsOfAlmanac, shortIdFor } from '../core/world.js';
+    import { computeWorldKey, inheritedWorldKey, foldWorld, hasUnseenInApp, seenKeyForAlmanac, latestTsOfAlmanac, shortIdFor, latestTsOfShop, seenKeyForShop } from '../core/world.js';
     import { sanitizeSnapshotHtml } from '../apps/browser/app.js';
     import { renderForumListHtml, renderForumThreadHtml, authorLabel } from '../apps/forum/app.js';
     import { chrome, setChromeLanguage } from '../ui/chrome.js';
+    import { renderShopListHtml, renderShopItemHtml, resolveShopItem } from '../apps/shop/app.js';
     import { renderThreadListHtml } from '../apps/messenger/app.js';
     import { escapeHtml } from '../core/escape.js';
     import {
@@ -733,6 +741,50 @@
         return m ? m[1] : null;
     }
 
+    // ── M15 购物「Libra」fixture(S,没有续写入口,只有一个主生成)──
+    // 首刷:2 张订单(其一 3 件:正常 / tone 非法 / 缺 name 应被丢;其二 1 件)+ 车里 add 3 件新商品。
+    // 所有件都带 zh/descZh——zh 档应被 cleanZh 丢掉,ja_zh 档应留下(断言对比两档)。
+    function shopItem(name, extra) { return { name, zh: `（中译）${name}`, shop: 'ミナト堂', price: '¥498', qty: 1, desc: `${name}の外観`, descZh: `（中译）${name}の外観`, tone: 'white', ...extra }; }
+    function buildFixtureS1() {
+        return {
+            worldTime: '2026-08-21 20:00',
+            newOrders: [
+                { items: [shopItem('ボックスティッシュ 5箱パック', { qty: 2 }), shopItem('謎の置物', { tone: 'neon' }), shopItem('', { desc: '名前のない件' })], delayMin: 0 },
+                { items: [shopItem('洗濯洗剤 詰め替え 大容量', { price: '¥398', tone: 'sea' })], delayMin: 30 },
+            ],
+            cart: [
+                { action: 'add', item: shopItem('マグカップ', { price: '¥1,280', tone: 'food' }), delayMin: 0 },
+                { action: 'add', item: shopItem('ブックスタンド', { price: '¥2,480', tone: 'indoor' }), delayMin: 10 },
+                { action: 'add', item: shopItem('手袋 レディース', { price: '¥1,980', tone: 'blossom' }), delayMin: 20 },
+            ],
+            statusUpdates: [],
+        };
+    }
+    // 二刷:从 digest 里正则取已有 cartItemId(按车里倒序:最新加的在前)与 orderId(按下单时刻倒序)。
+    // 车:移出 ids[0]、再加回 ids[0]、移出 ids[2](留在 removed);订单:新下一单,其中一件 fromCart=ids[1](买走)、
+    // 另一件 fromCart 指向不存在的 id(只忽略 fromCart、订单照收);状态:首刷第一张订单 shipped,
+    // 加上三条应被丢的(指向不存在的订单 / 重复 shipped / 非法枚举 ordered)。时间全部 >= 锚点 21:00。
+    function buildFixtureS2(userContent) {
+        const ids = [...(userContent || '').matchAll(/id=(ci_[0-9a-z]+) name/g)].map(m => m[1]);
+        const orders = [...(userContent || '').matchAll(/订单 id=(od_[0-9a-z]+)/g)].map(m => m[1]);
+        const firstOrder = orders[orders.length - 1]; // 倒序列表的最后一张 = 首刷里最早的那张
+        return {
+            worldTime: '2026-08-21 21:00',
+            newOrders: [{ items: [shopItem('マグカップ', { fromCart: ids[1], price: '¥1,280' }), shopItem('保温ボトル', { fromCart: 'ci_ghost' })], delayMin: 5 }],
+            cart: [
+                { action: 'remove', cartItemId: ids[0], delayMin: 30 },
+                { action: 'add', cartItemId: ids[0], delayMin: 10 },
+                { action: 'remove', cartItemId: ids[2], delayMin: 20 },
+            ],
+            statusUpdates: [
+                { orderId: firstOrder, status: 'shipped' },
+                { orderId: 'od_ghost', status: 'delivered' },
+                { orderId: firstOrder, status: 'shipped' },
+                { orderId: firstOrder, status: 'ordered' },
+            ],
+        };
+    }
+
     function wrapFenced(obj) {
         return `好的，这是本次生成结果：\n\`\`\`json\n${JSON.stringify(obj)}\n\`\`\`\n以上，希望符合要求！`;
     }
@@ -756,6 +808,9 @@
     // 占位真的被换成了「N 个新帖」,侧信道写法照 capturedUraUserContent。
     let capturedOmoteSystemPrompt = null;
     let capturedUraSystemPrompt = null;
+    // M15 断言用:购物主生成这一路每次都存一份 systemPrompt/userContent(侧信道写法同上)。
+    let capturedShopSystemPrompt = null;
+    let capturedShopUserContent = null;
 
     function mockGenerate(systemPrompt, userContent) {
         if (document.getElementById('fxBroken').checked) return '(不知道你在说什么，我拒绝回答。)';
@@ -818,6 +873,15 @@
         if (systemPrompt.includes('门户上自然会新增的条目与状态流转')) {
             const isFirstTime = (userContent || '').includes('门户是空的');
             const body = isFirstTime ? buildFixtureP1() : buildFixtureP2(extractExistingAlmanacItemId(userContent));
+            return fence ? wrapFenced(body) : JSON.stringify(body);
+        }
+        // M15:购物主生成(S)。"购物 app「Libra」"是 PROMPT_S 独有的措辞,不与任何既有路由词重叠
+        // (PROMPT_S 不含「续写」「手机通讯录」「登录中的 SNS」等);首刷/二刷按 digest 是否报「Libra 还是空的」切换。
+        if (systemPrompt.includes('购物 app「Libra」')) {
+            capturedShopSystemPrompt = systemPrompt;
+            capturedShopUserContent = userContent;
+            const isFirstTime = (userContent || '').includes('Libra 还是空的');
+            const body = isFirstTime ? buildFixtureS1() : buildFixtureS2(userContent);
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
         if (systemPrompt.includes('手机里的相册')) {
@@ -2033,6 +2097,285 @@
         runM14Assertions().catch(err => {
             document.getElementById('m14AssertResult').textContent = `断言运行出错:${err?.message || err}`;
             console.error('[M14 断言]', err);
+        });
+    });
+
+    // ── M15:Libra 购物断言面板(任务书-M15 §六)。①~④共用同一个临时世界(首刷→二刷→倒带),
+    //    ⑤手写账本条目测 fold,⑥纯渲染,⑦契约(五档语言各跑一次生成,侧信道捕获 systemPrompt),跑完即清。 ──
+
+    function shopEntries(list) { return list.filter(e => e.app === 'shop'); }
+    function shopOpts(wk, language) {
+        return { worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false }, owner: 'テスト主人', language, excludeTags: '' };
+    }
+    const ALL_WM_APPS = ['messenger', 'forum', 'forumUra', 'sns', 'browser', 'gallery', 'memo', 'almanac'];
+
+    async function assertShopFlow() {
+        const wk = `__m15_assert_shop_${Date.now()}`;
+        await store.setOwner(wk, 'テスト主人');
+        const tip = ctx.chat.length - 1;
+
+        // ── ① 首刷 ──
+        const r1 = await generator.generateMoreShop(ctx, store, shopOpts(wk, 'zh'));
+        const content1 = capturedShopUserContent || '';
+        const ledger1 = await store.getEntriesForWorld(wk);
+        const w1 = foldWorld(ledger1);
+        const orders1 = [...w1.shopOrders.values()].sort((a, b) => a.worldTime - b.worldTime);
+        const tissue = orders1.find(o => o.items.some(i => i.name.startsWith('ボックスティッシュ')));
+        const wm1 = {};
+        for (const a of ALL_WM_APPS) wm1[a] = await store.getWatermark(wk, a);
+        wm1.shop = await store.getWatermark(wk, 'shop');
+        const first = [
+            ['生成成功', !!r1?.ok],
+            ['added===5(2 单 + 3 条加车)', r1?.added === 5],
+            ['落账条目全部 app==="shop"', ledger1.filter(e => e.type.startsWith('shop_')).every(e => e.app === 'shop') && shopEntries(ledger1).length === 5],
+            ['订单 2 张', orders1.length === 2],
+            ['缺 name 的件被丢(首单 3 件→2 件)', !!tissue && tissue.items.length === 2 && !tissue.items.some(i => !i.name)],
+            ['qty 保留(×2)', tissue?.items[0]?.qty === 2],
+            ['tone 白名单:合法值保留(white)', tissue?.items[0]?.tone === 'white'],
+            ['tone 白名单:非法值 neon 落 street', tissue?.items[1]?.tone === 'street'],
+            ['price 以字符串存', typeof tissue?.items[0]?.price === 'string' && tissue.items[0].price === '¥498'],
+            ['zh 档:不存 zh/descZh', !tissue?.items[0]?.zh && !tissue?.items[0]?.descZh],
+            ['新订单状态隐含 ordered', orders1.every(o => o.status === 'ordered')],
+            ['购物车 3 件全 in、addCount 均为 1', w1.cartItems.size === 3 && [...w1.cartItems.values()].every(c => c.state === 'in' && c.addCount === 1)],
+            ['购物车 id 用 ci_ 前缀、订单 id 用 od_ 前缀', [...w1.cartItems.keys()].every(k => k.startsWith('ci_')) && [...w1.shopOrders.keys()].every(k => k.startsWith('od_'))],
+            ['首刷 userContent:空态 digest + 【Libra 当前状态】+ 叙事另一方 caution', content1.includes('【Libra 当前状态】') && content1.includes('Libra 还是空的') && content1.includes('为 TA 买的东西')],
+            ['shop 水位推进到 tip', wm1.shop === tip && tip >= 0],
+            ['其他水位纹丝不动(-1)', ALL_WM_APPS.every(a => wm1[a] === -1)],
+            ['shopNow 为最后一条的世界时间(订单 20:30)', w1.shopNow === new Date(2026, 7, 21, 20, 30).getTime()],
+            ['worldClock 并入 shopNow', w1.worldClock === w1.shopNow],
+        ];
+
+        // ── ② 二刷 ──
+        const digest1 = generator.buildShopDigestText(w1);
+        const ids = [...w1.cartItems.values()].sort((a, b) => b.latestTs - a.latestTs).map(c => c.cartItemId);
+        const firstOrderId = orders1[0].orderId;
+        const r2 = await generator.generateMoreShop(ctx, store, shopOpts(wk, 'zh'));
+        const content2 = capturedShopUserContent || '';
+        const ledger2 = await store.getEntriesForWorld(wk);
+        const w2 = foldWorld(ledger2);
+        const cart2 = id => w2.cartItems.get(id);
+        const buyEntries = ledger2.filter(e => e.type === 'shop_cart' && e.payload.action === 'buy');
+        const statusEntries = ledger2.filter(e => e.type === 'shop_status');
+        const newOrder = [...w2.shopOrders.values()].find(o => !orders1.some(x => x.orderId === o.orderId));
+        const second = [
+            ['二刷成功', !!r2?.ok],
+            ['二刷 userContent 不再是空态,带 id=ci_ 与订单 id', !content2.includes('Libra 还是空的') && content2.includes('id=ci_') && content2.includes('订单 id=od_')],
+            ['added===6(车 3 条:移出/加回/移出 + 订单 1 + buy 1 + 状态 1)', r2?.added === 6],
+            ['移出再加回:ids[0] 状态 in、addCount===2', cart2(ids[0])?.state === 'in' && cart2(ids[0])?.addCount === 2],
+            ['移出再加回:history 为 add/remove/add', JSON.stringify(cart2(ids[0])?.history.map(h => h.action)) === '["add","remove","add"]'],
+            ['fromCart 命中:ids[1] 状态 bought', cart2(ids[1])?.state === 'bought'],
+            ['buy 条目生成 1 条、cartItemId===ids[1]、worldTime 与新订单同刻', buyEntries.length === 1 && buyEntries[0].payload.cartItemId === ids[1] && buyEntries[0].payload.worldTime === newOrder?.worldTime],
+            ['ids[2] 被移出,停在 removed', cart2(ids[2])?.state === 'removed'],
+            ['新订单落账、fromCart 指向不存在的 id 只忽略(2 件都在)', !!newOrder && newOrder.items.length === 2],
+            ['没有为 ci_ghost 写出任何 buy/add 条目', !ledger2.some(e => e.type === 'shop_cart' && e.payload.cartItemId === 'ci_ghost')],
+            ['状态推进:首刷首单 shipped', w2.shopOrders.get(firstOrderId)?.status === 'shipped'],
+            ['状态非法丢弃:账本里只有 1 条 shop_status', statusEntries.length === 1 && statusEntries[0].payload.orderId === firstOrderId],
+            ['digest:购物车只剩 in 的(ids[0])、有「最近移出」小节(ids[2])、订单带状态', (() => {
+                const d = generator.buildShopDigestText(w2);
+                return d.includes(`id=${ids[0]} name`) && !d.split('[最近移出购物车的]')[0].includes(`id=${ids[1]} name`) && d.includes('[最近移出购物车的]') && d.includes(`id=${ids[2]} name`) && d.includes('状态 shipped') && d.includes('加过 2 次');
+            })()],
+            ['digest:首刷后车内逐行带 id/加入于/加过 1 次', digest1.includes('[购物车里现在的东西]') && digest1.includes('加过 1 次') && digest1.includes('[最近的订单]') && digest1.includes('  · ボックスティッシュ 5箱パック ×2 ¥498')],
+            ['shop 水位仍等于 tip,其他水位仍 -1', await store.getWatermark(wk, 'shop') === tip && (await Promise.all(ALL_WM_APPS.map(a => store.getWatermark(wk, a)))).every(v => v === -1)],
+        ];
+
+        // ── ③ 红点 / seen ──
+        const latest2 = latestTsOfShop(w2);
+        const seenChecks = [
+            ['有未见内容时 hasUnseenInApp("shop") 为真', hasUnseenInApp('shop', w2, {}) === true],
+            ['seen 追平最新 ts 后为假', hasUnseenInApp('shop', w2, { [seenKeyForShop()]: latest2 }) === false],
+            ['空世界不亮', hasUnseenInApp('shop', foldWorld([]), {}) === false],
+        ];
+
+        // ── ④ 倒带 ──
+        const anchor = new Date(2026, 7, 21, 21, 0).getTime();
+        await store.deleteShopFrom(wk, anchor);
+        const ledger3 = await store.getEntriesForWorld(wk);
+        const w3 = foldWorld(ledger3);
+        const rewind = [
+            ['倒带后 shop 条目回到 5 条', shopEntries(ledger3).length === 5],
+            ['订单回到 2 张(二刷新订单消失)', w3.shopOrders.size === 2],
+            ['首刷首单回到 ordered', w3.shopOrders.get(firstOrderId)?.status === 'ordered'],
+            ['购物车回到首刷:3 件全 in、addCount 1', w3.cartItems.size === 3 && [...w3.cartItems.values()].every(c => c.state === 'in' && c.addCount === 1)],
+            ['倒带不动水位', await store.getWatermark(wk, 'shop') === tip],
+        ];
+        // 倒带到更早:整个 Libra 清空;其他 app 的条目不受牵连
+        await store.addEntry({ worldKey: wk, sourceFloor: 0, app: 'memo', type: 'memo_note', payload: { noteId: 'mm_keep', text: '留着', worldTime: anchor + 1000 } });
+        await store.deleteShopFrom(wk, 0);
+        const ledger4 = await store.getEntriesForWorld(wk);
+        rewind.push(
+            ['倒带到 0:shop 条目全清', shopEntries(ledger4).length === 0],
+            ['倒带只动 shop:memo 条目留着', ledger4.some(e => e.type === 'memo_note' && e.payload.noteId === 'mm_keep')],
+        );
+
+        await store.wipeWorld(wk);
+        return { first, second, seenChecks, rewind, world2: w2, ids, firstOrderId };
+    }
+
+    // ⑤ fold:只进不退 / 悬空条目跳过(手写账本条目,不走生成)
+    function assertShopFold() {
+        const E = (type, payload, ts) => ({ type, app: 'shop', payload, ts, sourceFloor: 0 });
+        const item = { name: '商品', shop: 'S', price: '¥1', desc: 'd', tone: 'white' };
+        const ledger = [
+            E('shop_order', { orderId: 'od_t', worldTime: 100, items: [{ ...item, qty: 1 }] }, 1),
+            E('shop_status', { orderId: 'od_t', status: 'shipped', worldTime: 200 }, 2),
+            E('shop_status', { orderId: 'od_t', status: 'delivered', worldTime: 300 }, 3),
+            E('shop_status', { orderId: 'od_t', status: 'shipped', worldTime: 400 }, 4),   // 倒退:应被忽略
+            E('shop_status', { orderId: 'od_t', status: 'ordered', worldTime: 500 }, 5),   // 倒退:应被忽略
+            E('shop_status', { orderId: 'od_ghost', status: 'shipped', worldTime: 600 }, 6), // 悬空:跳过
+            E('shop_cart', { cartItemId: 'ci_x', action: 'remove', worldTime: 700 }, 7),    // 无首次 add:跳过
+            E('shop_cart', { cartItemId: 'ci_x', action: 'add', worldTime: 710 }, 8),       // 首次 add 没带 item:跳过
+            E('shop_cart', { cartItemId: 'ci_y', action: 'add', worldTime: 720, item }, 9),
+            E('shop_cart', { cartItemId: 'ci_y', action: 'buy', worldTime: 730 }, 10),
+            E('shop_cart', { cartItemId: 'ci_y', action: 'add', worldTime: 740 }, 11),      // 买走后再 add:fold 按回放规则回 in
+        ];
+        const w = foldWorld(ledger);
+        const o = w.shopOrders.get('od_t');
+        return [
+            ['delivered 之后再来 shipped,fold 仍为 delivered', o.status === 'delivered'],
+            ['statusTs 停在 delivered 的时刻', o.statusTs === 300],
+            ['被忽略的倒退条目不推高订单 latestTs', o.latestTs === 300],
+            ['指向不存在订单的 shop_status 被跳过(不新建订单)', !w.shopOrders.has('od_ghost') && w.shopOrders.size === 1],
+            ['无首次 add 的 remove / 不带 item 的首次 add 被跳过', !w.cartItems.has('ci_x')],
+            ['ci_y 按回放:add→buy→add,state in、addCount 2', w.cartItems.get('ci_y')?.state === 'in' && w.cartItems.get('ci_y')?.addCount === 2],
+            ['ci_y history 三步', w.cartItems.get('ci_y')?.history.length === 3],
+            ['ci_y firstAddTs 保持首次、latestTs 为最后一次', w.cartItems.get('ci_y')?.firstAddTs === 720 && w.cartItems.get('ci_y')?.latestTs === 740],
+            ['shopNow 取全部 shop 条目 worldTime 最大值(740)', w.shopNow === 740],
+            ['worldClock 并入 shopNow', w.worldClock === 740],
+        ];
+    }
+
+    // ⑥ 纯渲染:列表两 tab、详情、空态、语言档、转义、tone 再校验
+    function assertShopRender(world2, ids, firstOrderId) {
+        const nameOf = id => world2.cartItems.get(id)?.name;
+        setChromeLanguage('zh');
+        const ordersZh = renderShopListHtml({ world: world2, busy: false, tab: 'orders', seenAt: 0, shopNow: world2.worldClock });
+        const ordersNew = renderShopListHtml({ world: world2, busy: false, tab: 'orders', seenAt: 1, shopNow: world2.worldClock });
+        const cartZh = renderShopListHtml({ world: world2, busy: false, tab: 'cart', seenAt: 0, shopNow: world2.worldClock });
+        const busyHtml = renderShopListHtml({ world: world2, busy: true, tab: 'orders', seenAt: 0, shopNow: world2.worldClock });
+        const orderCards = (ordersZh.match(/class="or-shop-order"/g) || []).length;
+        const firstIdx = ordersZh.indexOf('保温ボトル'), lastIdx = ordersZh.indexOf('ボックスティッシュ');
+        const refOrder = `order:${firstOrderId}:0`;
+        const detOrder = renderShopItemHtml({ resolved: resolveShopItem(world2, refOrder) });
+        const detCart = renderShopItemHtml({ resolved: resolveShopItem(world2, `cart:${ids[0]}`) });
+        const detRemoved = renderShopItemHtml({ resolved: resolveShopItem(world2, `cart:${ids[2]}`) });
+        setChromeLanguage('ja_zh');
+        const ordersJa = renderShopListHtml({ world: world2, busy: false, tab: 'orders', seenAt: 0, shopNow: world2.worldClock });
+        const cartJa = renderShopListHtml({ world: world2, busy: false, tab: 'cart', seenAt: 0, shopNow: world2.worldClock });
+        setChromeLanguage('en_zh');
+        const ordersEn = renderShopListHtml({ world: world2, busy: false, tab: 'orders', seenAt: 0, shopNow: world2.worldClock });
+        const cartEn = renderShopListHtml({ world: world2, busy: false, tab: 'cart', seenAt: 0, shopNow: world2.worldClock });
+        const detOrderEn = renderShopItemHtml({ resolved: resolveShopItem(world2, refOrder) });
+        setChromeLanguage('zh');
+        const emptyOrders = renderShopListHtml({ world: foldWorld([]), busy: false, tab: 'orders' });
+        const emptyCart = renderShopListHtml({ world: foldWorld([]), busy: false, tab: 'cart' });
+        // 手写账本:危险字符转义 + tone 非法值渲染层再落 street + 双语字段
+        const evil = { name: '<b>危</b>', shop: '<i>店</i>', price: '"¥1"', desc: '<script>x<\/script>', tone: 'bogus', zh: '<u>译</u>', descZh: '<em>描述译</em>' };
+        const wEvil = foldWorld([
+            { type: 'shop_order', app: 'shop', ts: 1, payload: { orderId: 'od_e', worldTime: 100, items: [{ ...evil, qty: 500 }] } },
+            { type: 'shop_cart', app: 'shop', ts: 2, payload: { cartItemId: 'ci_e', action: 'add', worldTime: 110, item: evil } },
+        ]);
+        const evilList = renderShopListHtml({ world: wEvil, busy: false, tab: 'orders', seenAt: 0, shopNow: 200 })
+            + renderShopListHtml({ world: wEvil, busy: false, tab: 'cart', seenAt: 0, shopNow: 200 });
+        const evilDet = renderShopItemHtml({ resolved: resolveShopItem(wEvil, 'order:od_e:0') });
+        return [
+            ['列表头:返回 + 标题 Libra + 刷新钮 data-action=shop-refresh', ordersZh.includes('data-action="back"') && ordersZh.includes('>Libra<') && ordersZh.includes('data-action="shop-refresh"')],
+            ['busy 时刷新钮 disabled 且换 spinner', busyHtml.includes('disabled') && busyHtml.includes('or-orrery-spinner') && !ordersZh.includes('or-orrery-spinner')],
+            ['两钮 tab 用 .or-shop-tabs + data-action=shop-select-tab(orders/cart)', ordersZh.includes('class="or-shop-tabs"') && ordersZh.includes('data-action="shop-select-tab" data-tab="orders"') && ordersZh.includes('data-action="shop-select-tab" data-tab="cart"')],
+            ['orders tab:当前 tab 挂 on(购买记录)', /class="on" data-action="shop-select-tab" data-tab="orders"/.test(ordersZh) && /class="" data-action="shop-select-tab" data-tab="cart"/.test(ordersZh)],
+            ['cart tab:当前 tab 挂 on(购物车)', /class="on" data-action="shop-select-tab" data-tab="cart"/.test(cartZh)],
+            ['订单卡 3 张,带 data-worldtime', orderCards === 3 && /class="or-shop-order" data-worldtime="\d+"/.test(ordersZh)],
+            ['订单按下单时刻倒序(新单在前)', firstIdx > -1 && lastIdx > -1 && firstIdx < lastIdx],
+            ['订单里的件带 data-ref=order:<id>:<idx>', ordersZh.includes(`data-ref="${refOrder}"`) && ordersZh.includes('data-action="open-shop-item"')],
+            ['状态小标:已发货 / 已下单(zh)', ordersZh.includes('data-status="shipped">已发货<') && ordersZh.includes('data-status="ordered">已下单<')],
+            ['卡身次级行「店铺 · 价格 × qty」', ordersZh.includes('ミナト堂 · ¥498 × 2')],
+            ['seenAt=0 不挂 NEW 点;seenAt>0 且 ts 更新才挂', !ordersZh.includes('or-shop-new-dot') && ordersNew.includes('or-shop-new-dot')],
+            ['购物车 tab:in 的行带 data-ref=cart:<id> 与 data-worldtime', cartZh.includes(`data-ref="cart:${ids[0]}"`) && /class="or-shop-cart-row" data-worldtime="\d+"/.test(cartZh)],
+            ['购物车 tab:加过 2 次(zh)', cartZh.includes('加过 2 次')],
+            ['购物车 tab:「最近移出购物车」小节 + removed 行(降不透明度类、移出于)', cartZh.includes('or-shop-section-title">最近移出购物车<') && cartZh.includes('or-shop-cart-row removed') && cartZh.includes('移出于')],
+            ['购物车 tab:bought 的不在车里显示', !cartZh.includes(`cart:${ids[1]}`) && !cartZh.includes(nameOf(ids[1]) + '</span>') ],
+            ['ja_zh 档:購入履歴/カート/発送済み/注文済み/最近カートから削除/追加 2 回', ordersJa.includes('購入履歴') && ordersJa.includes('カート') && ordersJa.includes('発送済み') && ordersJa.includes('注文済み') && cartJa.includes('最近カートから削除') && cartJa.includes('追加 2 回')],
+            ['en_zh 档:Orders/Cart/Shipped/Ordered/Recently removed/Added 2×', ordersEn.includes('>Orders<') && ordersEn.includes('>Cart<') && ordersEn.includes('Shipped') && ordersEn.includes('Ordered') && cartEn.includes('Recently removed') && cartEn.includes('Added 2×')],
+            ['详情(订单件):大色块 + 名 + 店铺·价格·qty + desc + 「状态词 · 下单于」', detOrder.includes('or-shop-hero') && detOrder.includes('data-tone="') && detOrder.includes('ミナト堂 · ¥498 · × 2') && detOrder.includes('の外観') && /已发货 · 下单于 /.test(detOrder) && !detOrder.includes('<button class="or-pill-btn')],
+            ['详情(订单件)en_zh:状态词跟随语言档', /Shipped · 下单于 /.test(detOrderEn)],
+            ['详情(车内):加入于 + 加过 2 次', /加入于 /.test(detCart) && detCart.includes('加过 2 次')],
+            ['详情(已移出):移出于', /移出于 /.test(detRemoved)],
+            ['resolveShopItem:坏 ref/越界 idx/查无此物均返回 null', resolveShopItem(world2, 'order:od_x:0') === null && resolveShopItem(world2, `order:${firstOrderId}:99`) === null && resolveShopItem(world2, 'cart:ci_x') === null && resolveShopItem(world2, 'junk') === null],
+            ['空态:订单空/车空的文案', emptyOrders.includes('还没有订单。点「刷新」——买了什么,不会说谎。') && emptyCart.includes('购物车是空的。')],
+            ['转义:商品名/店铺/价格/描述/译文里的尖括号与引号都不裸出现', !/<b>危|<i>店|<script>x|<u>译|<em>描述译/.test(evilList + evilDet) && evilList.includes('&lt;b&gt;危') && evilDet.includes('&lt;em&gt;描述译')],
+            ['渲染层 tone 再校验:bogus 落 street(列表与详情)', evilList.includes('data-tone="street"') && !evilList.includes('bogus') && evilDet.includes('data-tone="street"') && !evilDet.includes('bogus')],
+            ['渲染层 qty 钳到 99', evilList.includes('× 99') && !evilList.includes('× 500')],
+        ];
+    }
+
+    // ⑦ 契约:PROMPT_S 与任务书逐字一致、占位、五档语言各跑一次生成(systemPrompt 无残留占位 + 双语档存 zh)、APPS 接线
+    async function assertShopContracts() {
+        const out = [];
+        let briefPrompt = null;
+        try {
+            const txt = await (await fetch('../docs/任务书-M15-Libra购物.md')).text();
+            const m = /### PROMPT_S[^\n]*\n\n```\n([\s\S]*?)\n```/.exec(txt);
+            briefPrompt = m ? m[1] : null;
+        } catch (e) { /* 任务书读不到时下面那条会 FAIL,提示原因 */ }
+        out.push(['PROMPT_S 与任务书 §三 逐字一致(读不到任务书时此条 FAIL)', briefPrompt !== null && generator.PROMPT_S === briefPrompt]);
+        out.push(['PROMPT_S 含 {{LANG_RULE}} 与 {{char}}、不含「续写」', generator.PROMPT_S.includes('{{LANG_RULE}}') && generator.PROMPT_S.includes('{{char}}') && !generator.PROMPT_S.includes('续写')]);
+
+        for (const lang of ['zh', 'ja', 'en', 'ja_zh', 'en_zh']) {
+            const wk = `__m15_assert_lang_${lang}_${Date.now()}`;
+            await store.setOwner(wk, 'テスト主人');
+            capturedShopSystemPrompt = null;
+            let threw = false, r = null;
+            try { r = await generator.generateMoreShop(ctx, store, shopOpts(wk, lang)); } catch (e) { threw = true; console.error('[M15 断言]', lang, e); }
+            const sp = capturedShopSystemPrompt || '';
+            const w = foldWorld(await store.getEntriesForWorld(wk));
+            const sampleItem = [...w.cartItems.values()][0];
+            const bilingual = lang === 'ja_zh' || lang === 'en_zh';
+            out.push([`langRule('shop', ${lang}):生成不抛错、systemPrompt 无残留占位、主人名已替换`, !threw && !!r?.ok && !!sp && !sp.includes('{{LANG_RULE}}') && !sp.includes('{{char}}') && sp.includes('テスト主人')]);
+            out.push([`${lang}:${bilingual ? '要求 name 译文放 zh、desc 译文放 descZh,且落账带 zh/descZh' : '不要求译文,落账不带 zh/descZh'}`,
+                bilingual ? (sp.includes('name 的译文放 zh') && sp.includes('desc 的译文放 descZh') && !!sampleItem?.zh && !!sampleItem?.descZh)
+                          : (sp.includes('不要输出 zh 与 descZh 字段') && !sampleItem?.zh && !sampleItem?.descZh)]);
+            await store.wipeWorld(wk);
+        }
+
+        const shellSrc = await (await fetch('../ui/shell.js')).text();
+        out.push(['APPS 含 shop(label 购物、bg cocoa、enabled)', /\{ id: 'shop', label: '购物', bg: 'cocoa', icon: ICON_APP_SHOP, enabled: true \}/.test(shellSrc)]);
+        out.push(['APPS 里 shop 排在 almanac 之后(网格 3+3+3)', shellSrc.indexOf("id: 'shop', label") > shellSrc.indexOf("id: 'almanac', label") && (shellSrc.match(/\{ id: '[a-z]+', label: '[^']+', bg:/g) || []).length === 9]);
+        const iconSrc = await (await fetch('../ui/icons.js')).text();
+        out.push(['ICON_APP_SHOP 是线稿 SVG(viewBox 24、stroke 1.6、无填充色块)', /export const ICON_APP_SHOP = '<svg viewBox="0 0 24 24">[^']*stroke-width="1.6"[^']*<\/svg>'/.test(iconSrc) && !/ICON_APP_SHOP[^\n]*fill="currentColor"/.test(iconSrc)]);
+        return out;
+    }
+
+    async function runM15Assertions() {
+        const out = document.getElementById('m15AssertResult');
+        out.textContent = '运行中…';
+        setChromeLanguage('zh');
+        const flow = await assertShopFlow();
+        const sections = [
+            ['1. 首刷落账(丢弃项/tone 白名单/水位)', flow.first],
+            ['2. 二刷(移出加回/买走/状态推进与非法丢弃/digest)', flow.second],
+            ['3. 红点 seen', flow.seenChecks],
+            ['4. 倒带 deleteShopFrom', flow.rewind],
+            ['5. fold 只进不退', assertShopFold()],
+            ['6. 纯渲染(两 tab/详情/语言档/转义)', assertShopRender(flow.world2, flow.ids, flow.firstOrderId)],
+            ['7. 契约(PROMPT_S/五档语言/APPS)', await assertShopContracts()],
+        ];
+        setChromeLanguage('ja_zh'); // 还原成别的断言面板期望的默认
+        let allPass = true;
+        const lines = [];
+        for (const [title, checks] of sections) {
+            lines.push(`<b>${escapeHtml(title)}</b>`);
+            for (const [label, pass] of checks) {
+                if (!pass) allPass = false;
+                lines.push(`  <span class="${pass ? 'pass' : 'fail'}">${pass ? 'PASS' : 'FAIL'}</span> ${escapeHtml(label)}`);
+            }
+        }
+        out.innerHTML = lines.join('\n');
+        log(`M15 断言跑完:${allPass ? '全绿' : '有未过项,见断言面板'}`);
+    }
+
+    document.getElementById('runM15AssertBtn').addEventListener('click', () => {
+        runM15Assertions().catch(err => {
+            document.getElementById('m15AssertResult').textContent = `断言运行出错:${err?.message || err}`;
+            console.error('[M15 断言]', err);
         });
     });
 

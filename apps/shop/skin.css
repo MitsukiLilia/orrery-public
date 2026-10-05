@@ -1,0 +1,81 @@
+/* 购物「Libra」皮肤——依赖 ui/shell.css 里定义的 --or-* token(四主题自动适配)。
+   tone 12 色是内容色,写死在这里、不随主题换值(同相册先例)。
+   apps 互相零依赖:tab 条不借 forum/skin.css 的 .or-forum-tabs、色块不借相册的类名,各自独立一份同款式。 */
+
+/* ── 两钮 tab(购买记录 / 购物车),样式照 .or-forum-tabs 另起一份 ── */
+.or-shop-tabs { flex-shrink: 0; display: flex; gap: 6px; padding: 0 14px 10px; background: var(--or-cream-2); }
+.or-shop-tabs button {
+    flex: 1; border: none; background: var(--or-cream); color: var(--or-cocoa-light);
+    font-size: 12.5px; font-weight: 600; padding: 8px 0; border-radius: 999px; cursor: pointer; font-family: inherit;
+}
+.or-shop-tabs button.on { background: var(--or-cocoa); color: var(--or-white); }
+
+/* ── 列表 ── */
+.or-shop-list { flex: 1; overflow-y: auto; padding: 10px 12px 14px; }
+
+/* 订单卡:卡头(时刻+状态小标)+ 每件一行 */
+.or-shop-order {
+    background: var(--or-white); border-radius: 12px; margin-bottom: 10px; padding: 4px 0 2px;
+    box-shadow: 0 1px 4px var(--or-shadow);
+}
+.or-shop-order-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px 4px; }
+.or-shop-order-time { flex: 1; font-size: 11px; color: var(--or-cocoa-light); }
+/* 配送状态小标:三种状态三种低调色,全部走 token,无渐变 */
+.or-shop-status { flex-shrink: 0; font-size: 10.5px; font-weight: 600; padding: 2px 9px; border-radius: 10px; }
+.or-shop-status[data-status="ordered"]   { background: var(--or-cream-2); color: var(--or-cocoa-light); }
+.or-shop-status[data-status="shipped"]   { background: var(--or-salt); color: var(--or-cocoa); }
+.or-shop-status[data-status="delivered"] { background: var(--or-cocoa); color: var(--or-white); }
+
+/* 商品行(订单里的件与车里的行共用骨架) */
+.or-shop-item-row, .or-shop-cart-row {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 8px 12px; border: none; background: none; cursor: pointer; font-family: inherit; text-align: left;
+}
+.or-shop-cart-row { background: var(--or-white); border-radius: 12px; margin-bottom: 8px; padding: 10px 12px; box-shadow: 0 1px 4px var(--or-shadow); }
+.or-shop-cart-row.removed { opacity: .55; } /* 最近移出:整行降低不透明度,名字不加删除线 */
+.or-shop-thumb { flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--or-shadow); } /* 描边:white 系色块落在白卡上也看得见轮廓 */
+.or-shop-item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.or-shop-item-name {
+    font-size: 13px; font-weight: 600; color: var(--or-cocoa); line-height: 1.35;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.or-shop-item-sub { font-size: 11.5px; color: var(--or-cocoa-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.or-shop-item-note { font-size: 10.5px; color: var(--or-cocoa-light); }
+
+.or-shop-section-title { font-size: 11.5px; font-weight: 600; color: var(--or-cocoa-light); margin: 16px 4px 8px; }
+
+/* 新内容小圆点:同 memo 那族的低调版 */
+.or-shop-new-dot {
+    flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--or-salt-deep);
+    animation: or-shop-dot-pulse 2.6s ease-in-out infinite;
+}
+@keyframes or-shop-dot-pulse {
+    0%, 72%, 100% { transform: scale(1); }
+    82% { transform: scale(1.3); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .or-shop-new-dot { animation: none; }
+}
+
+/* ── 详情屏:大 tone 色块(1:1,最大宽 280 居中)+ 名 + 店铺·价格 + desc + 元信息行 ── */
+.or-shop-detail-scroll { flex: 1; overflow-y: auto; padding: 16px; }
+.or-shop-hero { width: 100%; max-width: 280px; aspect-ratio: 1; border-radius: 16px; margin: 0 auto 16px; box-shadow: inset 0 0 0 1px var(--or-shadow); }
+.or-shop-detail-name { font-size: 14px; font-weight: 700; color: var(--or-cocoa); line-height: 1.5; }
+.or-shop-detail-price { font-size: 12.5px; color: var(--or-cocoa-light); margin: 6px 0 12px; }
+.or-shop-detail-desc { font-size: 13.5px; color: var(--or-cocoa); line-height: 1.7; }
+.or-shop-detail-meta { font-size: 11.5px; color: var(--or-cocoa-light); margin-top: 14px; }
+
+/* ── tone 调色板(固定 12 键,内容色、主题无关) ── */
+.or-shop-tone[data-tone="sky"]     { background: #A9C6DA; color: #34526B; }
+.or-shop-tone[data-tone="night"]   { background: #3D4A63; color: #C9D4E8; }
+.or-shop-tone[data-tone="sunset"]  { background: #E8B08A; color: #6E4A2F; }
+.or-shop-tone[data-tone="green"]   { background: #9DB89A; color: #3F5741; }
+.or-shop-tone[data-tone="blossom"] { background: #DFB9C8; color: #6D4457; }
+.or-shop-tone[data-tone="food"]    { background: #C89058; color: #55351B; }
+.or-shop-tone[data-tone="sea"]     { background: #7FA6B8; color: #2F4D5E; }
+.or-shop-tone[data-tone="indoor"]  { background: #D8C49A; color: #5C4E2E; }
+.or-shop-tone[data-tone="street"]  { background: #A9A6A1; color: #3E3C39; }
+.or-shop-tone[data-tone="white"]   { background: #EDEBE4; color: #6B675F; }
+.or-shop-tone[data-tone="dark"]    { background: #55504C; color: #D8D3CC; }
+.or-shop-tone[data-tone="screen"]  { background: #B9C0CB; color: #3C4552; }

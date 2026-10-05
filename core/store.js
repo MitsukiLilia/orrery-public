@@ -1,8 +1,8 @@
 // 世界账本:IndexedDB 持久化。全系统只认 RippleEntry(见 §3),这里不解释业务语义,只管存取。
 // 库名 orrery,两个 store:
 //   ledger — RippleEntry 本体,autoIncrement 主键;索引 worldKey(取某世界全部条目)、sourceFloor(极少单独用,配合内存过滤)
-//   meta   — 每个 worldKey 一条,{ worldKey, owner, watermarks: { messenger, forum, sns, browser, gallery, memo, almanac } },
-//            各 app 独立水位(M1 水位重构、M2 补 sns 档、M3 补 browser 档、M4 补 gallery/memo 档、M11 补 almanac 档,见
+//   meta   — 每个 worldKey 一条,{ worldKey, owner, watermarks: { messenger, forum, sns, browser, gallery, memo, shop, almanac } },
+//            各 app 独立水位(M1 水位重构、M2 补 sns 档、M3 补 browser 档、M4 补 gallery/memo 档、M11 补 almanac 档、M15 补 shop 档,见
 //            getWatermark/setWatermark/clampWatermarks;旧版单一 lastProcessedFloor + pendingFloors 已废除,
 //            读到旧格式时兼容迁移)
 
@@ -367,6 +367,32 @@ export async function deleteMemoFrom(worldKey, fromWorldTime) {
 }
 
 /**
+ * M15 购物 Libra 专用倒带:app==='shop' 的三型(shop_order/shop_status/shop_cart)一起,
+ * payload.worldTime >= fromWorldTime 的全删(任务书-M15 §一),工法同 deleteMemoFrom。倒带锚点=该条目的
+ * 最近活动时刻(订单取下单或最后一次状态变化较新者;车内商品取最后一次 add/remove),
+ * 锚点之前的下单/加车条目留下,fold 重放即还原到那一刻的订单状态与购物车。
+ */
+export async function deleteShopFrom(worldKey, fromWorldTime) {
+    if (!worldKey) return;
+    rollbackEpoch++; // 手动反悔同样代表用户更晚的意图:在飞的生成整批作废
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_LEDGER, 'readwrite');
+        const idx = tx.objectStore(STORE_LEDGER).index('worldKey');
+        const req = idx.openCursor(IDBKeyRange.only(worldKey));
+        req.onsuccess = () => {
+            const cursor = req.result;
+            if (!cursor) return;
+            const v = cursor.value;
+            if (v.app === 'shop' && (!Number.isFinite(v.payload?.worldTime) || v.payload.worldTime >= fromWorldTime)) cursor.delete();
+            cursor.continue();
+        };
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+/**
  * M11 门户专用倒带:almanac_item/almanac_update/almanac_page 三型,payload.worldTime >= fromWorldTime
  * 的全删,工法同 deleteBrowserFrom/deleteGalleryFrom。almanac_section(板块)一律跳过——板块不是
  * 时间轴事件(它是首次初始化时一次性定下的分类框架,不随剧情"发生"也不该随反悔"消失"),否则
@@ -398,7 +424,7 @@ export async function deleteAlmanacFrom(worldKey, fromWorldTime) {
  * M5 改組:清空该世界论坛的全部内容(board/resident/forum_thread/forum_reply/forum_draft,
  * 全部 app==='forum')+ community(所属,app==='world' type==='community')。旧世界不保留——
  * 一次性抹掉,下次「刷新」按主人的所属重新初始化(任务书-M5 §1.3)。
- * 比 wipeWorld 窄一圈:只清论坛+所属,messenger/sns/browser/gallery/memo 与主人设定原样保留。
+ * 比 wipeWorld 窄一圈:只清论坛+所属,messenger/sns/browser/gallery/memo/shop 与主人设定原样保留。
  */
 export async function deleteForumAll(worldKey) {
     if (!worldKey) return;
@@ -528,10 +554,10 @@ async function writeMeta(meta) {
 // 用户没开始用裏之前这个键永远是 -1,不会让悬浮球角标常亮(见 ui/shell.js 网格红点的 hasUra 判据)。
 function normalizeWatermarks(meta) {
     if (meta.watermarks && typeof meta.watermarks === 'object') {
-        return { messenger: -1, forum: -1, forumUra: -1, sns: -1, browser: -1, gallery: -1, memo: -1, almanac: -1, ...meta.watermarks };
+        return { messenger: -1, forum: -1, forumUra: -1, sns: -1, browser: -1, gallery: -1, memo: -1, shop: -1, almanac: -1, ...meta.watermarks };
     }
     const messenger = Number.isFinite(meta.lastProcessedFloor) ? meta.lastProcessedFloor : -1;
-    return { messenger, forum: -1, forumUra: -1, sns: -1, browser: -1, gallery: -1, memo: -1, almanac: -1 };
+    return { messenger, forum: -1, forumUra: -1, sns: -1, browser: -1, gallery: -1, memo: -1, shop: -1, almanac: -1 };
 }
 
 /**

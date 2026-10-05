@@ -20,6 +20,14 @@ const TABLE = {
     'alm.local':       { ja: '地域ニュース', zh: '本地新闻', en: 'Local News' },
     'alm.school':      { ja: 'ポータル', zh: '门户', en: 'Portal' },
     'alm.org':         { ja: 'イントラネット', zh: '内网', en: 'Intranet' },
+    // M15 购物 Libra:标签页/配送状态/车内小节标题。addedTimes 的 {n} 由调用方 replace。
+    'shop.orders':     { ja: '購入履歴', zh: '购买记录', en: 'Orders' },
+    'shop.cart':       { ja: 'カート', zh: '购物车', en: 'Cart' },
+    'shop.ordered':    { ja: '注文済み', zh: '已下单', en: 'Ordered' },
+    'shop.shipped':    { ja: '発送済み', zh: '已发货', en: 'Shipped' },
+    'shop.delivered':  { ja: 'お届け済み', zh: '已送达', en: 'Delivered' },
+    'shop.removed':    { ja: '最近カートから削除', zh: '最近移出购物车', en: 'Recently removed' },
+    'shop.addedTimes': { ja: '追加 {n} 回', zh: '加过 {n} 次', en: 'Added {n}×' },
 };
 
 // 未设置时按日文:不经过壳、直接调渲染函数的场合(测试台的纯函数断言)保持原样。

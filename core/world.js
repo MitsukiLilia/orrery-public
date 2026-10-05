@@ -135,6 +135,49 @@ export function anonIdFor(threadId, key) {
     return ((h >>> 0) % 36 ** 6).toString(36).padStart(6, '0'); // 异或会把值带回有符号,最后再转一次无符号
 }
 
+// ── M15 购物「Libra」折叠:订单、配送状态、购物车三型账本条目的回放规则,抽成共用函数——
+//    foldWorld 全量回放与 generator.js 落账时同步内存 world 走同一份,不各揣一份悄悄漂开。 ──
+// 配送状态只进不退:按 ordered<shipped<delivered 取最高,倒退/同级的条目忽略。
+export const SHOP_STATUS_RANK = { ordered: 0, shipped: 1, delivered: 2 };
+
+/**
+ * 把一条 app==='shop' 的账本条目折进 target.shopOrders / target.cartItems(原地修改)。
+ * 指向不存在订单/商品的条目一律跳过(warn)——一条畸形记录不能连累整个 Libra。
+ */
+export function applyShopEntry(target, e) {
+    const p = e.payload || {};
+    if (e.type === 'shop_order') {
+        target.shopOrders.set(p.orderId, {
+            orderId: p.orderId, worldTime: p.worldTime, items: Array.isArray(p.items) ? p.items : [],
+            status: 'ordered', statusTs: p.worldTime, latestTs: p.worldTime, ts: e.ts,
+        });
+    } else if (e.type === 'shop_status') {
+        const o = target.shopOrders.get(p.orderId);
+        if (!o) { console.warn('[Orrery] shop_status 指向不存在的订单', p.orderId, ',已跳过'); return; }
+        if (!(SHOP_STATUS_RANK[p.status] > SHOP_STATUS_RANK[o.status])) return; // 倒退或同级:忽略
+        o.status = p.status;
+        o.statusTs = p.worldTime;
+        if (Number.isFinite(p.worldTime)) o.latestTs = Math.max(o.latestTs || 0, p.worldTime);
+        o.ts = Math.max(o.ts || 0, e.ts || 0); // 状态推进也是新动静,红点/NEW 要认
+    } else if (e.type === 'shop_cart') {
+        let c = target.cartItems.get(p.cartItemId);
+        if (!c) {
+            // 首次 add 必须带 item;查不到 item 的 remove/buy/再 add 一律跳过。
+            if (p.action !== 'add' || !p.item) { console.warn('[Orrery] shop_cart 指向不存在的商品', p.cartItemId, ',已跳过'); return; }
+            c = { cartItemId: p.cartItemId, ...p.item, state: 'in', addCount: 1, history: [{ action: 'add', worldTime: p.worldTime }], firstAddTs: p.worldTime, latestTs: p.worldTime, ts: e.ts };
+            target.cartItems.set(p.cartItemId, c);
+            return;
+        }
+        if (p.action === 'add') { c.state = 'in'; c.addCount++; }
+        else if (p.action === 'remove') c.state = 'removed';
+        else if (p.action === 'buy') c.state = 'bought';
+        else return;
+        c.history.push({ action: p.action, worldTime: p.worldTime });
+        if (Number.isFinite(p.worldTime)) c.latestTs = Math.max(c.latestTs || 0, p.worldTime);
+        c.ts = Math.max(c.ts || 0, e.ts || 0);
+    }
+}
+
 /**
  * 账本 fold 成世界状态:{ contacts, groups, threads, worldNow, boards, residents, forumThreads, forumNow,
  *   snsAccounts, tweets, snsNow, searches, visits, browserNow, worldClock }。
@@ -198,6 +241,9 @@ export function foldWorld(entries) {
     const visits = new Map();
     const photosById = new Map(); // 内部工作表,最终按 worldTime 排序输出为 photos 数组(见 return)
     const memos = new Map();
+    let shopNow = 0;               // M15 购物时钟,见 shop_* 分支
+    const shopOrders = new Map();  // M15 购物订单:orderId -> { ..., status, statusTs, latestTs, ts }
+    const cartItems = new Map();   // M15 购物车商品:cartItemId -> { ...item, state, addCount, history, firstAddTs, latestTs, ts }
     const snapshots = new Map();  // v0.14 网页快照:visitId -> web_snapshot(一 visit 一张,后写覆盖)
     let snsSuggest = null;        // v0.14 搜索联想:整批一条,后写覆盖=只留最新一批
     let community = null;         // M5 所属:一世界一条,后写覆盖=只留最新(同 snsSuggest 的语义)
@@ -304,6 +350,10 @@ export function foldWorld(entries) {
             almanacPages.set(e.payload.itemId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
         } else if (e.type === 'photo') {
             photosById.set(e.payload.photoId, { ...e.payload, id: e.id, sourceFloor: e.sourceFloor, ts: e.ts });
+        } else if (e.type === 'shop_order' || e.type === 'shop_status' || e.type === 'shop_cart') {
+            applyShopEntry({ shopOrders, cartItems }, e);
+            // M15 购物时钟:shopNow 取所有 shop 条目 worldTime 的最大值(被忽略的畸形/倒退条目也算——世界时间只许向前)。
+            if (Number.isFinite(e.payload?.worldTime)) shopNow = Math.max(shopNow, e.payload.worldTime);
         } else if (e.type === 'memo_note') {
             memos.set(e.payload.noteId, {
                 noteId: e.payload.noteId, text: e.payload.text, zh: e.payload.zh,
@@ -387,6 +437,7 @@ export function foldWorld(entries) {
     let memoNow = 0;
     for (const m of memos.values()) if (Number.isFinite(m.latestTs)) memoNow = Math.max(memoNow, m.latestTs);
 
+
     // M11 门户收尾:updates 组内按 ts 升序排好(同浏览器追記此前的排序习惯——fold 只做一次,
     // UI/生成层都直接消费排好的顺序);status 取「有 update 带 status 的就用最后一条,否则用条目自己的」
     // (从后往前找第一条带 status 的 update,找不到就沿用条目自身);lastActiveTs 取条目与全部 updates
@@ -418,7 +469,7 @@ export function foldWorld(entries) {
     // 全手机的现在不该早于任何一个 app 已经走到的时刻。每个 app 自己的 xxxNow 语义不变、原样保留
     // (红点/NEW/latestTsOf* 仍靠它们认"这个 app 有没有新动静"),worldClock 只是叠加在上面的
     // 一把统一读数,不取代它们。七个都还是空世界(0)时 worldClock 才是 null。
-    const worldClock = Math.max(worldNow, forumNow, snsNow, browserNow, galleryNow, memoNow, almanacNow) || null;
+    const worldClock = Math.max(worldNow, forumNow, snsNow, browserNow, galleryNow, memoNow, shopNow, almanacNow) || null;
 
     return {
         contacts, groups, threads, worldNow: worldNow || null,
@@ -427,6 +478,7 @@ export function foldWorld(entries) {
         searches, visits, browserNow: browserNow || null, snapshots, snsSuggest,
         photos, galleryNow: galleryNow || null,
         memos, memoNow: memoNow || null,
+        shopOrders, cartItems, shopNow: shopNow || null, // M15 购物 Libra
         community, // M5:所属(对象或 null)
         nowPlaying, // M8:{ title, ts } 或 null,见上方长注
         follows, // M6:{ omote: Set, ura: Set } 关注表
@@ -455,6 +507,8 @@ export function starKeyForVisit(visitId) { return `wv:${visitId}`; }
 // M4 相册/备忘录同浏览器的整 app 一把快照工法(任务书-M4 §2)。
 export function seenKeyForGallery() { return 'gallery:app'; }
 export function seenKeyForMemo() { return 'memo:app'; }
+// M15 购物 Libra 同上,整 app 一把(订单/购物车混在一起判新旧)。
+export function seenKeyForShop() { return 'shop:app'; }
 // M11 门户同上,整 app 一把(条目/更新混在一起判新旧,不按板块/条目分)。
 export function seenKeyForAlmanac() { return 'almanac:app'; }
 
@@ -522,6 +576,14 @@ export function latestTsOfMemo(world) {
     return max;
 }
 
+/** Libra 全部订单与车内商品里最新的入账 ts——每项的 ts 已在 fold 时推到「创建或最后一次动静」的较新者。 */
+export function latestTsOfShop(world) {
+    let max = 0;
+    for (const o of world.shopOrders.values()) if (o.ts > max) max = o.ts;
+    for (const c of world.cartItems.values()) if (c.ts > max) max = c.ts;
+    return max;
+}
+
 /** 门户全部条目(items 与 updates)里最新的入账 ts——同 latestTsOfBrowser 的整 app 一把快照工法(页面不算)。 */
 export function latestTsOfAlmanac(world) {
     let max = 0;
@@ -565,6 +627,11 @@ export function hasUnseenInApp(app, world, seen) {
         if (!latest) return false; // 备忘录还是空的,不该为它亮角标
         return (seen[seenKeyForMemo()] || 0) < latest;
     }
+    if (app === 'shop') {
+        const latest = latestTsOfShop(world);
+        if (!latest) return false; // Libra 还是空的,不该为它亮角标
+        return (seen[seenKeyForShop()] || 0) < latest;
+    }
     if (app === 'almanac') {
         const latest = latestTsOfAlmanac(world);
         if (!latest) return false; // 门户还是空的,不该为它亮角标
@@ -599,6 +666,8 @@ export function seenBaselinePairs(world) {
     if (galleryTs) pairs.push([seenKeyForGallery(), galleryTs]);
     const memoTs = latestTsOfMemo(world);
     if (memoTs) pairs.push([seenKeyForMemo(), memoTs]);
+    const shopTs = latestTsOfShop(world);
+    if (shopTs) pairs.push([seenKeyForShop(), shopTs]);
     const almanacTs = latestTsOfAlmanac(world);
     if (almanacTs) pairs.push([seenKeyForAlmanac(), almanacTs]);
     return pairs;

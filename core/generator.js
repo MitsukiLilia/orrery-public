@@ -6,7 +6,7 @@
 // 2026-08-31 时间冻结硬约束(真机上出现过消息/论坛把余波写成「这一幕之后」——人物还没退场,板上已出现回去之后的目击):
 // A/B/B_GROUP/F/G 与二刷 hint 立「世界的现在=正文最新一幕落笔的那一瞬,人物钉在正文留下的位置上;论坛只有
 // 两种合法时态=已写出的过去+冻结的现在;未来只许被谈论不许被发生;冻结的是剧情不是生活」。A/F 原则由此改号。
-import { foldWorld, uncoveredMessages, monogramFor, colorForContact, resolveSender, GALLERY_TONES, anonIdFor } from './world.js';
+import { foldWorld, uncoveredMessages, monogramFor, colorForContact, resolveSender, GALLERY_TONES, anonIdFor, applyShopEntry, SHOP_STATUS_RANK } from './world.js';
 
 export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」的手机。给你的材料:①故事正文的最新进展 ②这部手机的当前状态(联系人、已有聊天)。请推演:这段进展之后,这部手机上自然会出现哪些新动静。
 
@@ -233,6 +233,29 @@ export const PROMPT_L = `你是 Orrery,一个隐形的叙事世界观测引擎�
 - delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走
 - 备忘录是完全无声的独处空间——没有读者,主人也不会对自己演戏`;
 
+// ── M15 购物 app「Libra」提示词:任务书-M15 §三逐字嵌入,一个字都不许改写。占位只有 {{char}} 与 {{LANG_RULE}}。──
+export const PROMPT_S = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里的购物 app「Libra」——这个故事世界里人人都在用的网购平台,属于故事世界本身。购物记录是生活的横截面:买了什么、什么时候买、给谁买,都不会说谎;购物车是犹豫的形状:加进去迟迟不下单的、加了又移出的、移出了又加回来的,都是没说出口的心事。给你的材料:①故事正文的最新进展 ②Libra 当前状态(购物车、最近移出的、最近的订单)。请推演这段进展之后,Libra 上自然会出现的新动静。
+
+# 原则
+1. 生活打底,余波稀有但响。大部分订单是彻底的生活流水:纸巾、洗衣液、食材、工作用的文具与线材、补货的日用品。与正文有关的余波是少数——正文里照顾生病的人,订单里就多一盒退烧贴和对方爱吃的那家布丁;正文里吵过架,车里就躺着一件迟迟不敢下单的赔礼。余波藏在「买了什么」里,不藏在商品描述里。
+2. 车是犹豫。购物车里放的是「想要,但还没决定」的东西:贵的、不必要的、给别人的、买了就等于承认什么的。一件东西在车里躺得越久、加了又移出的次数越多,心事就越重——用得克制,不是每批都要有人反复横跳。移出与买下都不需要说明理由。
+3. 性格优先。节俭的人比价、凑单、买大包装;冲动的人深夜下单;实务型只买必需品,车里几乎是空的;不擅表达的人连给别人的礼物都放在车里很久。以【人物设定参考】为准。
+4. 商品像真的。name 写成真实电商的商品标题(品牌感+规格,如「〇〇 ボックスティッシュ 5箱パック」那一挂,语言随语言规则);shop 是故事世界里合理的店铺名;price 用故事世界的货币与真实的价位,写成带货币符号的字符串;desc 只写商品图上看得到的东西(外观、颜色、包装),像给看不见图的人念图——绝不写心情、绝不解释为什么买;tone 从清单里选最贴合商品主色的那个。
+5. 视角与关系阶段纪律。只能出现主人自己会买、会想买的东西;正文尚未发生的事绝不出现。对叙事另一方:两人尚未相识,与对方有关的任何东西都绝不出现;相识后,车里一件「对方提过的东西」是这个 app 最高级的余波;交往之后,为对方买东西是理所当然。车里的东西也是剧情暗示——戒指、同居用品这类只有正文已经走到那一步才许出现,不许抢跑。关系阶段以正文为准,不许自行升温,也不许倒退——材料里若给出【主人已在私密处流露的心境】,买与不买都不得比它所在的阶段更早。
+6. 🚨时间冻结。世界停在正文最新一幕落笔的那一瞬:新订单是此刻下的单;配送状态只在故事时间确实流过时才推进(ordered→shipped→delivered,只进不退),刷新再多次时间也不会自己往前走;没有新剧情就让车里的犹豫多一点动静,而不是让快递凭空送达。
+7. 规模与下限:正文有新进展时,本批 1〜3 张新订单(每张 1〜4 件)+ 1〜3 条购物车动静——下限是至少 1 条动静,哪怕只是车里多了一件日用品;没有新进展的批次才允许 0〜2 条的安静。
+8. 🚨OOC 纪律:一切购物痕迹必须符合【人物设定参考】与正文已确立的性格和关系阶段,不得自行发明重大设定,不许未卜先知。
+9. {{LANG_RULE}}
+
+# 输出
+只输出一个 JSON 对象:
+{"worldTime":"YYYY-MM-DD HH:MM","newOrders":[{"items":[{"name":"","zh":"","shop":"","price":"","qty":1,"desc":"","descZh":"","tone":"清单键","fromCart":"仅当这件是从购物车里买走时写其 cartItemId"}],"delayMin":0}],"cart":[{"action":"add 或 remove","cartItemId":"加回/移出已有商品时写其 id;新加的商品省略","item":{"name":"","zh":"","shop":"","price":"","desc":"","descZh":"","tone":"清单键"},"delayMin":0}],"statusUpdates":[{"orderId":"已有订单id","status":"shipped 或 delivered"}]}
+- tone 清单:sky/night/sunset/green/blossom/food/sea/indoor/street/white/dark/screen(按商品主色挑:食品偏 food,白色包装偏 white,深色电子产品偏 dark,花与淡色偏 blossom……)
+- 新加入购物车的商品必须带 item;加回或移出已有商品只写 cartItemId,不必再带 item
+- delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走
+- 没有动静的数组给空数组;zh/descZh 只在语言规则要求译文时给
+- Libra 是主人独处时的痕迹——没有观众,买与不买都不会对谁演戏`;
+
 // ── 全局语言开关:{{LANG_RULE}} 运行时按档替换。──
 // 五档:zh(中文,默认)/ja_zh(日语原文+中文翻译)/en_zh(英语原文+中文翻译),以及不在设置页露出的纯 ja/en。
 // zh 档的稳定性靠两件事:①每个 scope 都明说「一律用中文书写」,不再让语言跟着正文走;②ZH_NOTE 把
@@ -443,6 +466,14 @@ const LANG_RULE = {
         en: '备忘用地道的英文便签体书写:碎片短语、清单式换行、随性的小写,notes-to-self 的省略语气。本提示词里的日系参照一律换算成英语圈对应物。不要输出 zh 字段。',
         ja_zh: '备忘用地道的日文メモ体书写:片言隻句、体言止め、清单式换行;写给自己的备忘里不会出现敬语,每条同时给出中文翻译字段 zh。',
         en_zh: '备忘用地道的英文便签体书写:碎片短语、清单式换行、随性的小写,notes-to-self 的省略语气。本提示词里的日系参照一律换算成英语圈对应物。每条同时给出中文翻译字段 zh。',
+    },
+    // M15 购物「Libra」(任务书-M15 §三):五档措辞照 memo 抄,「备忘」换成商品名与商品描述。
+    shop: {
+        zh: '商品名与商品描述一律用中文书写:商品名像真实电商的商品标题(品牌感+规格),描述是商品图上看得到的外观,短句、名词收尾为主。不要输出 zh 与 descZh 字段。',
+        ja: '商品名与商品描述用地道的日文电商文体书写:商品名像日本电商的商品标题(ブランド+規格+パック数那一挂),描述是商品图上看得到的外观,体言止め为主。不要输出 zh 与 descZh 字段。',
+        en: '商品名与商品描述用地道的英文电商文体书写:商品名像英语圈电商的 listing 标题(品牌+规格),描述是商品图上看得到的外观,短句为主。本提示词里的日系参照一律换算成英语圈对应物。不要输出 zh 与 descZh 字段。',
+        ja_zh: '商品名与商品描述用地道的日文电商文体书写:商品名像日本电商的商品标题(ブランド+規格+パック数那一挂),描述是商品图上看得到的外观,体言止め为主;每件同时给出中文翻译:name 的译文放 zh,desc 的译文放 descZh。',
+        en_zh: '商品名与商品描述用地道的英文电商文体书写:商品名像英语圈电商的 listing 标题(品牌+规格),描述是商品图上看得到的外观,短句为主。本提示词里的日系参照一律换算成英语圈对应物。每件同时给出中文翻译:name 的译文放 zh,desc 的译文放 descZh。',
     },
     // M5 所属コミュニティ推断(任务书-M5 §2):name/officialName 是原著专名,照抄写法;desc 与
     // worldBrief(M7b §2.5 新增)是给观测者看的说明文字,不必跟着语言档走——双语档与对应的单语档同文。
@@ -1428,6 +1459,42 @@ function buildMemoDigestText(world) {
         const { title, rest } = splitMemoFirstLine(m.text);
         const editedTag = m.editedTime ? `(编辑于 ${fmtWorldTime(m.editedTime)})` : '';
         parts.push(`[${m.noteId}] ${title} — ${rest.slice(0, 80)}${editedTag}`);
+    }
+    return parts.join('\n');
+}
+
+// ── M15 购物「Libra」digest(任务书-M15 §三):购物车现状 / 最近移出 / 最近订单三块。
+//    id 一律带上——二刷时模型要靠它引用「已有 cartItemId / orderId」。 ──
+export function buildShopDigestText(world) {
+    if (!world.shopOrders.size && !world.cartItems.size) {
+        return '(Libra 还是空的,这是第一次生成:请给出主人近期的几笔订单打底,购物车里放几件此刻还在犹豫的东西)';
+    }
+    const parts = [];
+    if (world.worldClock) parts.push(worldClockLine(world));
+
+    const inCart = [...world.cartItems.values()].filter(c => c.state === 'in')
+        .sort((a, b) => (b.latestTs || 0) - (a.latestTs || 0));
+    parts.push('[购物车里现在的东西]');
+    if (!inCart.length) parts.push('(空)');
+    for (const c of inCart) {
+        parts.push(`- id=${c.cartItemId} name ${c.name} shop ${c.shop} price ${c.price} (加入于 ${fmtWorldTime(c.firstAddTs)}·加过 ${c.addCount} 次)`);
+    }
+
+    const removed = [...world.cartItems.values()].filter(c => c.state === 'removed')
+        .sort((a, b) => (b.latestTs || 0) - (a.latestTs || 0)).slice(0, 5);
+    if (removed.length) {
+        parts.push('[最近移出购物车的]');
+        for (const c of removed) parts.push(`- id=${c.cartItemId} name ${c.name}(移出于 ${fmtWorldTime(c.latestTs)})`);
+    }
+
+    const orders = [...world.shopOrders.values()]
+        .sort((a, b) => (b.worldTime || 0) - (a.worldTime || 0)).slice(0, 8);
+    if (orders.length) {
+        parts.push('[最近的订单]');
+        for (const o of orders) {
+            parts.push(`- 订单 id=${o.orderId} 下单 ${fmtWorldTime(o.worldTime)} · 状态 ${o.status}`);
+            for (const it of o.items) parts.push(`  · ${it.name} ×${it.qty || 1} ${it.price}`);
+        }
     }
     return parts.join('\n');
 }
@@ -2984,6 +3051,136 @@ async function runMemoMainGeneration(ctx, store, { worldKey, floorWindow, profil
     return { ok: true, changed: true, added: addedCount };
 }
 
+// ── M15:购物「Libra」主生成:独立水位、独立触发(app 内「刷新」),消化 newOrders + cart + statusUpdates。
+//    没有续写/生成更多入口(任务书-M15 §一)。三个数组各自从同一个锚点起排开时间线(同备忘的 newNotes/edits)。 ──
+
+// 商品件清洗:缺 name 的件由调用方丢;tone 非法落 street;qty 钳 1〜99 整数;price 只当字符串存,不做数值运算。
+function cleanShopItem(raw, language, withQty) {
+    const it = {
+        name: String(raw.name).trim(),
+        shop: String(raw.shop || ''),
+        price: String(raw.price || ''),
+        desc: String(raw.desc || ''),
+        tone: GALLERY_TONES.includes(raw.tone) ? raw.tone : 'street',
+    };
+    if (withQty) {
+        const q = Math.round(Number(raw.qty));
+        it.qty = Number.isFinite(q) ? Math.max(1, Math.min(99, q)) : 1;
+    }
+    { const z = cleanZh(raw.zh, it.name, language); if (z) it.zh = z; }
+    { const z = cleanZh(raw.descZh, it.desc, language); if (z) it.descZh = z; }
+    return it;
+}
+
+async function runShopMainGeneration(ctx, store, { worldKey, floorWindow, profileId, customApi, owner, language, excludeTags }) {
+    await ensureRegexEngine();
+    const watermark = await store.getWatermark(worldKey, 'shop');
+    const tip = ctx.chat.length - 1;
+    const { newFrom, batchFloor, hint: regrowHint } = pendingOrRegrow(watermark, tip, floorWindow, 'generic');
+    if (batchFloor === null) return { ok: true, changed: false };
+
+    const world = foldWorld(await store.getEntriesForWorld(worldKey));
+    const charName = owner || ctx.name2 || '主角';
+    // 购物语境的措辞(任务书-M15 §三 caution 措辞):为对方买的、对方提过的东西同样算「与 TA 有关的痕迹」。
+    const userSideName = (ctx.name1 || '').trim();
+    const caution = (userSideName && userSideName !== charName)
+        ? `⚠️特别注意:正文是双人叙事,「${userSideName}」是叙事的另一方。两人尚未相识时,与 TA 有关的任何痕迹(为 TA 买的东西、TA 提过的东西)都绝不许出现在订单与购物车里。\n\n`
+        : '';
+    const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
+    const notes = await buildInjectedNotes(ctx);
+    // 喂主人私密心境:购物也是主人的私密痕迹,真心不倒退(同备忘/相册的消费方位置:正文之后、当前状态之前)。
+    const userContent = `${caution}${castRef}${notes.text}${buildFloorSection(ctx, { newFrom, floorWindow, excludeTags })}${buildOwnerInnerStateText(world)}【Libra 当前状态】\n${buildShopDigestText(world)}${regrowHint ? `\n\n${regrowHint.trim()}` : ''}`;
+    logContextShape('购物生成', userContent, notes.keys);
+    const systemPrompt = PROMPT_S.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('shop', language));
+
+    const epoch = store.getRollbackEpoch();
+    const parsed = await generateJsonWithRetry(ctx, systemPrompt, userContent, { profileId, customApi, responseLength: RESPONSE_BUDGET });
+    if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
+    if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
+
+    let addedCount = 0;
+    const rnd = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const makeOrderId = () => `od_${rnd()}`;
+    const makeCartId = () => `ci_${rnd()}`;
+    // 落账 + 同步写内存 world:折叠逻辑与 core/world.js 的 foldWorld 共用 applyShopEntry,不各揣一份。
+    async function put(type, payload) {
+        const added = await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'shop', type, payload });
+        applyShopEntry(world, { type, payload, ts: added.ts });
+        addedCount++;
+    }
+
+    // 锚=max(worldTime 解析值, worldClock);三个数组各自从同一锚点起排开(互不接续)。
+    const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? (world.worldClock ?? Date.now()), world.worldClock ?? 0);
+
+    // ① 新订单:每单 1〜6 件,缺 name 的件丢,件全丢整单丢。
+    const validOrders = [];
+    for (const o of Array.isArray(parsed.newOrders) ? parsed.newOrders : []) {
+        const items = [];
+        for (const raw of (Array.isArray(o?.items) ? o.items : []).slice(0, 6)) {
+            if (raw?.name && String(raw.name).trim()) items.push({ raw, item: cleanShopItem(raw, language, true) });
+            else console.warn('[Orrery] 订单商品缺少 name,已丢弃');
+        }
+        if (items.length) validOrders.push({ delayMin: o.delayMin, items });
+        else console.warn('[Orrery] 订单没有有效商品,整单已丢弃');
+    }
+    const orderTimes = layoutWorldTimes(validOrders, anchor, world.shopNow || 0);
+    for (let i = 0; i < validOrders.length; i++) {
+        const orderId = makeOrderId();
+        await put('shop_order', { orderId, worldTime: orderTimes[i], items: validOrders[i].items.map(x => x.item) });
+        // fromCart 指向车里 state==='in' 的商品:顺手写一条 buy(同一 worldTime);指向别处的只忽略 fromCart。
+        for (const { raw } of validOrders[i].items) {
+            if (!raw.fromCart) continue;
+            const ci = world.cartItems.get(String(raw.fromCart));
+            if (ci && ci.state === 'in') await put('shop_cart', { cartItemId: ci.cartItemId, action: 'buy', worldTime: orderTimes[i] });
+            else console.warn('[Orrery] fromCart 不在购物车里,已忽略', raw.fromCart);
+        }
+    }
+
+    // ② 购物车动静:加(新商品/加回)与移出。非法组合丢弃。
+    const validCart = [];
+    for (const c of Array.isArray(parsed.cart) ? parsed.cart : []) {
+        if (c && (c.action === 'add' || c.action === 'remove')) validCart.push(c);
+        else console.warn('[Orrery] 购物车动静 action 非法,已丢弃');
+    }
+    const cartTimes = layoutWorldTimes(validCart, anchor, world.shopNow || 0);
+    for (let i = 0; i < validCart.length; i++) {
+        const c = validCart[i];
+        const id = c.cartItemId ? String(c.cartItemId) : '';
+        const existing = id ? world.cartItems.get(id) : null;
+        if (c.action === 'add') {
+            if (!existing) {
+                if (!c.item?.name || !String(c.item.name).trim()) { console.warn('[Orrery] 新加购物车的商品缺少 name,已丢弃'); continue; }
+                await put('shop_cart', { cartItemId: makeCartId(), action: 'add', worldTime: cartTimes[i], item: cleanShopItem(c.item, language, false) });
+            } else if (existing.state === 'removed') {
+                await put('shop_cart', { cartItemId: id, action: 'add', worldTime: cartTimes[i] });
+            } else {
+                console.warn('[Orrery] 购物车里已有/已买走的商品再次 add,已忽略', id);
+            }
+        } else {
+            if (existing && existing.state === 'in') await put('shop_cart', { cartItemId: id, action: 'remove', worldTime: cartTimes[i] });
+            else console.warn('[Orrery] remove 指向不在车里的商品,已丢弃', id);
+        }
+    }
+
+    // ③ 配送状态推进:订单必须已存在,status 必须比当前更靠后。
+    const validStatus = [];
+    for (const u of Array.isArray(parsed.statusUpdates) ? parsed.statusUpdates : []) {
+        if (u && (u.status === 'shipped' || u.status === 'delivered') && u.orderId) validStatus.push(u);
+        else console.warn('[Orrery] 配送状态更新缺少 orderId 或 status 非法,已丢弃');
+    }
+    const statusTimes = layoutWorldTimes(validStatus, anchor, world.shopNow || 0);
+    for (let i = 0; i < validStatus.length; i++) {
+        const orderId = String(validStatus[i].orderId);
+        const o = world.shopOrders.get(orderId);
+        if (!o) { console.warn('[Orrery] 配送状态指向不存在的订单', orderId, ',已丢弃'); continue; }
+        if (SHOP_STATUS_RANK[validStatus[i].status] <= SHOP_STATUS_RANK[o.status]) { console.warn('[Orrery] 配送状态没有比当前更靠后,已丢弃', orderId); continue; }
+        await put('shop_status', { orderId, status: validStatus[i].status, worldTime: statusTimes[i] });
+    }
+
+    await store.setWatermark(worldKey, 'shop', batchFloor);
+    return { ok: true, changed: true, added: addedCount };
+}
+
 // ── M11:门户「Almanac」材料拼装(任务书-M11 §3.1)。首页/板块页共用这一份 digest 喂给 PROMPT_P;
 //    条目页面是另一份单条材料,见 runAlmanacPageGeneration。 ──
 
@@ -3199,7 +3396,7 @@ async function runAlmanacPageGeneration(ctx, store, { worldKey, itemId, floorWin
     return { ok: true, changed: true, added: 1 };
 }
 
-// ── 对外入口:UI 只认这十五个。messenger 两个内部自动接总结检查;forum/sns/browser/gallery/memo
+// ── 对外入口:UI 只认这十六个(M15 购物 generateMoreShop 是第十六个,同备忘只有主刷新一个入口)。messenger 两个内部自动接总结检查;forum/sns/browser/gallery/memo
 //    没有总结机制(§2 拍板不用改 PROMPT_C)。browser/gallery/memo 各只有一个入口——v1 没有详情页
 //    续写,自然也没有续写;almanac 两个入口(刷新批量生成条目/点开条目单独生成页面,页面命中
 //    缓存时 runAlmanacPageGeneration 早退,不花一分 token);M12 裏サイト多出的 generateMoreForumUra
@@ -3266,6 +3463,10 @@ export async function generateMoreGallery(ctx, store, opts) {
 
 export async function generateMoreMemo(ctx, store, opts) {
     return await runMemoMainGeneration(ctx, store, opts);
+}
+
+export async function generateMoreShop(ctx, store, opts) {
+    return await runShopMainGeneration(ctx, store, opts);
 }
 
 export async function generateMoreAlmanac(ctx, store, opts) {

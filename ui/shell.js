@@ -3,9 +3,9 @@
 import {
     computeWorldKey, foldWorld,
     seenKeyForThread, seenKeyForForumThread, seenKeyForTweet, seenKeyForBrowser,
-    seenKeyForGallery, seenKeyForMemo, seenKeyForAlmanac,
+    seenKeyForGallery, seenKeyForMemo, seenKeyForShop, seenKeyForAlmanac,
     latestTsOfThread, latestTsOfForumThread, latestTsOfTweet, latestTsOfBrowser,
-    latestTsOfGallery, latestTsOfMemo, latestTsOfAlmanac,
+    latestTsOfGallery, latestTsOfMemo, latestTsOfShop, latestTsOfAlmanac,
     hasUnseenInApp, seenBaselinePairs,
 } from '../core/world.js';
 import * as store from '../core/store.js';
@@ -13,7 +13,7 @@ import * as generator from '../core/generator.js';
 import {
     generateMore, generateContacts, continueThread, generateMoreForum, generateMoreForumUra, continueForumThread,
     generateMoreSns, continueTweetReplies, generateMoreBrowser,
-    generateMoreGallery, generateMoreMemo, generateSnsSearch, generateWebSnapshot,
+    generateMoreGallery, generateMoreMemo, generateMoreShop, generateSnsSearch, generateWebSnapshot,
     generateMoreAlmanac, generateAlmanacPage,
 } from '../core/generator.js';
 import { manualRevert } from '../core/rollback.js';
@@ -22,7 +22,7 @@ import { formatClock, formatClockDate } from '../core/worldtime.js';
 import {
     ICON_BACK, ICON_CHEVRON_RIGHT, ICON_CHECK, ICON_MINUS, ICON_PLUS, ICON_CLOSE,
     ICON_APP_MESSENGER, ICON_APP_SETTINGS, ICON_APP_FORUM, ICON_APP_MEMO, ICON_APP_SNS, ICON_APP_GALLERY,
-    ICON_APP_BROWSER, ICON_APP_ALMANAC,
+    ICON_APP_BROWSER, ICON_APP_ALMANAC, ICON_APP_SHOP,
     ICON_HUD_STARS, ICON_HUD_RING, ICON_STAR, ICON_STAR_FILL, dotPatternDataUri, scallopWaveDataUri,
     ICON_LOOP, ICON_PIXEL_MOON,
 } from './icons.js';
@@ -32,6 +32,7 @@ import { renderSnsTlHtml, renderSnsTweetHtml, renderSnsProfileHtml, renderSnsMyP
 import { renderBrowserHtml, renderWebPageHtml, BROWSER_SKIN_URL } from '../apps/browser/app.js';
 import { renderGalleryListHtml, renderGalleryPhotoHtml, GALLERY_SKIN_URL } from '../apps/gallery/app.js';
 import { renderMemoListHtml, renderMemoNoteHtml, MEMO_SKIN_URL } from '../apps/memo/app.js';
+import { renderShopListHtml, renderShopItemHtml, resolveShopItem, SHOP_SKIN_URL } from '../apps/shop/app.js';
 import { renderAlmanacHomeHtml, renderAlmanacSectionHtml, renderAlmanacItemHtml, ALMANAC_SKIN_URL } from '../apps/almanac/app.js';
 import { chrome, setChromeLanguage } from './chrome.js';
 import { exportWebSnapshot, exportForumThread, exportMessengerThread, exportAlmanacPage } from './exporter.js';
@@ -54,7 +55,7 @@ const DEFAULT_SETTINGS = {
     customApi: { enabled: false, baseUrl: '', apiKey: '', model: '' },
 };
 
-// M11:门户「Almanac」开通,8 个 app 全亮(网格 3+3+2)。
+// M15:购物「Libra」开通,9 个 app 全亮(网格 3+3+3)。
 const APPS = [
     { id: 'messenger', label: '消息', bg: 'salt', icon: ICON_APP_MESSENGER, enabled: true },
     { id: 'settings', label: '设置', bg: 'cocoa', icon: ICON_APP_SETTINGS, enabled: true },
@@ -64,6 +65,7 @@ const APPS = [
     { id: 'gallery', label: '相册', bg: 'cocoa', icon: ICON_APP_GALLERY, enabled: true },
     { id: 'browser', label: '浏览器', bg: 'salt', icon: ICON_APP_BROWSER, enabled: true },
     { id: 'almanac', label: '门户', bg: 'cream', icon: ICON_APP_ALMANAC, enabled: true },
+    { id: 'shop', label: '购物', bg: 'cocoa', icon: ICON_APP_SHOP, enabled: true },
 ];
 
 // escapeHtml 收编进 core/escape.js(带引号转义的安全版,六个 app 共用,注释见彼处)。
@@ -248,7 +250,7 @@ export function createShell(ctx, onExternalChange) {
     // 生成锁按 app 分:常见用法是一边等消息生成一边去翻论坛,共用一把锁会把整部手机锁死。
     // 六个 app 的账、水位、prompt 本来就各走各的,锁也该各管各的
     // (M2 补 sns、M3 补 browser、M4 补 gallery/memo,照 forum 的接法)。
-    const busy = { messenger: false, forum: false, sns: false, browser: false, gallery: false, memo: false, almanac: false };
+    const busy = { messenger: false, forum: false, sns: false, browser: false, gallery: false, memo: false, shop: false, almanac: false };
     // M10 导出:与上面的 LLM 生成锁完全独立(需求:导出与生成互不相扰)——
     // 各把各管各,导出中不锁生成,生成中也不挡导出。exporter.js 内部另有自己的「一次只跑一张图」
     // 闸(跨这几把之上的全局闸),这里只管"哪个按钮该转 spinner"这层 UI 状态。
@@ -312,12 +314,13 @@ export function createShell(ctx, onExternalChange) {
                     contacts: new Map(), threads: new Map(), boards: new Map(), residents: new Map(), forumThreads: new Map(),
                     snsAccounts: new Map(), tweets: new Map(), searches: new Map(), visits: new Map(),
                     photos: [], memos: new Map(),
+                    shopOrders: new Map(), cartItems: new Map(),
                     sections: new Map(), almanacItems: new Map(), almanacPages: new Map(),
                 },
-                tip: -1, watermarks: { messenger: -1, forum: -1, forumUra: -1, sns: -1, browser: -1, gallery: -1, memo: -1, almanac: -1 }, seen: {}, starred: {},
+                tip: -1, watermarks: { messenger: -1, forum: -1, forumUra: -1, sns: -1, browser: -1, gallery: -1, memo: -1, shop: -1, almanac: -1 }, seen: {}, starred: {},
             };
         }
-        const [entries, wmMessenger, wmForum, wmForumUra, wmSns, wmBrowser, wmGallery, wmMemo, wmAlmanac] = await Promise.all([
+        const [entries, wmMessenger, wmForum, wmForumUra, wmSns, wmBrowser, wmGallery, wmMemo, wmShop, wmAlmanac] = await Promise.all([
             store.getEntriesForWorld(worldKey),
             store.getWatermark(worldKey, 'messenger'),
             store.getWatermark(worldKey, 'forum'),
@@ -326,6 +329,7 @@ export function createShell(ctx, onExternalChange) {
             store.getWatermark(worldKey, 'browser'),
             store.getWatermark(worldKey, 'gallery'),
             store.getWatermark(worldKey, 'memo'),
+            store.getWatermark(worldKey, 'shop'),
             store.getWatermark(worldKey, 'almanac'),
         ]);
         const world = foldWorld(entries);
@@ -337,7 +341,7 @@ export function createShell(ctx, onExternalChange) {
         const [seen, starred] = await Promise.all([store.getSeenMap(worldKey), store.getStarred(worldKey)]);
         return {
             worldKey, world, tip,
-            watermarks: { messenger: wmMessenger, forum: wmForum, forumUra: wmForumUra, sns: wmSns, browser: wmBrowser, gallery: wmGallery, memo: wmMemo, almanac: wmAlmanac },
+            watermarks: { messenger: wmMessenger, forum: wmForum, forumUra: wmForumUra, sns: wmSns, browser: wmBrowser, gallery: wmGallery, memo: wmMemo, shop: wmShop, almanac: wmAlmanac },
             seen, starred,
         };
     }
@@ -376,10 +380,10 @@ export function createShell(ctx, onExternalChange) {
     // 长按删一条、调一下条数,用户正在读的位置就被弹回顶部(真机反馈过的一个点)。
     // 规则:同一块屏幕重渲染 → 原地保持;刚进屋 / 刚生成完 → 跳到新内容分界线。 ──
     const SCROLLERS = '.or-chat-scroll, .or-forum-scroll, .or-thread-list, .or-forum-list, .or-browser-list, .or-list, .or-home, '
-        + '.or-gallery-list, .or-memo-list, .or-gallery-detail-scroll, .or-memo-detail-scroll, .or-sns-list, .or-sns-scroll, .or-aster-list, '
+        + '.or-gallery-list, .or-memo-list, .or-shop-list, .or-gallery-detail-scroll, .or-memo-detail-scroll, .or-shop-detail-scroll, .or-sns-list, .or-sns-scroll, .or-aster-list, '
         + '.or-sns-suggest-list, .or-webpage-body, .or-alm-home, .or-alm-list, .or-alm-item-body';
     function screenKey(top) {
-        return [top.type, top.threadId || '', top.boardId || '', top.tweetId || '', top.accountId || '', top.photoId || '', top.noteId || '', top.tab || '', top.word || '', top.visitId || '', top.sectionId || '', top.itemId || '', top.side || ''].join('|');
+        return [top.type, top.threadId || '', top.boardId || '', top.tweetId || '', top.accountId || '', top.photoId || '', top.noteId || '', top.ref || '', top.tab || '', top.word || '', top.visitId || '', top.sectionId || '', top.itemId || '', top.side || ''].join('|');
     }
     let lastScreenKey = null;
 
@@ -457,6 +461,7 @@ export function createShell(ctx, onExternalChange) {
                 browser: watermarks.browser < tip || hasUnseenInApp('browser', world, seen),
                 gallery: watermarks.gallery < tip || hasUnseenInApp('gallery', world, seen),
                 memo: watermarks.memo < tip || hasUnseenInApp('memo', world, seen),
+                shop: watermarks.shop < tip || hasUnseenInApp('shop', world, seen),
                 almanac: watermarks.almanac < tip || hasUnseenInApp('almanac', world, seen),
             };
             // M8:时钟(顶)+ 图标网格 + 音乐组件(底)一起装进 .or-home 这个滚动容器——
@@ -568,6 +573,16 @@ export function createShell(ctx, onExternalChange) {
             const note = world.memos.get(top.noteId);
             if (!note) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚/反悔清空
             screenEl.innerHTML = renderMemoNoteHtml({ note });
+        } else if (top.type === 'shop') {
+            // 整 app 一把 seen 快照,进屏定格一次(同 memo);tab 切换/重渲染不再挪动。
+            const seenKey = seenKeyForShop();
+            if (top.seenAt === undefined) top.seenAt = seen[seenKey] || 0;
+            screenEl.innerHTML = renderShopListHtml({ world, busy: busy.shop, tab: top.tab || 'orders', seenAt: top.seenAt, shopNow: world.worldClock });
+            markSeenAfter = [seenKey, latestTsOfShop(world)];
+        } else if (top.type === 'shopItem') {
+            const resolved = resolveShopItem(world, top.ref);
+            if (!resolved) { navStack = [{ type: 'grid' }]; return render(); } // 已被回滚/反悔清空
+            screenEl.innerHTML = renderShopItemHtml({ resolved });
         } else if (top.type === 'sns-search') {
             screenEl.innerHTML = renderSnsSearchHtml({ world });
         } else if (top.type === 'sns-search-result') {
@@ -647,6 +662,7 @@ export function createShell(ctx, onExternalChange) {
         else if (appId === 'browser') navPush({ type: 'browser', tab: 'search' });
         else if (appId === 'gallery') navPush({ type: 'gallery' });
         else if (appId === 'memo') navPush({ type: 'memo' });
+        else if (appId === 'shop') navPush({ type: 'shop', tab: 'orders' });
         else if (appId === 'almanac') navPush({ type: 'almanac' });
     }
 
@@ -686,11 +702,12 @@ export function createShell(ctx, onExternalChange) {
             else if (result.toast) showToast(result.toast);
             else if (result.changed === false) showToast('还没有新的正文进展');
             else if (!result.added) showToast('这一刻,世界很安静');
-            // browser/gallery/memo 的成功文案各自单独一挂(任务书 §1/M4 §1),其余三个 app 仍共用
+            // browser/gallery/memo/shop 的成功文案各自单独一挂(任务书 §1/M4 §1),其余三个 app 仍共用
             // 「小世界起了 N 圈涟漪」——没有改动它们的文案,只在这一个分支上多分几叉。
             else if (app === 'browser') showToast(`浏览器里多了 ${result.added} 道痕迹`);
             else if (app === 'gallery') showToast(`相册里多了 ${result.added} 张照片`);
             else if (app === 'memo') showToast(`备忘录里多了 ${result.added} 处动静`);
+            else if (app === 'shop') showToast(`Libra 上多了 ${result.added} 处动静`);
             else if (app === 'almanac') showToast(`门户里多了 ${result.added} 处动静`);
             else showToast(`小世界起了 ${result.added} 圈涟漪`);
             return { skipped: null, result };
@@ -1396,6 +1413,46 @@ export function createShell(ctx, onExternalChange) {
         await render();
     }
 
+    // ── M15:购物「Libra」:独立水位的「刷新」(唯一入口,没有续写)+ tab 切换(纯本地)
+    //    + 反悔(按世界时间倒带——见 store.deleteShopFrom 的长注)。 ──
+
+    async function doGenerateMoreShop() {
+        const top = navStack[navStack.length - 1];
+        await runGeneration('shop', async ({ worldKey, owner, s }) => {
+            let before = 0;
+            if (top.type === 'shop') {
+                const seenMap = await store.getSeenMap(worldKey);
+                before = seenMap[seenKeyForShop()] || 0;
+            }
+            const result = await generateMoreShop(ctx, store, {
+                worldKey, floorWindow: s.floorWindow,
+                profileId: s.profileId || null, customApi: s.customApi, owner, language: s.language,
+                excludeTags: s.excludeTags || '',
+            });
+            if (result?.ok && result.added > 0 && top.type === 'shop') top.seenAt = before;
+            onExternalChange?.();
+            return result;
+        });
+    }
+
+    function doShopSelectTab(tab) {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'shop') return;
+        top.tab = tab === 'cart' ? 'cart' : 'orders';
+        render();
+    }
+
+    async function doShopRevert(worldTime) {
+        const top = navStack[navStack.length - 1];
+        if (top.type !== 'shop' || !Number.isFinite(worldTime)) return;
+        const confirmed = await ctx.callGenericPopup('从这条起删除之后的所有购物动静?', ctx.POPUP_TYPE.CONFIRM);
+        if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        await store.deleteShopFrom(worldKey, worldTime); // 世界回滚,按世界时间不按入账序号
+        await render();
+    }
+
     // ── M11:门户「Almanac」:独立水位的「刷新」(唯一批量入口,首页/板块页共用)+ 条目页面
     //    点开才生成(缓存命中免生成,同 doOpenWebPage)+ 导出条目页面 + 反悔(按世界时间倒带,
     //    板块幸存——见 store.deleteAlmanacFrom 的长注)。 ──
@@ -1615,6 +1672,9 @@ export function createShell(ctx, onExternalChange) {
             case 'gallery-refresh': doGenerateMoreGallery(); break;
             case 'open-memo-note': navPush({ type: 'memoNote', noteId: el.dataset.noteId }); break;
             case 'memo-refresh': doGenerateMoreMemo(); break;
+            case 'shop-refresh': doGenerateMoreShop(); break;
+            case 'shop-select-tab': doShopSelectTab(el.dataset.tab); break;
+            case 'open-shop-item': navPush({ type: 'shopItem', ref: el.dataset.ref }); break;
             case 'almanac-refresh': doGenerateMoreAlmanac(); break;
             case 'open-almanac-section': doOpenAlmanacSection(el.dataset.sectionId); break;
             case 'open-almanac-item': doOpenAlmanacItem(el.dataset.itemId); break;
@@ -1736,6 +1796,14 @@ export function createShell(ctx, onExternalChange) {
             }, 550);
             return;
         }
+        const shopRow = e.target.closest('.or-shop-order, .or-shop-cart-row');
+        if (shopRow) {
+            longPressTimer = setTimeout(() => {
+                suppressNextClick = true;
+                doShopRevert(Number(shopRow.dataset.worldtime));
+            }, 550);
+            return;
+        }
         const almRow = e.target.closest('.or-alm-row');
         if (almRow) {
             longPressTimer = setTimeout(() => {
@@ -1801,6 +1869,12 @@ export function createShell(ctx, onExternalChange) {
             doMemoRevert(Number(memoRow.dataset.worldtime));
             return;
         }
+        const shopRow = e.target.closest('.or-shop-order, .or-shop-cart-row');
+        if (shopRow) {
+            e.preventDefault();
+            doShopRevert(Number(shopRow.dataset.worldtime));
+            return;
+        }
         const almRow = e.target.closest('.or-alm-row');
         if (almRow) {
             e.preventDefault();
@@ -1821,7 +1895,7 @@ export function createShell(ctx, onExternalChange) {
         document.body.appendChild(host);
         shadow = host.attachShadow({ mode: 'open' });
 
-        for (const href of [SHELL_CSS_URL, MESSENGER_SKIN_URL, FORUM_SKIN_URL, SNS_SKIN_URL, BROWSER_SKIN_URL, GALLERY_SKIN_URL, MEMO_SKIN_URL, ALMANAC_SKIN_URL]) {
+        for (const href of [SHELL_CSS_URL, MESSENGER_SKIN_URL, FORUM_SKIN_URL, SNS_SKIN_URL, BROWSER_SKIN_URL, GALLERY_SKIN_URL, MEMO_SKIN_URL, SHOP_SKIN_URL, ALMANAC_SKIN_URL]) {
             const link = document.createElement('link');
             link.rel = 'stylesheet';
             link.href = href;
