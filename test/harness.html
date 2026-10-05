@@ -382,6 +382,10 @@
     // M13 表板実名制专用旁路(assertion②「user 硬防线」用):非 null 时 buildFixtureF 额外塞一个
     // castName===该值的 ゲスト(invitedBy 指向 r_sato),测完记得清空——默认 null 不影响其余用例。
     let fixtureFUserGuestCastName = null;
+    // v0.25.1 表裏隔离断言用:非 null 时 buildFixtureF 的 newReplies/顶层 myDraft 换成这两份(指向裏帖),测完清空。
+    let fixtureFExtraNewReplies = null;
+    let fixtureFTopDraft = null;
+    let capturedOmoteUserContent = null;
 
     // M13 首次论坛主生成(実名制形状,任务书-M13 §5):4 名実名住民——r_chinatsu 是身边人(验证
     // 「真身≠displayName 时也能正常走」)、r_sato 的 castName 与 displayName 故意不同(专供
@@ -431,7 +435,8 @@
                     replies: [],
                 },
             ],
-            newReplies: [],
+            newReplies: fixtureFExtraNewReplies || [],
+            ...(fixtureFTopDraft ? { myDraft: fixtureFTopDraft } : {}),
         };
     }
     // 【本帖的名無し】digest 行里现取第一个已出现的 key(格式 `key=xxx name=… ID:…`)——M13 起
@@ -776,6 +781,7 @@
         // M14 断言④(帖数点单)用:每次都存一份 systemPrompt——侧信道写法照 capturedUraUserContent。
         if (systemPrompt.includes('手机里的内部掲示板')) {
             capturedOmoteSystemPrompt = systemPrompt;
+            capturedOmoteUserContent = userContent;
             const body = buildFixtureF();
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
@@ -1951,6 +1957,50 @@
         ];
     }
 
+    // ── v0.25.1(真机:表板刷新后有実名楼出现在裏版;裏版主人草稿比正文冷;消息刷新常常只动一个线程)──
+    async function assertV0251() {
+        const wk = `__v0251_assert_${Date.now()}`;
+        await store.setOwner(wk, 'テスト主人');
+        // 裏帖种子 + 一条模拟旧版本留下的実名脏楼(fold 应折掉它)+ 一条正常名無し楼
+        await store.addEntry({ worldKey: wk, sourceFloor: 0, app: 'forum', type: 'forum_thread',
+            payload: { threadId: 't_seed_ura', side: 'ura', title: '裏帖种子', body: '', worldTime: 1000, anon: { key: 'a', name: '名無し' } } });
+        await store.addEntry({ worldKey: wk, sourceFloor: 0, app: 'forum', type: 'forum_reply',
+            payload: { threadId: 't_seed_ura', body: '旧版本漏进来的実名楼', worldTime: 1100, authorId: 'r_sato' } });
+        await store.addEntry({ worldKey: wk, sourceFloor: 0, app: 'forum', type: 'forum_reply',
+            payload: { threadId: 't_seed_ura', body: '正常的名無し楼', worldTime: 1200, anon: { key: 'b', name: '名無し' } } });
+        fixtureFExtraNewReplies = [{ threadId: 't_seed_ura', replies: [{ authorId: 'r_chinatsu', ...withZhBody('表板的人不该出现在裏帖') }] }];
+        fixtureFTopDraft = { threadId: 't_seed_ura', ...withZh('表板草稿不该挂到裏帖') };
+        capturedOmoteUserContent = null;
+        let result;
+        try {
+            result = await generator.generateMoreForum(ctx, store, {
+                worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+                owner: 'テスト主人', language: 'ja', excludeTags: '',
+            });
+            // 第二次:此时表板已有板块与住民,digest 才会走到「最近的帖子」那一段
+            result = await generator.generateMoreForum(ctx, store, {
+                worldKey: wk, floorWindow: 0, profileId: null, customApi: { enabled: false },
+                owner: 'テスト主人', language: 'ja', excludeTags: '',
+            });
+        } finally {
+            fixtureFExtraNewReplies = null;
+            fixtureFTopDraft = null;
+        }
+        const folded = foldWorld(await store.getEntriesForWorld(wk));
+        const ura = folded.forumThreads.get('t_seed_ura');
+        const out = [
+            ['表板生成成功', !!result?.ok],
+            ['表板 digest 不含裏帖', !!capturedOmoteUserContent && capturedOmoteUserContent.includes('[帖 ') && !capturedOmoteUserContent.includes('t_seed_ura')],
+            ['表板 newReplies 指向裏帖被丢弃', !!ura && !ura.replies.some(r => r.body.includes('表板的人不该出现在裏帖'))],
+            ['表板顶层 myDraft 指向裏帖被丢弃', !!ura && !ura.myDraft],
+            ['fold 折掉裏帖里的旧実名楼,名無し楼保留', !!ura && !ura.replies.some(r => r.authorId) && ura.replies.some(r => r.body === '正常的名無し楼')],
+            ['PROMPT_F2 草稿温度锚正文', generator.PROMPT_F2.includes('🌡草稿的感情温度与正文里此刻的 TA 一致')],
+            ['PROMPT_A 刷新铺开到 3〜5 个线程', generator.PROMPT_A.includes('分布在 3〜5 个线程')],
+        ];
+        await store.wipeWorld(wk);
+        return out;
+    }
+
     async function runM14Assertions() {
         const out = document.getElementById('m14AssertResult');
         out.textContent = '运行中…';
@@ -1964,6 +2014,7 @@
             ['5. 列表渲染(帖数 stepper)', assertForumListThreadBatchRender()],
             ['6. 契约与路由', assertPromptContracts()],
             ['7. 界面词跟随语言档', assertChromeFollowsLanguage()],
+            ['8. v0.25.1 表裏隔离/草稿温度/消息铺开', await assertV0251()],
         ];
         let allPass = true;
         const lines = [];

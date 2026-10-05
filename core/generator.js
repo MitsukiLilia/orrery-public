@@ -17,7 +17,7 @@ export const PROMPT_A = `你是 Orrery,一个隐形的叙事世界观测引擎�
 4. 视角纪律。每个人只知道自己视角内能知道的事(在场、被告知、公开可见)。不许任何人未卜先知。
 5. 消息像真人用 LINE:短句连发、口语、省略主语,贴合各人身份与关系亲疏。颜文字与表情符号是调味不是主食——是否使用、用多少,必须贴合角色性格:冷淡寡言的角色几乎不用,活泼的角色才多用,性格永远优先于氛围。不写小说腔,不用书面语转述剧情。
 6. {{LANG_RULE}}
-7. 克制与规模感:本次共 2〜8 条消息,分布在 1〜3 个线程。刷新是让已有的人际网按剧情起涟漪,不是挖人:通讯录里已登记的人(包括还没有聊天记录的)优先——谁会在此刻发来一条、哪个群里有人冒泡、已读不回的那条有没有下文。新联系人或新群只在正文里主人**刚刚**新认识了某人并合理交换了联系方式时才建,一次最多 1 位/1 个,而且必须有名有姓有身份;把主人既有的人际网(家人、上司下属、旧友、原著配角)挖出来登记是通讯录登记的事,不是刷新的事。没有名字的路人不配进通讯录。
+7. 克制与规模感:本次共 4〜12 条消息,分布在 3〜5 个线程(已有线程不够就有几个算几个),私聊与群聊都要有;每个线程 1〜3 条就够——余波是在好几处同时泛起的,宁可多个线程各冒一两条,也不要把消息都堆进同一个线程。刷新是让已有的人际网按剧情起涟漪,不是挖人:通讯录里已登记的人(包括还没有聊天记录的)优先——谁会在此刻发来一条、哪个群里有人冒泡、已读不回的那条有没有下文。新联系人或新群只在正文里主人**刚刚**新认识了某人并合理交换了联系方式时才建,一次最多 1 位/1 个,而且必须有名有姓有身份;把主人既有的人际网(家人、上司下属、旧友、原著配角)挖出来登记是通讯录登记的事,不是刷新的事。没有名字的路人不配进通讯录。
 8. 主人此刻单曲循环的那首歌:曲名优先用这个故事世界里真实存在的歌(原作里有歌就用原作的),没有就虚构一个贴合主人当下心境的曲名(语言随语言规则);心境变了才换歌,心境没变就省略此字段(省略=沿用上一首)——单曲循环本身就是心境的形状,不必每批都动。
 9. 🚨联系人纪律(绝对红线,违反即全盘失败)。手机里只能出现主人**在剧情中已经认识、且合理交换过联系方式**的人。判断只看剧情事实,不看叙事结构:正文哪怕通篇是两个人的双线叙事,只要剧情里他们尚未相识,对方就绝不能出现在通讯录——素未谋面的人不会躺在彼此的手机里。不要被任何先验带偏(比如默认两位主角是恋人或熟人)。宁缺勿滥:联系人晚一点出现,永远比过早出现真实。
 10. 熟稔度纪律。就算是真联系人,消息的语气亲疏也必须匹配剧情当前的关系阶段:刚认识就客气生分,熟人才随意,恋人才亲昵。关系阶段以正文为准,不许自行升温;也不许倒退——材料里若给出【主人已在私密处流露的心境】,主人可以嘴硬、可以口是心非,但真心所在的阶段不得低于它。
@@ -115,7 +115,7 @@ export const PROMPT_F2 = `你是 Orrery,一个隐形的叙事世界观测引擎�
 6. 自演与安価。有人为了洗清嫌疑或带节奏,同一帖里换 key 自问自答——留下的痕迹是口吻相似的两个 key 一唱一和,绝不点破;安価(>>N に従う)只用来决定鸡毛蒜皮的小事。这两样是裏サイト的调味,不是主菜,不必每批都有。
 7. 人口有边界:只有这个共同体的成员;外面的世界只以「听说」「目击」传进来;主线人物若不属于这个共同体,只能被议论,绝不登场。视角合法性同表板:每个成员只知道公开可见或自己亲历的事,🚫绝不许把与主线雷同的经历当成自己的亲身经历。
 8. 🚨时间冻结(绝对红线)。正文最新一幕落笔的那一瞬,就是唯一的「现在」;住民只有已写出的过去与冻结的现在两种合法时态;刷新再多次世界也停在原地——没有新剧情就多长鸡毛蒜皮与对既往的翻旧账,绝不用推进时间的新事件制造新鲜感。
-9. 主角的未发送草稿(myDraft):当某帖戳中「{{char}}」(被议论、被误解、想反驳),可以给该帖附一条 TA 写了又删的回复草稿——在裏サイト,这句话比在表板更不能发。整批至多一条,宁缺毋滥,贴合 TA 的性格与正文当下的心境。
+9. 主角的未发送草稿(myDraft):当某帖戳中「{{char}}」(被议论、被误解、聊到了 TA 在意的人或事),可以给该帖附一条 TA 写了又删的回复草稿——在裏サイト,这句话比在表板更不能发。整批至多一条,宁缺毋滥。🌡草稿的感情温度与正文里此刻的 TA 一致:正文里 TA 在开心、在用心照顾谁,写了又删的那句就带着同样的热度(想替对方说话、想纠正一句「不是那样的」、忍不住想炫耀一下又删掉);只有正文里的 TA 本身就在嘴硬或否认时,草稿才许嘴硬或否认——不许比正文冷,也不许比正文激烈。删掉它的理由是「不能在这里开口」,不是 TA 的心意变了。
 10. 语域随所属:组织・职场是社畜的怨念与黑话,学校是若者言葉与身内感,町内是市井的家长里短;仍像日系匿名掲示板(短句、「w/草」、安价跟风、歪楼、抬杠、颜文字),绝不像小说。
 11. 克制:本批{{THREAD_COUNT_RULE}}+ 0〜6 条对已有帖的新回复;冷场合理就冷场。
 12. 🚨主线人物纪律(严禁提前暗示与 OOC):一切痕迹符合【人物设定参考】与正文已确立的性格和关系阶段;正文里尚未发生的关系不许提前暗示;裏サイト永远落后于正文半步。
@@ -1188,8 +1188,10 @@ function buildForumDigestText(world) {
     for (const r of world.residents.values()) if (r.castName) parts.push(residentRosterLine(r, world));
     // 近 10 帖带一楼摘要:此前只给 5 帖、且只有标题,模型看不见一楼在聊什么,
     // 撞话题是必然。更早的旧帖不再进上下文=自然沉底,newReplies 也只许指向这 10 帖——和真论坛一样。
+    // v0.25.1:必须滤掉裏帖——此前只滤 t.title,裏帖混进了表板的「最近的帖子」,模型照着 newReplies
+    // 指过去,実名住民的楼就长到了匿名的裏帖底下。
     const recentThreads = [...world.forumThreads.values()]
-        .filter(t => t.title)
+        .filter(t => t.title && t.side !== 'ura')
         .sort((a, b) => (b.lastActiveTs || 0) - (a.lastActiveTs || 0))
         .slice(0, 10);
     if (recentThreads.length) {
@@ -1507,7 +1509,7 @@ function pendingOrRegrow(watermark, tip, floorWindow, scope = 'messenger') {
         // v0.24.1:此前这段明写「优先自问还有谁没登场、有人选就让 TA 登场」——通讯录登记(M14)接手挖人之后,
         // 二刷再这么写,右上角的「刷新」在固定测试世界(水位早已到顶,每次都是二刷)里就变成了添人按钮。
         // 刷新=按剧情起涟漪;添人走设置页的通讯录登记。
-        hint: '(正文自上次生成后没有新进展。请基于同样的进展,让已有的线程继续自然生长:通讯录里已登记的人(包括还没有聊天记录的)谁会在此刻发来一条、哪个群里有人冒泡、已读不回的那条有没有下文、上次的话题有没有余温。不要新建联系人或群——添人是通讯录登记的事,不是刷新的事,newContact/newGroup 一律留空。纪律照旧且最优先:叙事另一方仍然绝对不许出现;不要为了新而新,不要重复已有内容。另外,刷新不代表时间前进——世界仍冻结在正文落幕的那一瞬,绝不许生出这之后才会发生的事件;没有新剧情,就把已有的话题聊得更深:此刻的心情、对既往剧情的回味、对未来的打算——未来只许被谈论,不许被发生。)\n\n',
+        hint: '(正文自上次生成后没有新进展。请基于同样的进展,让已有的线程继续自然生长,而且照原则 7 的规模在好几个线程里同时起波,不要只动一个:通讯录里已登记的人(包括还没有聊天记录的)谁会在此刻发来一条、哪个群里有人冒泡、已读不回的那条有没有下文、上次的话题有没有余温。不要新建联系人或群——添人是通讯录登记的事,不是刷新的事,newContact/newGroup 一律留空。纪律照旧且最优先:叙事另一方仍然绝对不许出现;不要为了新而新,不要重复已有内容。另外,刷新不代表时间前进——世界仍冻结在正文落幕的那一瞬,绝不许生出这之后才会发生的事件;没有新剧情,就把已有的话题聊得更深:此刻的心情、对既往剧情的回味、对未来的打算——未来只许被谈论,不许被发生。)\n\n',
     };
 }
 
@@ -2045,6 +2047,8 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
         if (!nr?.threadId) continue;
         const thread = world.forumThreads.get(String(nr.threadId));
         if (!thread?.title) continue; // 帖不存在,丢弃
+        // v0.25.1:与裏サイト主生成的同名闸对称——表板的実名楼不许长到裏帖底下。
+        if (thread.side === 'ura') { console.warn('[Orrery] 表板 newReplies 指向裏帖,已丢弃:', nr.threadId); continue; }
         const threadId = thread.threadId;
         const replies = (Array.isArray(nr.replies) ? nr.replies : []).filter(rp => rp?.body && claimSpeaker(world, rp, { realName: true }));
         const tailTs = thread.replies.length ? thread.replies[thread.replies.length - 1].worldTime : thread.worldTime;
@@ -2063,7 +2067,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     // 顶层 myDraft=对已有帖的草稿(帖必须真实存在且有 title,悬空壳不收);fold 侧后写覆盖=同帖只留最新
     if (parsed.myDraft?.text && parsed.myDraft?.threadId) {
         const t = world.forumThreads.get(String(parsed.myDraft.threadId));
-        if (t?.title) draftCandidates.push({ threadId: t.threadId, text: parsed.myDraft.text, zh: parsed.myDraft.zh });
+        if (t?.title && t.side !== 'ura') draftCandidates.push({ threadId: t.threadId, text: parsed.myDraft.text, zh: parsed.myDraft.zh });
     }
     const draft = draftCandidates[0];
     if (draft) {
@@ -2186,7 +2190,7 @@ async function runForumUraMainGeneration(ctx, store, { worldKey, floorWindow, pr
     // 顶层 myDraft=对已有帖的草稿,写法照 runForumMainGeneration 一字不改(帖必须真实存在且有 title)。
     if (parsed.myDraft?.text && parsed.myDraft?.threadId) {
         const t = world.forumThreads.get(String(parsed.myDraft.threadId));
-        if (t?.title) draftCandidates.push({ threadId: t.threadId, text: parsed.myDraft.text, zh: parsed.myDraft.zh });
+        if (t?.title && t.side === 'ura') draftCandidates.push({ threadId: t.threadId, text: parsed.myDraft.text, zh: parsed.myDraft.zh });
     }
     const draft = draftCandidates[0];
     if (draft) {

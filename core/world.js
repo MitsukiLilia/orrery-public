@@ -347,6 +347,9 @@ export function foldWorld(entries) {
         // Object.assign(e.payload)里写上了 t.side;这里补一次归一,把「没有 side」(表板旧世界、
         // 或帖壳还没等到 forum_thread 到达)一律钳成 'omote',UI/生成层从此不必再判 undefined。
         t.side = t.side === 'ura' ? 'ura' : 'omote';
+        // v0.25.1:裏帖只有名無し——v0.25.0 以前表板刷新会把実名楼误挂到裏帖底下(digest 没滤裏帖),
+        // 账本里的旧脏楼在这里折掉,不必迁移、不必用户逐条反悔。
+        if (t.side === 'ura') t.replies = t.replies.filter(r => !r.authorId);
         t.replies.sort((a, b) => (a.worldTime || a.ts) - (b.worldTime || b.ts));
         t.replyCount = t.replies.length;
         const times = [t.worldTime, ...t.replies.map(r => r.worldTime)].filter(Number.isFinite);
