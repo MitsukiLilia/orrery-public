@@ -85,17 +85,17 @@ export const PROMPT_F = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newBoards":[{"boardId":"","name":"","desc":"一句话"}],"newResidents":[{"residentId":"","displayName":"板上显示的实名表记","affiliation":"部署・役職/クラス/丁目那一挂","persona":"立場与口調一句话","castName":"真身(故事人物照人物设定参考;正文没写到的人=displayName)","kind":"member 或 guest","invitedBy":"仅 guest:招待 TA 的成员 residentId"}],"newThreads":[{"boardId":"","title":"","authorId":"名册里的 residentId,必填","body":"","zh":"","replies":[{"authorId":"必填","body":"","zh":"","delayMin":0,"replyToFloor":0}],"myDraft":{"text":"","zh":""}}],"newReplies":[{"threadId":"","replies":[{"authorId":"必填","body":"","zh":"","delayMin":0,"replyToFloor":0}]}],"myDraft":{"threadId":"已有帖id","text":"","zh":""}}
+{"worldTime":"YYYY-MM-DD HH:MM","newBoards":[{"boardId":"","name":"","desc":"一句话"}],"newResidents":[{"residentId":"","displayName":"板上显示的实名表记","affiliation":"部署・役職/クラス/丁目那一挂","persona":"立場与口調一句话","castName":"真身(故事人物照人物设定参考;正文没写到的人=displayName)","kind":"member 或 guest","invitedBy":"仅 guest:招待 TA 的成员 residentId"}],"newThreads":[{"boardId":"","title":"","authorId":"名册里的 residentId,必填","body":"","zh":"","replies":[{"authorId":"必填","body":"","zh":"","replyToFloor":0}],"myDraft":{"text":"","zh":""}}],"newReplies":[{"threadId":"","replies":[{"authorId":"必填","body":"","zh":"","replyToFloor":0}]}],"myDraft":{"threadId":"已有帖id","text":"","zh":""}}
 - newBoards 仅首次初始化时给出(3〜4 个,按生活板的逻辑分:落とし物・譲ります系/おすすめ・布教系/日常・雑談系/趣味・部活・サークル系那一挂,名字贴合这个共同体,不要通用模板味);之后为空数组
 - 每一楼都必须给 authorId(已有或本批新建的 residentId);没有 authorId 或名册里查不到的楼作废——这块板上没有匿名这回事
-- replyToFloor 仅在明确回应某楼时给出;delayMin=距上一楼的分钟数
+- replyToFloor 仅在明确回应某楼时给出
 - myDraft=主角写了又删的未发送回复草稿:附在某个 newThreads 条目内=给那个新帖;顶层带 threadId=给已有帖。整批至多一条,没有就整个省略该字段
 - worldTime 从正文推断,只许向后走`;
 
 export const PROMPT_G = `你是 Orrery,叙事世界观测引擎。用户想继续围观「{{community}}」内部掲示板上这个帖子的后续——这是実名制的雑談板,每一楼都顶着真名与所属,大家都知道谁在说话,聊的是生活不是工作。基于帖子走向和各人的立場口調,自然地续写{{COUNT_RULE}}
 遵守:実名制是铁律——每一楼都必须是名册里的人(authorId),没有名無し、没有网名;沿用材料里[実名名册]已有的人,新人才用 newResident 注册(必带 displayName/affiliation/castName/kind,本次至多 2 名;ゲスト只许在招待 TA 的那件事的帖子里出现、必带 invitedBy 与正文撑得住的理由);🎯话题范围:材料末尾【本帖的主題】给出的标题与首楼划定本帖的话题范围——每一楼都留在范围内,角度可以多样(直接回首楼/补充/追问细节/接前面某楼的话往下走/客气地提出不同意见),不必每楼都>>1;绝不许整帖滑到与标题无关的新话题,没得聊时就在本帖的事情本身上追问细节、补一句感想或推荐,而不是换题;这里是実名で書く生活の場:语域是実名下的敬体カジュアル(比匿名板客气,比連絡板放松),感情只许从形式里漏出来(回得太快、多写一句不必要的话、故意不碰某个话题、恋バナ里一句欲言又止),真正的吃瓜与本音属于裏サイト不属于这里,误读只许是客气的读偏且不许夹带正文没有的事实;认知只进不退:材料末尾给出本帖的开帖时刻与现在的时刻,续楼的人活在现在,开帖时的疑问若已被后来公开的事实回答就按现在的认知接话,绝不许退回开帖时的状态;上位者的帖子得到的是常識的な社交(自然、得体、比必要多一分客气),绝不许合唱式的翼賛,也绝不许有人公开顶撞;每人只知道自己知道的,无关成员不得把与主线雷同的经历当成自己的亲历,主线人物也绝不回复与自己经历雷同的内容;主线人物顶着真名开口时,内容与正文已确立的关系阶段(及材料里【主人已在私密处流露的心境】的水位,若有)一致——可以不提、可以只聊猫与拉面,绝不许写出与私密心境相反的话,与叙事另一方的关系尚未公开时绝不点名,方式必须贴合其已确立的性格;材料里若有【主人刚刚发出的回复】,它就是本帖最新的一楼(作者=主人本人),续写必须以它为前提、不得复述它,成员对它的反应照上面的常識的な社交;若那一节注明主人尚无名册条目,用 ownerResident 为主人登记(displayName 按这个所属对 TA 的称呼、affiliation 写 TA 的役職或立場、kind=member、castName=TA 的名字);🚨剧情冻结——正文是这个世界唯一的剧情作者,盖楼只是余波:世界的「现在」停在正文最新一幕落笔的那一瞬,主线人物钉在正文留下的位置与状态里,回去之后、第二天的事都还不存在;绝不许爆出正文尚未发生的新事件或关系进展,也不许替剧情预告下一步;绝不像匿名掲示板(没有「w/草」、没有安価、不抬杠),绝不像連絡板(没有商务定型句、没有業務連絡),绝不像小说;不复述正文。
 {{LANG_RULE}}
-只输出 JSON:{"ownerResident":{"residentId":"","displayName":"","affiliation":"","persona":"","castName":"","kind":"member"},"replies":[{"authorId":"名册里的 residentId,必填","newResident":{"residentId":"","displayName":"","affiliation":"","persona":"","castName":"必填","kind":"member 或 guest","invitedBy":"仅 guest"},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}
+只输出 JSON:{"ownerResident":{"residentId":"","displayName":"","affiliation":"","persona":"","castName":"","kind":"member"},"replies":[{"authorId":"名册里的 residentId,必填","newResident":{"residentId":"","displayName":"","affiliation":"","persona":"","castName":"必填","kind":"member 或 guest","invitedBy":"仅 guest"},"body":"","zh":"","replyToFloor":0}]}
 - ownerResident 只在材料要求为主人登记时给出,否则省略
 - 没有 authorId 或名册里查不到(且本楼没带 newResident)的楼作废`;
 
@@ -123,16 +123,16 @@ export const PROMPT_F2 = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newThreads":[{"title":"","anon":{"key":"帖内短标记","name":"名無し系默认名"},"body":"","zh":"","replies":[{"anon":{"key":"","name":""},"body":"","zh":"","delayMin":0,"replyToFloor":0}],"myDraft":{"text":"","zh":""}}],"newReplies":[{"threadId":"","replies":[{"anon":{"key":"","name":""},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}],"myDraft":{"threadId":"已有帖id","text":"","zh":""}}
+{"worldTime":"YYYY-MM-DD HH:MM","newThreads":[{"title":"","anon":{"key":"帖内短标记","name":"名無し系默认名"},"body":"","zh":"","replies":[{"anon":{"key":"","name":""},"body":"","zh":"","replyToFloor":0}],"myDraft":{"text":"","zh":""}}],"newReplies":[{"threadId":"","replies":[{"anon":{"key":"","name":""},"body":"","zh":"","replyToFloor":0}]}],"myDraft":{"threadId":"已有帖id","text":"","zh":""}}
 - 每一楼都必须带 anon(没有 authorId 这回事,这里没有固定住民);缺 anon 的楼作废
-- replyToFloor 仅在明确回应某楼时给出;delayMin=距上一楼的分钟数
+- replyToFloor 仅在明确回应某楼时给出
 - myDraft 整批至多一条,没有就整个省略该字段
 - worldTime 从正文推断,只许向后走`;
 
 export const PROMPT_G2 = `你是 Orrery,叙事世界观测引擎。用户想继续围观「{{community}}」的裏サイト上这个帖子的后续——这里是成员们背着上面的人说真话的匿名场所,没有固定住民,人人都是一次性的名無し。基于帖子走向,自然地续写{{COUNT_RULE}}
 遵守:像日系匿名掲示板般跟风、带「w/草」与颜文字,绝不像小说;🎯话题范围:材料末尾【本帖的主題】给出的标题与首楼划定本帖的话题家族——每一楼都留在这个范围内,但切入角度要多样(直接回首楼/附和补充/聊话题的相关侧面/接前面某楼的话往下走/独立意见/抬杠),不必每楼都>>1;允许一时的歪楼,但歪出去的楼要在一两楼内被日系网民的强行转折(「それより」「てか」「話戻すけど」)拉回首楼关心的事,绝不许整帖滑到与标题无关的新话题;发言者一律用 anon(同帖同 key=同一人,可沿用材料里[本帖的名無し]已出现的 key 让某人回来接话,新人就起新 key),没有 authorId 这回事;大前提是「ここは上に見られていない」——本音不过滤,对上司与制度的抱怨、隐语绰号、粗口与自嘲都可以,但匿名是铁律(真名与役職+姓永不出现,役職本身可以叫);察し在这里反转:没有翼賛,偶尔有人疑神疑鬼「ここ見られてないよね?」引发一小阵自我审查再照旧吐槽,没有人写出是谁在看;材料里[表板の実名メンバー]是表板上顶着真名的人,在这里全都是名無し——名册上的任何人都可能正在本帖匿名说话,只许用立場、口癖与当事人才知道的细节让读者觉得「表のあの人では?」,绝不写出名册上的名字或所属+姓;标了 ゲスト 的外人进不来这里,只能被议论;主线人物及其身边人若在本帖说话也同样匿名,只靠口癖透出「像但不明说」,绝不自曝、言行不得 OOC(以【人物设定参考】为准);每人只知道自己知道的,无关住民不得把与主线雷同的经历当成自己的亲历;旁观者接话按吃瓜的天性歪出错误、夸张的推论(不许借「猜错」夹带正文没有的事实),歪的只许是事实与因果,不许是感情的重量——已确立的关系温度只许围观不许降格;🧭认知只进不退:材料末尾给出本帖的开帖时刻与现在的时刻,续楼的人活在现在,开帖之后公开发生的事 TA 们都知道,开帖时的疑问若已被后来公开的事实回答(误会已解开、事情已有结果)就按现在的认知接话、可以回味「あの時はまだ…」,绝不许退回开帖时的状态当作现在;自演(同帖换 key 自问自答,口吻相似不点破)与安価(>>N に従う,只决定鸡毛蒜皮)是这里的调味;主人在这里只潜水,永远不会开口——TA 写了又删的话住民看不见,🚫绝不许有任何一楼回应它;🚨剧情冻结——正文是这个世界唯一的剧情作者,盖楼只是余波:世界的「现在」停在正文最新一幕落笔的那一瞬,住民只能围绕已发生、公开可见的事继续跟风追问,绝不许爆出正文尚未发生的新事件或关系进展,也不许替剧情预告下一步;楼歪到没得聊时,转向对本帖话题本身的翻旧账与细节抬杠(同一件事的另一面、更早的前例、鸡毛蒜皮的具体细节),而不是换题;不复述正文。
 {{LANG_RULE}}
-只输出 JSON:{"replies":[{"anon":{"key":"帖内短标记","name":"名無し系默认名"},"body":"","zh":"","delayMin":0,"replyToFloor":0}]}
+只输出 JSON:{"replies":[{"anon":{"key":"帖内短标记","name":"名無し系默认名"},"body":"","zh":"","replyToFloor":0}]}
 - 每一楼都必须带 anon;缺 anon 的楼作废`;
 
 // ── M2:SNS「Pulsar」提示词(H/I),任务书 §4 逐字嵌入,一个字都不许改写。 ──
@@ -157,18 +157,18 @@ export const PROMPT_H = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newAccounts":[{"accountId":"","handle":"英数字ID(不带@)","displayName":"显示名","bio":"一句话简介","locked":false,"ownerRole":"仅主人的账号才写:omote 或 ura","castName":"仅当是故事人物的账号才写其真名,否则省略","official":false}],"newTweets":[{"accountId":"","body":"","zh":"","delayMin":0,"likes":0,"retweets":0,"retweetOf":"仅转发时写已有推文id","replies":[{"accountId":"","body":"","zh":"","delayMin":0}]}],"newReplies":[{"tweetId":"","replies":[{"accountId":"","body":"","zh":"","delayMin":0}]}],"followChanges":[{"by":"omote 或 ura","accountId":"已有或本批新建的账号id","action":"follow 或 unfollow"}],"suggestedSearches":["",""]}
+{"worldTime":"YYYY-MM-DD HH:MM","newAccounts":[{"accountId":"","handle":"英数字ID(不带@)","displayName":"显示名","bio":"一句话简介","locked":false,"ownerRole":"仅主人的账号才写:omote 或 ura","castName":"仅当是故事人物的账号才写其真名,否则省略","official":false}],"newTweets":[{"accountId":"","body":"","zh":"","likes":0,"retweets":0,"retweetOf":"仅转发时写已有推文id","replies":[{"accountId":"","body":"","zh":""}]}],"newReplies":[{"tweetId":"","replies":[{"accountId":"","body":"","zh":""}]}],"followChanges":[{"by":"omote 或 ura","accountId":"已有或本批新建的账号id","action":"follow 或 unfollow"}],"suggestedSearches":["",""]}
 - newAccounts 里 ownerRole、castName、official 三者互斥;accountId 必须是已有或本批新建的
 - 首次初始化必建主人的表垢(ownerRole:"omote");裏垢(ownerRole:"ura")只在原则 3 的条件满足时才诞生
 - bio 与 displayName 都是余波舞台:情绪剧变或进入某事件时,可改 bio、或在 displayName 加状态后缀(低浮上、〇〇ロス式)作隐秘表达——用 newAccounts 重发同 accountId 覆盖即可
 - followChanges 的 by=ura 只在裏垢存在时有效;没有变动就给空数组
 - 转发推(带 retweetOf)的 body 留空
-- delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走`;
+- worldTime 从正文推断,只许向后走`;
 
 export const PROMPT_I = `你是 Orrery,叙事世界观测引擎。用户想继续围观这条推文下的后续。基于推文内容和各账号的人格口癖,自然地续写{{COUNT_RULE}}
 遵守:像真实的日本推特回复串(短文、体言止め、跟风、歪楼),绝不像小说;严格保持社交距离感——熟人随意接梗,陌生人搭话(尤其热推下)常带「FF外から失礼します」式客套,偶尔有不读空气的 KY,但对主线人物的失礼极少且轻微、且很快有其他账号自然怼回或打圆场;账号口癖与人格跨推一致;每人只知道公开可见的事;故事人物的账号绝不自曝、言行不得OOC(以【人物设定参考】为准);表垢与裏垢的语气落差要守住;无关住民不得把与主线雷同的经历当成自己的亲历;⭐主人本人的账号绝不出现在陌生账号的回复区(主人只回已相识者的推,身边人路过陌生推则不受此限);🚨剧情冻结——正文是这个世界唯一的剧情作者,回复串只是余波:只围绕已发生、公开可见的事接梗,绝不许爆出正文尚未发生的新事件或关系进展;不复述正文。
 {{LANG_RULE}}
-只输出 JSON:{"replies":[{"accountId":"已有账号id或新id","newAccount":{"accountId":"","handle":"","displayName":"","bio":"","castName":"可省略"},"body":"","zh":"","delayMin":0}]}`;
+只输出 JSON:{"replies":[{"accountId":"已有账号id或新id","newAccount":{"accountId":"","handle":"","displayName":"","bio":"","castName":"可省略"},"body":"","zh":""}]}`;
 
 // ── M3:浏览器「Astrolabe」提示词(J),任务书-M3 §3 逐字嵌入,一个字都不许改写。──
 
@@ -186,8 +186,8 @@ export const PROMPT_J = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newSearches":[{"text":"检索词","zh":"","delayMin":0,"visits":[{"title":"页面标题","site":"站名","zh":"","delayMin":0}]}],"newVisits":[{"title":"","site":"","zh":"","delayMin":0}]}
-- delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走
+{"worldTime":"YYYY-MM-DD HH:MM","newSearches":[{"text":"检索词","zh":"","visits":[{"title":"页面标题","site":"站名","zh":""}]}],"newVisits":[{"title":"","site":"","zh":""}]}
+- worldTime 从正文推断,只许向后走
 - visits 挂在某条检索下=从那条检索点进去的页面;newVisits=与检索无关的独立浏览
 - 转发式、艾特式的社交行为不存在于这里——浏览器是完全无声的独处空间`;
 
@@ -207,10 +207,10 @@ export const PROMPT_K = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newPhotos":[{"label":"一两个词","desc":"画面描述","zh":"","tone":"清单键","kind":"photo 或 screenshot","delayMin":0}]}
+{"worldTime":"YYYY-MM-DD HH:MM","newPhotos":[{"label":"一两个词","desc":"画面描述","zh":"","tone":"清单键","kind":"photo 或 screenshot"}]}
 - tone 清单:sky(昼の空)/night(夜)/sunset(夕方の光)/green(緑・植物)/blossom(花・淡い色)/food(料理・暖色)/sea(水辺)/indoor(室内の灯り)/street(街・グレー)/white(白っぽい・明るい)/dark(暗がり)/screen(スクショ)
 - label=缩略图角落的一两个词(「空」「弁当」「スクショ」式);desc=完整的画面描述
-- delayMin=距上一张的分钟数;worldTime 从正文推断,只许向后走
+- worldTime 从正文推断,只许向后走
 - 相册是完全无声的独处空间——没有点赞没有观众,只有主人自己知道这里存了什么`;
 
 export const PROMPT_L = `你是 Orrery,一个隐形的叙事世界观测引擎。你观测的对象是故事主角「{{char}}」手机里的备忘录,属于故事世界本身。备忘录是写给自己的只言片语:买い物リスト与人生大事挤在同一个列表里,没有观众,所以最诚实——写了又删的、没写完的、永远不会发出去的,都停在这里。给你的材料:①故事正文的最新进展 ②备忘录当前状态(已有的备忘)。请推演这段进展之后,备忘录里自然会新增或改动的痕迹。
@@ -227,10 +227,10 @@ export const PROMPT_L = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newNotes":[{"text":"","zh":"","delayMin":0}],"edits":[{"noteId":"已有备忘的id","text":"改写后的完整内容","zh":"","delayMin":0}]}
+{"worldTime":"YYYY-MM-DD HH:MM","newNotes":[{"text":"","zh":""}],"edits":[{"noteId":"已有备忘的id","text":"改写后的完整内容","zh":""}]}
 - edits 的 noteId 必须来自【备忘录当前状态】里列出的 id;text=整条改写后的完整内容,不是增量
 - 备忘的第一行会被当作标题显示,像真人那样随手起头
-- delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走
+- worldTime 从正文推断,只许向后走
 - 备忘录是完全无声的独处空间——没有读者,主人也不会对自己演戏`;
 
 // ── M15 购物 app「Libra」提示词:任务书-M15 §三逐字嵌入,一个字都不许改写。占位只有 {{char}} 与 {{LANG_RULE}}。──
@@ -249,10 +249,10 @@ export const PROMPT_S = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newOrders":[{"items":[{"name":"","zh":"","shop":"","price":"","qty":1,"desc":"","descZh":"","tone":"清单键","fromCart":"仅当这件是从购物车里买走时写其 cartItemId"}],"delayMin":0}],"cart":[{"action":"add 或 remove","cartItemId":"加回/移出已有商品时写其 id;新加的商品省略","item":{"name":"","zh":"","shop":"","price":"","desc":"","descZh":"","tone":"清单键"},"delayMin":0}],"statusUpdates":[{"orderId":"已有订单id","status":"shipped 或 delivered"}]}
+{"worldTime":"YYYY-MM-DD HH:MM","newOrders":[{"items":[{"name":"","zh":"","shop":"","price":"","qty":1,"desc":"","descZh":"","tone":"清单键","fromCart":"仅当这件是从购物车里买走时写其 cartItemId"}]}],"cart":[{"action":"add 或 remove","cartItemId":"加回/移出已有商品时写其 id;新加的商品省略","item":{"name":"","zh":"","shop":"","price":"","desc":"","descZh":"","tone":"清单键"}}],"statusUpdates":[{"orderId":"已有订单id","status":"shipped 或 delivered"}]}
 - tone 清单:sky/night/sunset/green/blossom/food/sea/indoor/street/white/dark/screen(按商品主色挑:食品偏 food,白色包装偏 white,深色电子产品偏 dark,花与淡色偏 blossom……)
 - 新加入购物车的商品必须带 item;加回或移出已有商品只写 cartItemId,不必再带 item
-- delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走
+- worldTime 从正文推断,只许向后走
 - 没有动静的数组给空数组;zh/descZh 只在语言规则要求译文时给
 - Libra 是主人独处时的痕迹——没有观众,买与不买都不会对谁演戏`;
 
@@ -348,9 +348,9 @@ export const PROMPT_P = `你是 Orrery,一个隐形的叙事世界观测引擎�
 
 # 输出
 只输出一个 JSON 对象:
-{"worldTime":"YYYY-MM-DD HH:MM","newSections":[{"sectionId":"","name":"","desc":"一句话"}],"newItems":[{"sectionId":"","title":"件名","summary":"一行摘要","zh":"","signedBy":"部署/役職/发布主体","status":"有流程状态的条目才写(受理/承認済/募集中/受付中那一挂),否则省略此字段","delayMin":0}],"updates":[{"itemId":"已有条目id","status":"新状态","note":"一句备注","zh":""}]}
+{"worldTime":"YYYY-MM-DD HH:MM","newSections":[{"sectionId":"","name":"","desc":"一句话"}],"newItems":[{"sectionId":"","title":"件名","summary":"一行摘要","zh":"","signedBy":"部署/役職/发布主体","status":"有流程状态的条目才写(受理/承認済/募集中/受付中那一挂),否则省略此字段"}],"updates":[{"itemId":"已有条目id","status":"新状态","note":"一句备注","zh":""}]}
 - newSections 仅首次初始化时给出;之后为空数组
-- delayMin=距上一条的分钟数;worldTime 从正文推断,只许向后走
+- worldTime 从正文推断,只许向后走
 - updates 只能指向材料里列出的已有条目 id`;
 
 export const PROMPT_Q = `你是 Orrery,一个隐形的叙事世界观测引擎。主人「{{char}}」在门户 app「Almanac」里点开了一个条目——请把那张页面完整地呈现出来:{{MODE_PAGE_INTRO}}
@@ -715,19 +715,31 @@ function fmtWorldTime(ts) {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// delayMin 上限:世界时钟只许向前走,且 world.worldNow 取全局最大值——模型某条多打两个零
-// (60 → 6000)就能把整个世界的时间地板推到几个月后,之后每批生成都从那里起跳,不可自愈,
-// 只能手动反悔删掉那批才修得回来。一周足够表达「很久以后」,超出的一律按一周算。
-const MAX_DELAY_MIN = 60 * 24 * 7;
+// 批内时刻的排法(v0.26.1):连刷不推进剧情时刻。此前每条都按模型给的 delayMin(分钟)累加,
+// 一批下来动辄一两个小时,worldClock 取全机最大值又把这截尾巴当成「现在」讲回给模型——同一层楼
+// 连刷两次就能从下午三点走到晚上六点,论坛和消息于是开始臆测正文里还没发生的事。
+// 照 Perigee 论坛的做法:除消息外,间隔一律由代码按秒排,不再问模型(热门话题半分钟刷出几十条是真实的);
+// 消息的 delayMin 承载「迟疑/冷场/已读不回」的节奏,保留比例,但整批压进一个小窗口:单聊 10 分钟、群聊 5 分钟。
+const BURST_GAP_MIN_MS = 2000;
+const BURST_GAP_MAX_MS = 20000;
+// 新批锚点比 worldClock 晚的那一步(防钳平后与旧最新条同刻),此前是整 1 分钟。
+const CLOCK_STEP_MS = 5000;
+const DM_WINDOW_MIN = 10;
+const GROUP_WINDOW_MIN = 5;
 
-/** 从锚点起按 delayMin 依次排开一批消息的世界时刻。起点不早于线程尾,保证单调。 */
-function layoutWorldTimes(messages, anchor, threadTailTs) {
+/** 从锚点起按秒级随机间隔排开一批条目的世界时刻。起点不早于尾时刻,保证单调。 */
+function layoutBurstTimes(items, anchor, tailTs) {
+    let clock = Math.max(anchor, tailTs || 0);
+    return items.map(() => (clock += BURST_GAP_MIN_MS + Math.floor(Math.random() * (BURST_GAP_MAX_MS - BURST_GAP_MIN_MS))));
+}
+
+/** 消息专用:按 delayMin 的比例排开,整批总跨度不超过 windowMin 分钟。起点不早于线程尾,保证单调。 */
+function layoutChatTimes(messages, anchor, threadTailTs, windowMin) {
+    const delays = messages.map(m => Number.isFinite(m.delayMin) ? Math.max(0, m.delayMin) : 0);
+    const total = delays.reduce((a, b) => a + b, 0);
+    const k = total > windowMin ? windowMin / total : 1;
     let clock = Math.max(anchor, threadTailTs || 0);
-    return messages.map(m => {
-        const d = Number.isFinite(m.delayMin) ? Math.min(Math.max(0, m.delayMin), MAX_DELAY_MIN) : 0;
-        clock += d * 60000;
-        return clock;
-    });
+    return delays.map(d => (clock += Math.round(d * k * 60000)));
 }
 
 // ── LLM 调用优先级:独立 API > 指定 Connection Profile > 酒馆当前连接的裸调用。──
@@ -1669,10 +1681,10 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
     const touchedThreads = new Set();
     let addedCount = 0;
     // 锚严格晚于 worldClock(整部手机的现在,M7c 起不再只看 worldNow 自己那本账;同论坛的钳制):
-    // 线程内有 batchTail/layoutWorldTimes 保单调,但锚若倒退,只动到旧线程的批次会把新消息标进
+    // 线程内有 batchTail/layoutChatTimes 保单调,但锚若倒退,只动到旧线程的批次会把新消息标进
     // 过去,线程列表(按最新消息排)随之倒挂——钳到 worldClock 而不是 worldNow,是为了不让消息
     // 落后于论坛/SNS/浏览器等其他 app 已经走到的时刻。
-    const notBefore = world.worldClock ? world.worldClock + 60000 : null;
+    const notBefore = world.worldClock ? world.worldClock + CLOCK_STEP_MS : null;
     const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? notBefore ?? Date.now(), notBefore ?? 0);
     // 批内线程尾时刻:world.threads 是批次开始前的静态快照,循环里从不更新。同一次响应里
     // 两个块落到同一条线程时(模型重复同一 threadId,或经身份归一后被合并),第二块若仍读旧快照,
@@ -1745,7 +1757,7 @@ async function runMainGeneration(ctx, store, { worldKey, floorWindow, profileId,
         const valid = t.messages.filter(m => m && m.text);
         // 线程尾优先取批内已写入的最后时刻(见上方 batchTail),没有才回落到批前快照
         const tail = batchTail.get(threadId) ?? world.threads.get(threadId)?.lastMessage?.displayTs;
-        const times = layoutWorldTimes(valid, anchor, tail);
+        const times = layoutChatTimes(valid, anchor, tail, isGroup ? GROUP_WINDOW_MIN : DM_WINDOW_MIN);
         if (times.length) batchTail.set(threadId, times[times.length - 1]);
         for (let i = 0; i < valid.length; i++) {
             const m = valid[i];
@@ -1923,7 +1935,7 @@ async function runThreadContinue(ctx, store, { worldKey, threadId, floorWindow, 
     // 更新的线程被点开续聊时,不该让它的时刻落回比其他 app 更早的过去——地板抬到整部手机的现在。
     const anchor = Math.max(thread.lastMessage?.displayTs ?? 0, world.worldClock ?? 0) || Date.now();
     const valid = parsed.messages.filter(m => m && m.text);
-    const times = layoutWorldTimes(valid, anchor, thread.lastMessage?.displayTs);
+    const times = layoutChatTimes(valid, anchor, thread.lastMessage?.displayTs, isGroup ? GROUP_WINDOW_MIN : DM_WINDOW_MIN);
     for (let i = 0; i < valid.length; i++) {
         const m = valid[i];
         const payload = {
@@ -2006,9 +2018,9 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
 
     // 锚严格晚于 worldClock(M7c 起钳的是整部手机的现在,不再只看论坛自己的 forumNow):提示词
     // 里光靠一句文字挡不住正文日期含糊时模型随机挑日(新批帖子会整批标进过去,列表按 lastActiveTs
-    // 倒序时沉到旧批下面)。这道代码钳制 M2 起各 app 都有,论坛是 M1 建的一直没回填;+1 分钟是
+    // 倒序时沉到旧批下面)。这道代码钳制 M2 起各 app 都有,论坛是 M1 建的一直没回填;+CLOCK_STEP_MS 是
     // 防钳平后与旧最新帖同刻,稳定排序仍让新帖垫底。
-    const notBefore = world.worldClock ? world.worldClock + 60000 : null;
+    const notBefore = world.worldClock ? world.worldClock + CLOCK_STEP_MS : null;
     const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? notBefore ?? Date.now(), notBefore ?? 0);
     let addedCount = 0;
 
@@ -2098,7 +2110,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
         world.forumThreads.set(threadId, { ...payload, replies: [] });
 
         const replies = (Array.isArray(t.replies) ? t.replies : []).filter(rp => rp?.body && claimSpeaker(world, rp, { realName: true }));
-        const times = layoutWorldTimes(replies, anchor, anchor);
+        const times = layoutBurstTimes(replies, anchor, anchor);
         for (let i = 0; i < replies.length; i++) {
             const rp = replies[i];
             const rpayload = { threadId, body: String(rp.body), worldTime: times[i], authorId: String(rp.authorId) };
@@ -2119,7 +2131,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
         const threadId = thread.threadId;
         const replies = (Array.isArray(nr.replies) ? nr.replies : []).filter(rp => rp?.body && claimSpeaker(world, rp, { realName: true }));
         const tailTs = thread.replies.length ? thread.replies[thread.replies.length - 1].worldTime : thread.worldTime;
-        const times = layoutWorldTimes(replies, anchor, tailTs);
+        const times = layoutBurstTimes(replies, anchor, tailTs);
         for (let i = 0; i < replies.length; i++) {
             const rp = replies[i];
             const rpayload = { threadId, body: String(rp.body), worldTime: times[i], authorId: String(rp.authorId) };
@@ -2187,7 +2199,7 @@ async function runForumUraMainGeneration(ctx, store, { worldKey, floorWindow, pr
     if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
     if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
 
-    const notBefore = world.worldClock ? world.worldClock + 60000 : null;
+    const notBefore = world.worldClock ? world.worldClock + CLOCK_STEP_MS : null;
     const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? notBefore ?? Date.now(), notBefore ?? 0);
     let addedCount = 0;
 
@@ -2218,7 +2230,7 @@ async function runForumUraMainGeneration(ctx, store, { worldKey, floorWindow, pr
         world.forumThreads.set(threadId, { ...payload, replies: [] });
 
         const replies = (Array.isArray(t.replies) ? t.replies : []).filter(rp => { if (!rp) return false; delete rp.authorId; return rp.body && claimSpeaker(world, rp); });
-        const times = layoutWorldTimes(replies, anchor, anchor);
+        const times = layoutBurstTimes(replies, anchor, anchor);
         for (let i = 0; i < replies.length; i++) {
             const rp = replies[i];
             const rpayload = { threadId, body: String(rp.body), worldTime: times[i], anon: rp.anon };
@@ -2242,7 +2254,7 @@ async function runForumUraMainGeneration(ctx, store, { worldKey, floorWindow, pr
         const threadId = thread.threadId;
         const replies = (Array.isArray(nr.replies) ? nr.replies : []).filter(rp => { if (!rp) return false; delete rp.authorId; return rp.body && claimSpeaker(world, rp); });
         const tailTs = thread.replies.length ? thread.replies[thread.replies.length - 1].worldTime : thread.worldTime;
-        const times = layoutWorldTimes(replies, anchor, tailTs);
+        const times = layoutBurstTimes(replies, anchor, tailTs);
         for (let i = 0; i < replies.length; i++) {
             const rp = replies[i];
             const rpayload = { threadId, body: String(rp.body), worldTime: times[i], anon: rp.anon };
@@ -2363,7 +2375,7 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWin
             resolvedOwner = { ...payload, sourceFloor: added.sourceFloor, ts: added.ts };
             world.residents.set(residentId, resolvedOwner);
         }
-        anchor += 60000;
+        anchor += CLOCK_STEP_MS;
         const rpayload = { threadId, authorId: resolvedOwner.residentId, body: String(draft.text), worldTime: anchor, fromDraftId: draft.draftId };
         { const z = cleanZh(draft.zh, draft.text, language); if (z) rpayload.zh = z; }
         await store.addEntry({ worldKey, sourceFloor, app: 'forum', type: 'forum_reply', payload: rpayload });
@@ -2417,7 +2429,7 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWin
     }
     if (!valid.length) return { ok: true, added: addedCount }; // 草稿发出本身已经是「有变化」,不必再有新回复
 
-    const times = layoutWorldTimes(valid, anchor, anchor);
+    const times = layoutBurstTimes(valid, anchor, anchor);
     for (let i = 0; i < valid.length; i++) {
         const rp = valid[i];
         const rpayload = { threadId, body: String(rp.body), worldTime: times[i] };
@@ -2515,7 +2527,7 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
     }
 
     // 锚=max(worldTime 解析值, worldClock)(M7c 起钳整部手机的现在,不再只看 snsNow 自己那本账),
-    // 推自锚点按 delayMin 排开,回复再依推内 delayMin 排开。
+    // 推自锚点按秒排开,回复再从推自己的时刻起按秒排开(见 layoutBurstTimes)。
     const parsedWt = parseWorldTime(parsed.worldTime);
     const anchor = Math.max(parsedWt ?? (world.worldClock ?? Date.now()), world.worldClock ?? 0);
 
@@ -2532,7 +2544,7 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
         }
         return true;
     });
-    const tweetTimes = layoutWorldTimes(validTweets, anchor, world.snsNow || 0);
+    const tweetTimes = layoutBurstTimes(validTweets, anchor, world.snsNow || 0);
 
     for (let i = 0; i < validTweets.length; i++) {
         const t = validTweets[i];
@@ -2550,9 +2562,9 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
         addedCount++;
         world.tweets.set(tweetId, { ...payload, replies: [] });
 
-        // 内联 replies → tweet_reply,推内依 delayMin 排开(锚=推自己的 worldTime)
+        // 内联 replies → tweet_reply,推内按秒排开(锚=推自己的 worldTime)
         const replies = (Array.isArray(t.replies) ? t.replies : []).filter(rp => rp?.body && claimAccount(rp));
-        const rtimes = layoutWorldTimes(replies, tweetTimes[i], tweetTimes[i]);
+        const rtimes = layoutBurstTimes(replies, tweetTimes[i], tweetTimes[i]);
         for (let j = 0; j < replies.length; j++) {
             const rp = replies[j];
             const rpayload = { replyId: makeTweetReplyId(), tweetId, accountId: String(rp.accountId), body: String(rp.body), worldTime: rtimes[j] };
@@ -2571,7 +2583,7 @@ async function runSnsMainGeneration(ctx, store, { worldKey, floorWindow, profile
         const tweetId = tweet.tweetId;
         const replies = (Array.isArray(nr.replies) ? nr.replies : []).filter(rp => rp?.body && claimAccount(rp));
         const tailTs = tweet.replies.length ? tweet.replies[tweet.replies.length - 1].worldTime : tweet.worldTime;
-        const times = layoutWorldTimes(replies, anchor, tailTs);
+        const times = layoutBurstTimes(replies, anchor, tailTs);
         for (let i = 0; i < replies.length; i++) {
             const rp = replies[i];
             const rpayload = { replyId: makeTweetReplyId(), tweetId, accountId: String(rp.accountId), body: String(rp.body), worldTime: times[i] };
@@ -2802,7 +2814,7 @@ async function runSnsTweetContinue(ctx, store, { worldKey, tweetId, floorWindow,
 
     // 尾=最后一条回复或推本身(同 runForumThreadContinue 的写法),再钳一次 worldClock 的地板。
     const anchor = Math.max(tweet.replies.length ? tweet.replies[tweet.replies.length - 1].worldTime : (tweet.worldTime || 0), world.worldClock ?? 0) || Date.now();
-    const times = layoutWorldTimes(valid, anchor, anchor);
+    const times = layoutBurstTimes(valid, anchor, anchor);
     for (let i = 0; i < valid.length; i++) {
         const rp = valid[i];
         const rpayload = { replyId: makeTweetReplyId(), tweetId, accountId: String(rp.accountId), body: String(rp.body), worldTime: times[i] };
@@ -2855,7 +2867,7 @@ async function runBrowserMainGeneration(ctx, store, { worldKey, floorWindow, pro
     function makeVisitId() { return `bv_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
 
     // 锚=max(worldTime 解析值, worldClock)(同 SNS 的锚点写法,M7c 起钳整部手机的现在),
-    // 新检索自锚点按 delayMin 排开。
+    // 新检索自锚点按秒排开。
     const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? (world.worldClock ?? Date.now()), world.worldClock ?? 0);
 
     const validSearches = [];
@@ -2863,7 +2875,7 @@ async function runBrowserMainGeneration(ctx, store, { worldKey, floorWindow, pro
         if (s?.text) validSearches.push(s);
         else console.warn('[Orrery] 新检索缺少 text,已丢弃'); // 静默丢弃教训:留声,不连累其余条目
     }
-    const searchTimes = layoutWorldTimes(validSearches, anchor, world.browserNow || 0);
+    const searchTimes = layoutBurstTimes(validSearches, anchor, world.browserNow || 0);
 
     for (let i = 0; i < validSearches.length; i++) {
         const s = validSearches[i];
@@ -2873,13 +2885,13 @@ async function runBrowserMainGeneration(ctx, store, { worldKey, floorWindow, pro
         await store.addEntry({ worldKey, sourceFloor: batchFloor, app: 'browser', type: 'search_query', payload });
         addedCount++;
 
-        // visits 挂在这条检索下:从这条检索点进去的页面,锚=检索自己的 worldTime 再依 delayMin 排开。
+        // visits 挂在这条检索下:从这条检索点进去的页面,锚=检索自己的 worldTime 再按秒排开。
         const visits = [];
         for (const v of Array.isArray(s.visits) ? s.visits : []) {
             if (v?.title) visits.push(v);
             else console.warn('[Orrery] 浏览记录缺少 title,已丢弃');
         }
-        const vtimes = layoutWorldTimes(visits, searchTimes[i], searchTimes[i]);
+        const vtimes = layoutBurstTimes(visits, searchTimes[i], searchTimes[i]);
         for (let j = 0; j < visits.length; j++) {
             const v = visits[j];
             const vpayload = { visitId: makeVisitId(), title: String(v.title), site: String(v.site || ''), worldTime: vtimes[j], fromQueryId: queryId };
@@ -2895,7 +2907,7 @@ async function runBrowserMainGeneration(ctx, store, { worldKey, floorWindow, pro
         if (v?.title) validVisits.push(v);
         else console.warn('[Orrery] 独立浏览记录缺少 title,已丢弃');
     }
-    const visitTimes = layoutWorldTimes(validVisits, anchor, world.browserNow || 0);
+    const visitTimes = layoutBurstTimes(validVisits, anchor, world.browserNow || 0);
     for (let i = 0; i < validVisits.length; i++) {
         const v = validVisits[i];
         const payload = { visitId: makeVisitId(), title: String(v.title), site: String(v.site || ''), worldTime: visitTimes[i] };
@@ -2947,7 +2959,7 @@ async function runGalleryMainGeneration(ctx, store, { worldKey, floorWindow, pro
     function makePhotoId() { return `ph_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
 
     // 锚=max(worldTime 解析值, worldClock)(同浏览器的锚点写法,M7c 起钳整部手机的现在),
-    // 新照片自锚点按 delayMin 排开。
+    // 新照片自锚点按秒排开。
     const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? (world.worldClock ?? Date.now()), world.worldClock ?? 0);
 
     const validPhotos = [];
@@ -2955,7 +2967,7 @@ async function runGalleryMainGeneration(ctx, store, { worldKey, floorWindow, pro
         if (p?.desc) validPhotos.push(p);
         else console.warn('[Orrery] 新照片缺少 desc,已丢弃'); // 静默丢弃教训:留声,不连累其余条目
     }
-    const times = layoutWorldTimes(validPhotos, anchor, world.galleryNow || 0);
+    const times = layoutBurstTimes(validPhotos, anchor, world.galleryNow || 0);
 
     for (let i = 0; i < validPhotos.length; i++) {
         const p = validPhotos[i];
@@ -3006,7 +3018,7 @@ async function runMemoMainGeneration(ctx, store, { worldKey, floorWindow, profil
 
     // 锚=max(worldTime 解析值, worldClock)(M7c 起钳整部手机的现在),newNotes 与 edits 各自独立
     // 自锚点排开(同浏览器 newSearches/newVisits 的写法——两个数组各是各的时间线,不互相接续,
-    // 谁的 delayMin 都从同一个锚点起算)。
+    // 都从同一个锚点起算)。
     const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? (world.worldClock ?? Date.now()), world.worldClock ?? 0);
 
     const validNotes = [];
@@ -3014,7 +3026,7 @@ async function runMemoMainGeneration(ctx, store, { worldKey, floorWindow, profil
         if (n?.text) validNotes.push(n);
         else console.warn('[Orrery] 新备忘缺少 text,已丢弃');
     }
-    const noteTimes = layoutWorldTimes(validNotes, anchor, world.memoNow || 0);
+    const noteTimes = layoutBurstTimes(validNotes, anchor, world.memoNow || 0);
     for (let i = 0; i < validNotes.length; i++) {
         const n = validNotes[i];
         const noteId = makeNoteId();
@@ -3033,7 +3045,7 @@ async function runMemoMainGeneration(ctx, store, { worldKey, floorWindow, profil
         if (e?.noteId && e?.text) validEdits.push(e);
         else console.warn('[Orrery] 改写缺少 noteId 或 text,已丢弃');
     }
-    const editTimes = layoutWorldTimes(validEdits, anchor, world.memoNow || 0);
+    const editTimes = layoutBurstTimes(validEdits, anchor, world.memoNow || 0);
     for (let i = 0; i < validEdits.length; i++) {
         const e = validEdits[i];
         const noteId = String(e.noteId);
@@ -3120,10 +3132,10 @@ async function runShopMainGeneration(ctx, store, { worldKey, floorWindow, profil
             if (raw?.name && String(raw.name).trim()) items.push({ raw, item: cleanShopItem(raw, language, true) });
             else console.warn('[Orrery] 订单商品缺少 name,已丢弃');
         }
-        if (items.length) validOrders.push({ delayMin: o.delayMin, items });
+        if (items.length) validOrders.push({ items });
         else console.warn('[Orrery] 订单没有有效商品,整单已丢弃');
     }
-    const orderTimes = layoutWorldTimes(validOrders, anchor, world.shopNow || 0);
+    const orderTimes = layoutBurstTimes(validOrders, anchor, world.shopNow || 0);
     for (let i = 0; i < validOrders.length; i++) {
         const orderId = makeOrderId();
         await put('shop_order', { orderId, worldTime: orderTimes[i], items: validOrders[i].items.map(x => x.item) });
@@ -3142,7 +3154,7 @@ async function runShopMainGeneration(ctx, store, { worldKey, floorWindow, profil
         if (c && (c.action === 'add' || c.action === 'remove')) validCart.push(c);
         else console.warn('[Orrery] 购物车动静 action 非法,已丢弃');
     }
-    const cartTimes = layoutWorldTimes(validCart, anchor, world.shopNow || 0);
+    const cartTimes = layoutBurstTimes(validCart, anchor, world.shopNow || 0);
     for (let i = 0; i < validCart.length; i++) {
         const c = validCart[i];
         const id = c.cartItemId ? String(c.cartItemId) : '';
@@ -3168,7 +3180,7 @@ async function runShopMainGeneration(ctx, store, { worldKey, floorWindow, profil
         if (u && (u.status === 'shipped' || u.status === 'delivered') && u.orderId) validStatus.push(u);
         else console.warn('[Orrery] 配送状态更新缺少 orderId 或 status 非法,已丢弃');
     }
-    const statusTimes = layoutWorldTimes(validStatus, anchor, world.shopNow || 0);
+    const statusTimes = layoutBurstTimes(validStatus, anchor, world.shopNow || 0);
     for (let i = 0; i < validStatus.length; i++) {
         const orderId = String(validStatus[i].orderId);
         const o = world.shopOrders.get(orderId);
@@ -3242,8 +3254,8 @@ async function runAlmanacMainGeneration(ctx, store, { worldKey, floorWindow, pro
     if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'parse_failed' };
     if (store.getRollbackEpoch() !== epoch) return { ok: false, error: 'rolled_back' };
 
-    // 锚严格晚于 worldClock(同论坛的钳法,M7c 起钳的是整部手机的现在,+1 分钟防钳平后与旧最新条同刻)。
-    const notBefore = world.worldClock ? world.worldClock + 60000 : null;
+    // 锚严格晚于 worldClock(同论坛的钳法,M7c 起钳的是整部手机的现在,+CLOCK_STEP_MS 防钳平后与旧最新条同刻)。
+    const notBefore = world.worldClock ? world.worldClock + CLOCK_STEP_MS : null;
     const anchor = Math.max(parseWorldTime(parsed.worldTime) ?? notBefore ?? Date.now(), notBefore ?? 0);
     let addedCount = 0;
 
@@ -3283,7 +3295,7 @@ async function runAlmanacMainGeneration(ctx, store, { worldKey, floorWindow, pro
         }
         validItems.push({ ...it, sectionId });
     }
-    const itemTimes = layoutWorldTimes(validItems, anchor, anchor);
+    const itemTimes = layoutBurstTimes(validItems, anchor, anchor);
     for (let i = 0; i < validItems.length; i++) {
         const it = validItems[i];
         const itemId = makeItemId();
@@ -3312,11 +3324,12 @@ async function runAlmanacMainGeneration(ctx, store, { worldKey, floorWindow, pro
         if (!status && !note) continue;
         validUpdates.push({ ...u, item, status, note });
     }
+    const updateTimes = layoutBurstTimes(validUpdates, anchor, anchor);
     for (let i = 0; i < validUpdates.length; i++) {
         const u = validUpdates[i];
         const payload = {
             updateId: makeUpdateId(), itemId: u.item.itemId,
-            worldTime: Math.max(anchor + (i + 1) * 60000, u.item.worldTime + 60000),
+            worldTime: Math.max(updateTimes[i], u.item.worldTime + CLOCK_STEP_MS),
         };
         if (u.status) payload.status = u.status;
         if (u.note) payload.note = u.note;
