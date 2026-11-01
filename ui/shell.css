@@ -347,6 +347,7 @@
     font-size: 14px; color: var(--or-cocoa); background: none; border: none; text-align: left;
     font-family: inherit;
 }
+.or-model-list { max-height: 260px; overflow-y: auto; margin: 0 0 8px; border-radius: 10px; }
 .or-option:active { background: rgba(110, 90, 80, .06); }
 .or-option svg { width: 16px; height: 16px; color: var(--or-salt-deep); }
 

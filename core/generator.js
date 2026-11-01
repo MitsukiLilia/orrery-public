@@ -753,6 +753,30 @@ function buildChatEndpoint(baseUrl) {
     return u + '/v1/chat/completions';
 }
 
+// 模型列表端点:与 buildChatEndpoint 同一套拼法,把 /chat/completions 换成 /models。
+function buildModelsEndpoint(baseUrl) {
+    let u = String(baseUrl || '').trim().replace(/\/+$/, '');
+    if (!u) return null;
+    u = u.replace(/\/chat\/completions$/, '');
+    if (/\/v\d+$/.test(u)) return u + '/models';
+    return u + '/v1/models';
+}
+
+/** 独立 API 拉取模型列表(OpenAI 兼容 GET /models)。返回去重排序后的模型 id 数组;失败抛错。 */
+export async function fetchCustomApiModels(customApi) {
+    const url = buildModelsEndpoint(customApi?.baseUrl);
+    if (!url) throw new Error('先填 Base URL');
+    const res = await fetch(url, {
+        headers: customApi.apiKey ? { Authorization: `Bearer ${customApi.apiKey}` } : {},
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    // 通行格式 {data:[{id}]};也兼容直接回数组、或 {models:[{name|id}]}(Gemini 原生那一挂)
+    const list = Array.isArray(data) ? data : (data?.data || data?.models || []);
+    const ids = list.map(m => (typeof m === 'string' ? m : (m?.id || m?.name || ''))).map(x => String(x).replace(/^models\//, '')).filter(Boolean);
+    return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
+}
+
 // 有的 OpenAI 兼容网关会无视 stream:false 强行回 SSE(真机实测:服务端 .json() 解析「data: {…」直接炸)。
 // 独立 API 通道自带装甲:显式非流式 + 响应嗅探,收到 SSE 也逐行拼装出全文。
 function parseSseText(text) {
@@ -1611,14 +1635,37 @@ async function ensureCommunity(ctx, store, { worldKey, profileId, customApi, own
     try { return await p; } finally { communityInFlight.delete(worldKey); }
 }
 
-async function inferCommunity(ctx, store, { worldKey, profileId, customApi, owner, language, excludeTags }) {
+// 论坛场景(用户在设置里指定):有场景就按场景推一个论坛专用的所属,存 meta(store.getForumScene);
+// 没有就照旧走 ensureCommunity。只有论坛表裏两板走这里,门户/浏览器仍认自动推断的所属。
+async function ensureForumCommunity(ctx, store, opts) {
+    const fs = await store.getForumScene(opts.worldKey);
+    if (!fs) return ensureCommunity(ctx, store, opts);
+    if (fs.community?.name) return fs.community;
+    const flightKey = `${opts.worldKey}\u0000forum:${fs.scene}`;
+    if (communityInFlight.has(flightKey)) return communityInFlight.get(flightKey);
+    const p = inferCommunity(ctx, store, { ...opts, scene: fs.scene });
+    communityInFlight.set(flightKey, p);
+    try { return await p; } finally { communityInFlight.delete(flightKey); }
+}
+
+// 盖楼用:只读不推。设了场景就认场景的所属(还没推出来时为 null,调用方按「この掲示板」兜底)。
+async function peekForumCommunity(store, worldKey, world) {
+    const fs = await store.getForumScene(worldKey);
+    return fs ? (fs.community || null) : world.community;
+}
+
+async function inferCommunity(ctx, store, { worldKey, profileId, customApi, owner, language, excludeTags, scene = null }) {
     const charName = owner || ctx.name2 || '主角';
     const castRef = await buildCastReference(ctx, recentFloorTexts(ctx, excludeTags), charName);
     const notes = await buildInjectedNotes(ctx);
     // 一世界只推一次、结果永久缓存——给整本聊天当背景比给一小截窗口更划算,不会重复烧这份成本。
     const recent = buildFloorSection(ctx, { newFrom: null, floorWindow: 0, excludeTags, background: true });
-    const userContent = `${castRef}${notes.text}${recent}`;
-    logContextShape('所属推断', userContent, notes.keys);
+    // 用户指定了论坛场景:以它为准,模型只负责把它补成完整的所属对象(称呼体系/简报照原著补)。
+    const sceneHint = scene
+        ? `\n\n【用户指定的论坛场景】${scene}\n这部手机里的掲示板由用户指定为上面这个场景,以它为准,不再自行判断所属:name 就取这个场景(原著里有正式写法就补成正式写法,不改换成别的组织);kind 取最贴近的一档;desc 写清它是怎样的地方、主角在其中是什么身份;titles 按这个场景里成员彼此的称呼体系给。`
+        : '';
+    const userContent = `${castRef}${notes.text}${recent}${sceneHint}`;
+    logContextShape(scene ? '论坛场景推断' : '所属推断', userContent, notes.keys);
     const systemPrompt = PROMPT_O.replaceAll('{{char}}', charName).replaceAll('{{LANG_RULE}}', langRule('community', language));
 
     // 回滚纪元闸(2026-08-31 整体review P1-1 回填):所属结果永久缓存、只能靠改組重推,
@@ -1628,13 +1675,18 @@ async function inferCommunity(ctx, store, { worldKey, profileId, customApi, owne
     if (!parsed || !parsed.name) return null;
     if (store.getRollbackEpoch() !== epoch) return null;
 
-    const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
     const payload = {
         name: String(parsed.name), kind: (['org', 'school', 'local'].includes(parsed.kind) ? parsed.kind : 'org'),
         desc: String(parsed.desc || ''), slug: String(parsed.slug || ''), officialName: String(parsed.officialName || ''),
         titles: String(parsed.titles || '').trim() || '(未提供)', // 空串会被当成「缺」而每次重推,占位止损
         worldBrief: String(parsed.worldBrief || '').trim() || '(未提供)', // 同上,worldBrief 空串同样止损
     };
+    if (scene) {
+        // 场景所属是设置的一部分,不进账本(不随回滚消失);推断途中场景被改了就作废。
+        if (!(await store.setForumSceneCommunity(worldKey, scene, payload))) return null;
+        return payload;
+    }
+    const sourceFloor = ctx.chat.length ? ctx.chat.length - 1 : 0;
     const added = await store.addEntry({ worldKey, sourceFloor, app: 'world', type: 'community', payload });
     return { ...payload, sourceFloor: added.sourceFloor, ts: added.ts };
 }
@@ -1995,7 +2047,7 @@ async function runForumMainGeneration(ctx, store, { worldKey, floorWindow, profi
     const charName = owner || ctx.name2 || '主角';
     // 所属コミュニティ(任务书-M5 §4):论坛提示词离不开它——底稿说的是「TA 每天打交道最多的
     // 那个共同体」,没有它连身份都立不住,失败就整批不生成,不硬凑一个「未知所属」。
-    const community = await ensureCommunity(ctx, store, { worldKey, profileId, customApi, owner: charName, language, excludeTags, world });
+    const community = await ensureForumCommunity(ctx, store, { worldKey, profileId, customApi, owner: charName, language, excludeTags, world });
     if (!community) return { ok: false, error: 'community_failed' };
     world.community = community; // 首次生成时是刚写入的新条目,folded world 还没见过它,手动同步一次
     // 同 messenger 的点名警示,换成论坛语境的措辞(住民注册发言而非通讯录出现)。
@@ -2175,7 +2227,7 @@ async function runForumUraMainGeneration(ctx, store, { worldKey, floorWindow, pr
     const charName = owner || ctx.name2 || '主角';
     // 裏サイト同样离不开所属(它是「组织外面立起来的匿名场所」,组织是谁必须先立住);
     // 与表板共用同一次推断——ensureCommunity 内部按 world 是否已有 community 缓存,不会重推两遍。
-    const community = await ensureCommunity(ctx, store, { worldKey, profileId, customApi, owner: charName, language, excludeTags, world });
+    const community = await ensureForumCommunity(ctx, store, { worldKey, profileId, customApi, owner: charName, language, excludeTags, world });
     if (!community) return { ok: false, error: 'community_failed' };
     world.community = community; // 首次生成时是刚写入的新条目,folded world 还没见过它,手动同步一次
     // caution 照论坛表板版措辞——裏也不许把叙事另一方错当住民注册、更不许暗示尚未成立的关系。
@@ -2291,6 +2343,7 @@ async function runForumThreadContinue(ctx, store, { worldKey, threadId, floorWin
     const world = foldWorld(await store.getEntriesForWorld(worldKey));
     const thread = world.forumThreads.get(threadId);
     if (!thread?.title) return { ok: false, error: 'no_thread' };
+    world.community = await peekForumCommunity(store, worldKey, world); // 设了论坛场景就认场景的所属
     // M12:裏サイト的帖子走另一条 lane——没有固定住民,主人发出也只是又一个名無し,不查也
     // 不建 ownerResident(见下方 ownerRes/draft 发出两处的分道)。
     const isUra = thread.side === 'ura';

@@ -136,7 +136,7 @@ function renderNowPlayingHtml(nowPlaying, theme) {
     </div>`;
 }
 
-function renderSettingsHtml(s, profileLabel, owner, busy) {
+function renderSettingsHtml(s, profileLabel, owner, busy, forumScene = '', autoCommunity = '', capiModels = { loading: false, list: [], error: '' }) {
     return `
         <div class="or-header"><button class="or-back-btn" data-action="back">${ICON_BACK}</button><span class="or-header-title">设置</span></div>
         <div class="or-list">
@@ -215,8 +215,24 @@ function renderSettingsHtml(s, profileLabel, owner, busy) {
             <div class="or-field"><label>API Key</label><input type="password" data-capi="apiKey" value="${escapeHtml(s.customApi.apiKey)}"></div>
             <div class="or-field"><label>模型名</label><input type="text" data-capi="model" value="${escapeHtml(s.customApi.model)}" placeholder="例:gemini-2.5-flash" spellcheck="false"></div>
             <div class="or-row with-note">
+                <button class="or-row-main" data-action="capi-fetch-models" ${capiModels.loading ? 'disabled' : ''}><span class="or-row-label">${capiModels.loading ? '拉取中…' : '拉取模型列表'}</span></button>
+                <div class="or-row-note">${capiModels.error ? `拉取失败:${escapeHtml(capiModels.error)}。也可以直接手填模型名。` : (capiModels.list.length ? `共 ${capiModels.list.length} 个,点一下就填进去。` : '按上面的 Base URL 与 Key 向服务商要模型清单,点选即可;拉不到时照旧手填。')}</div>
+            </div>
+            ${capiModels.list.length ? `<div class="or-model-list">${capiModels.list.map(m => `
+                <button class="or-option" data-action="capi-pick-model" data-model="${escapeHtml(m)}">
+                    <span>${escapeHtml(m)}</span>
+                    ${m === s.customApi.model ? ICON_CHECK : ''}
+                </button>`).join('')}</div>` : ''}
+            <div class="or-row with-note">
                 <button class="or-row-main" data-action="generate-contacts" ${busy ? 'disabled' : ''}><span class="or-row-label">${busy ? '登记中…' : '生成更多联系人和群组'}</span></button>
                 <div class="or-row-note">从人物设定与正文里再挖一批主人已经认识的人与群,只登记人、不写消息;也会给已有的群补成员。TA 的人际网挖尽时会提示没有。</div>
+            </div>
+            <div class="or-section-title">论坛场景</div>
+            <div class="or-row-note">论坛以什么地方为主。留空=按主人的所属自动推断${autoCommunity ? `(现在是「${escapeHtml(autoCommunity)}」)` : ''};填了就按你写的来,比如学校、社团、兴趣论坛。只影响论坛,门户与浏览器不变。</div>
+            <div class="or-field"><label>场景(留空=自动)</label><input type="text" data-forum-scene value="${escapeHtml(forumScene)}" placeholder="例:江古田高中 / 侦探交流论坛" spellcheck="false"></div>
+            <div class="or-row with-note">
+                <button class="or-row-main or-danger" data-action="forum-scene-apply"><span class="or-row-label">按这个场景重建论坛</span></button>
+                <div class="or-row-note">清空表板与${chrome('forum.uraSite')}的帖子、回复、草稿、名册与板块,下次进论坛「刷新」按新场景重新建板。不可恢复。</div>
             </div>
             <div class="or-row with-note">
                 <button class="or-row-main or-danger" data-action="forum-restart"><span class="or-row-label">论坛重来</span></button>
@@ -263,6 +279,8 @@ export function createShell(ctx, onExternalChange) {
     let suppressNextClick = false; // 线程行长按触发删除后,抑制紧随的 click(否则会顺手打开线程)
     const baselineDone = new Set(); // 已打过 seen 基线的 worldKey(纯内存去重,免得每次 render 都读一次 meta)
     let justUpdated = null;         // 刚生成完那一批 threadId;render 用掉一次就清,动效只播一回
+    let forumSceneDraft = null;     // 设置页「论坛场景」填了还没应用的字(别的按钮触发重绘时不丢)
+    let capiModels = { loading: false, list: [], error: '' }; // 独立 API 拉到的模型清单(只在内存,不存设置)
     let pendingScroll = null;       // 'anchor' = 下次渲染后跳到新内容分界线;null = 原地保持滚动位置
 
     function settings() {
@@ -426,6 +444,7 @@ export function createShell(ctx, onExternalChange) {
         // (导航状态本身是跨开合保留的,见 open();只有换世界才清。)
         if (worldKey !== lastWorldKey) {
             lastWorldKey = worldKey;
+            forumSceneDraft = null; // 场景是按世界存的,换了手机草稿作废
             if (navStack.length > 1) navStack = [{ type: 'grid' }];
         }
         const top = navStack[navStack.length - 1];
@@ -487,7 +506,7 @@ export function createShell(ctx, onExternalChange) {
             markSeenAfter = [seenKey, latestTsOfThread(thread)];
         } else if (top.type === 'forum-list') {
             screenEl.innerHTML = renderForumListHtml({
-                world, busy: busy.forum, side: top.side || 'omote', page: top.page || 1, seen, justUpdated,
+                world: await forumWorldView(worldKey, world), busy: busy.forum, side: top.side || 'omote', page: top.page || 1, seen, justUpdated,
                 threadBatch: settings().forumThreadBatch,
             });
         } else if (top.type === 'forum-thread') {
@@ -499,7 +518,7 @@ export function createShell(ctx, onExternalChange) {
                 pendingScroll = { fallback: top.seenAt > 0 ? 'bottom' : 'top', key };
             }
             screenEl.innerHTML = renderForumThreadHtml({
-                thread, world, busy: busy.forum, forumNow: world.worldClock,
+                thread, world: await forumWorldView(worldKey, world), busy: busy.forum, forumNow: world.worldClock,
                 seenAt: top.seenAt, starred, replyBatch: settings().forumReplyBatch,
                 exportMode: !!top.exportMode, exportSel: top.exportSel ?? null, exportBusy: exportBusy.forum,
             });
@@ -617,7 +636,8 @@ export function createShell(ctx, onExternalChange) {
         } else if (top.type === 'settings') {
             const s = settings();
             const owner = await store.getOwner(currentWorldKey());
-            screenEl.innerHTML = renderSettingsHtml(s, profileLabel(s.profileId), owner, busy.messenger);
+            const forumScene = await store.getForumScene(currentWorldKey());
+            screenEl.innerHTML = renderSettingsHtml(s, profileLabel(s.profileId), owner, busy.messenger, forumSceneDraft ?? (forumScene?.scene || ''), world.community?.name || '', capiModels);
         } else if (top.type === 'settings-profile-picker') {
             const s = settings();
             const profiles = ctx.ConnectionManagerRequestService?.getSupportedProfiles?.() || [];
@@ -1107,12 +1127,19 @@ export function createShell(ctx, onExternalChange) {
         render();
     }
 
+    // 论坛场景(设置里指定)只管论坛:论坛两屏与论坛导出看到的「所属」换成场景的那份,其余 app 不动。
+    async function forumWorldView(worldKey, world) {
+        const fs = await store.getForumScene(worldKey);
+        return fs ? { ...world, community: fs.community || null } : world;
+    }
+
     async function doForumExportRun() {
         const top = navStack[navStack.length - 1];
         if (top.type !== 'forum-thread' || !top.exportMode || exportBusy.forum) return;
         exportBusy.forum = true; // 上锁抢在第一个 await 之前
         try {
-            const { world } = await currentWorld();
+            const { world: rawWorld } = await currentWorld();
+            const world = await forumWorldView(currentWorldKey(), rawWorld);
             const thread = world.forumThreads.get(top.threadId);
             if (!thread) return;
             await render();
@@ -1616,6 +1643,52 @@ export function createShell(ctx, onExternalChange) {
         onExternalChange?.();
     }
 
+    // 论坛场景:填空存 meta(按世界),清空论坛帖子/名册/板块,下次刷新按新场景推所属、重新建板。
+    async function doForumSceneApply() {
+        const worldKey = currentWorldKey();
+        if (!worldKey) return;
+        if (busy.forum) { showToast('论坛正在生成,等它结束再改场景'); return; }
+        const input = screenEl.querySelector('input[data-forum-scene]');
+        const scene = (input?.value || '').trim();
+        const label = scene ? `「${scene}」` : '自动推断的所属';
+        const confirmed = await ctx.callGenericPopup(
+            `论坛改按${label}重建?会清空表板与${chrome('forum.uraSite')}的帖子、回复、草稿、名册与板块,不可恢复。确定吗?`,
+            ctx.POPUP_TYPE.CONFIRM,
+        );
+        if (confirmed !== ctx.POPUP_RESULT.AFFIRMATIVE) return;
+        await store.setForumScene(worldKey, scene);
+        forumSceneDraft = null;
+        await store.deleteForumThreadsOnly(worldKey);
+        for (let i = 0; i < navStack.length; i++) {
+            if (navStack[i].type === 'forum-thread') navStack[i] = { type: 'forum-list', side: 'omote', page: 1 };
+        }
+        showToast(`论坛已清空,进论坛点「刷新」按${label}重新建板`);
+        await render();
+        onExternalChange?.();
+    }
+
+    async function doFetchCapiModels() {
+        if (capiModels.loading) return;
+        capiModels = { loading: true, list: capiModels.list, error: '' };
+        await render();
+        try {
+            const list = await generator.fetchCustomApiModels(settings().customApi);
+            capiModels = { loading: false, list, error: list.length ? '' : '服务商没有返回任何模型' };
+        } catch (err) {
+            // 浏览器跨域拦截时 fetch 只给 TypeError,说人话
+            const msg = err instanceof TypeError ? '连不上(可能是网络或跨域限制)' : (err?.message || String(err));
+            capiModels = { loading: false, list: [], error: msg };
+        }
+        await render();
+    }
+
+    function doPickCapiModel(model) {
+        const s = settings();
+        s.customApi.model = model;
+        saveSettings();
+        render();
+    }
+
     function doPickProfile(profileId) {
         const s = settings();
         s.profileId = profileId || null;
@@ -1687,6 +1760,9 @@ export function createShell(ctx, onExternalChange) {
             case 'confirm-setup': doConfirmSetup(); break;
             case 'generate-contacts': doGenerateContacts(); break;
             case 'forum-restart': doForumRestart(); break;
+            case 'forum-scene-apply': doForumSceneApply(); break;
+            case 'capi-fetch-models': doFetchCapiModels(); break;
+            case 'capi-pick-model': doPickCapiModel(el.dataset.model); break;
             case 'wipe-phone': doWipePhone(); break;
             case 'open-profile-picker': navPush({ type: 'settings-profile-picker' }); break;
             case 'pick-profile': doPickProfile(el.dataset.profileId); break;
@@ -1699,6 +1775,9 @@ export function createShell(ctx, onExternalChange) {
         const s = settings();
         if (input.matches?.('input[data-capi]')) {
             s.customApi[input.dataset.capi] = input.value.trim();
+        } else if (input.matches?.('input[data-forum-scene]')) {
+            forumSceneDraft = input.value; // 只记草稿,按「重建」才落库
+            return;
         } else if (input.matches?.('input[data-field-text]')) {
             s[input.dataset.fieldText] = input.value.trim();
         } else return;

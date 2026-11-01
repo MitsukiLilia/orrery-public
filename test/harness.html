@@ -829,6 +829,9 @@
         }
         if (systemPrompt.includes('判断主角')) {
             const body = buildFixtureO();
+            // 论坛场景:用户指定了场景时,模拟模型照抄场景名(断言「场景只进论坛」用)
+            const sceneM = (userContent || '').match(/【用户指定的论坛场景】(.+)/);
+            if (sceneM) Object.assign(body, { name: sceneM[1].trim(), kind: 'school', desc: '用户指定的论坛场景', titles: '先輩、後輩' });
             return fence ? wrapFenced(body) : JSON.stringify(body);
         }
         // M7a:PROMPT_F 已从「匿名论坛」改写成「内部掲示板」(v0.15 起),这里的匹配词早就该跟着换了

@@ -128,6 +128,7 @@ export async function forkWorld(fromKey, toKey, tip) {
     if (meta.seen && typeof meta.seen === 'object') newMeta.seen = { ...meta.seen };
     if (meta.seenBaseline) newMeta.seenBaseline = meta.seenBaseline;
     if (meta.starred && typeof meta.starred === 'object') newMeta.starred = { ...meta.starred };
+    if (meta.forumScene?.scene) newMeta.forumScene = { ...meta.forumScene }; // 用户亲手填的设置,同主人一样跟着分支走
     await writeMeta(newMeta);
     return { copied: entries.length, skipped: false };
 }
@@ -541,6 +542,37 @@ export async function setOwner(worldKey, name) {
     if (meta.owner) return; // 不可更改——静默拒绝二次设定
     meta.owner = String(name).trim();
     await writeMeta(meta);
+}
+
+/**
+ * 论坛场景(用户在设置里亲手指定):{ scene, community } 或 null。只管论坛表裏两板——门户/浏览器
+ * 继续用自动推断的所属。放 meta 不放账本:它是设置不是余波,回滚/反悔都不该把它带走(同主人)。
+ * community 是按 scene 推断出的所属对象,第一次论坛刷新时补上;scene 改了就清空等重推。
+ */
+export async function getForumScene(worldKey) {
+    if (!worldKey) return null;
+    const fs = (await readMeta(worldKey)).forumScene;
+    return fs?.scene ? fs : null;
+}
+
+/** 设定/清除论坛场景(空串=回到自动推断)。旧的推断结果一并作废。 */
+export async function setForumScene(worldKey, scene) {
+    if (!worldKey) return;
+    const meta = await readMeta(worldKey);
+    const text = String(scene || '').trim();
+    if (text) meta.forumScene = { scene: text, community: null };
+    else delete meta.forumScene;
+    await writeMeta(meta);
+}
+
+/** 落下按场景推断出的所属;场景在推断期间被改掉了就不落(推的是旧场景)。 */
+export async function setForumSceneCommunity(worldKey, scene, community) {
+    if (!worldKey) return false;
+    const meta = await readMeta(worldKey);
+    if (meta.forumScene?.scene !== scene) return false;
+    meta.forumScene = { scene, community };
+    await writeMeta(meta);
+    return true;
 }
 
 async function writeMeta(meta) {
